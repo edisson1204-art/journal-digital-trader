@@ -6,7 +6,7 @@ import { useState } from "react";
 const STRATEGIES: any[] = [];
 
 export default function StrategiesPage() {
-  const [selected, setSelected] = useState<number | null>(null); if (STRATEGIES.length === 0) return <div className="p-10 text-center text-text-muted">Aún no hay estrategias registradas. Empieza a operar para ver tus estadísticas.</div>;
+  const [selected, setSelected] = useState<number | null>(null); if (STRATEGIES.length === 0) return <AppShell title="Libro de Estrategias" subtitle="Gestiona y evalua cada estrategia de trading"><div className="p-10 text-center text-text-muted mt-20">Aun no hay estrategias registradas. Empieza a operar para ver tus estadisticas.</div></AppShell>;
   const sel = STRATEGIES.find(s => s.id === selected);
 
   const gradeColor = (g: string) =>
@@ -16,7 +16,7 @@ export default function StrategiesPage() {
     "text-yellow-warn bg-yellow-warn/10 border-yellow-warn/20";
 
   return (
-    <AppShell title="Libro de Estrategias" subtitle="Gestiona y evalÃºa cada estrategia de trading"> {STRATEGIES.length === 0 ? <div className="p-10 text-center text-text-muted mt-20">Aún no hay estrategias registradas. Empieza a operar para ver tus estadísticas.</div> : <div className="w-full">
+    <AppShell title="Libro de Estrategias" subtitle="Gestiona y evalÃºa cada estrategia de trading"> {STRATEGIES.length === 0 ? <div className="p-10 text-center text-text-muted mt-20">Aun no hay estrategias registradas. Empieza a operar para ver tus estadisticas.</div> : <div className="w-full">
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 w-full max-w-[1800px] mx-auto">
 
         {/* â”€â”€ Strategy list â”€â”€ */}
@@ -125,6 +125,9 @@ export default function StrategiesPage() {
     </div>}</AppShell>
   );
 }
+
+
+
 
 
 

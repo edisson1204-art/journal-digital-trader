@@ -53,7 +53,7 @@ function RuleRow({ label, current, limit, invert = false, format = "dollar", war
 }
 
 export default function AccountsPage() {
-  const [selected, setSelected] = useState(ACCOUNTS[0]?.id); if (ACCOUNTS.length === 0) return <div className="p-10 text-center text-text-muted">Aún no hay cuentas registradas. Empieza a operar para ver tus estadísticas.</div>;
+  const [selected, setSelected] = useState(ACCOUNTS[0]?.id); if (ACCOUNTS.length === 0) return <AppShell title="Cuentas de Trading" subtitle="Reglas, limites y estado de cada cuenta"><div className="p-10 text-center text-text-muted mt-20">Aun no hay cuentas registradas. Empieza a operar para ver tus estadisticas.</div></AppShell>;
   const account = ACCOUNTS.find(a => a.id === selected)!;
 
   const remainingProfit = account.profit_target > 0 ? account.profit_target - account.current_profit : null;
@@ -62,7 +62,7 @@ export default function AccountsPage() {
   const bestDayOk = consistencyLimit ? account.best_day_pnl <= consistencyLimit : true;
 
   return (
-    <AppShell title="Cuentas de Trading" subtitle="Reglas, lÃ­mites y estado de cada cuenta"> {ACCOUNTS.length === 0 ? <div className="p-10 text-center text-text-muted mt-20">Aún no hay cuentas registradas. Empieza a operar para ver tus estadísticas.</div> : <div className="w-full">
+    <AppShell title="Cuentas de Trading" subtitle="Reglas, lÃ­mites y estado de cada cuenta"> {ACCOUNTS.length === 0 ? <div className="p-10 text-center text-text-muted mt-20">Aun no hay cuentas registradas. Empieza a operar para ver tus estadisticas.</div> : <div className="w-full">
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
 
         {/* Account selector */}
@@ -202,6 +202,9 @@ export default function AccountsPage() {
     </div>}</AppShell>
   );
 }
+
+
+
 
 
 

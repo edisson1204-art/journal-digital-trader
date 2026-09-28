@@ -11,11 +11,11 @@ const EMOTIONS: any[] = [];
 const totalEmotions = EMOTIONS.reduce((s, e) => s + e.count, 0);
 
 export default function PsychologyPage() {
-  const moodColors = ["", "bg-red-loss","bg-red-loss/60","bg-yellow-warn","bg-green-primary/70","bg-green-primary"]; const moodLabels = ["","Poor","Low","Neutral","Good","Excellent"]; if (MOOD_DATA.length === 0 || EMOTIONS.length === 0) return <div className="p-10 text-center text-text-muted">No hay datos psicolÃ³gicos suficientes. Registra mÃ¡s trades.</div>;
+  const moodColors = ["", "bg-red-loss","bg-red-loss/60","bg-yellow-warn","bg-green-primary/70","bg-green-primary"]; const moodLabels = ["","Poor","Low","Neutral","Good","Excellent"]; if (MOOD_DATA.length === 0 || EMOTIONS.length === 0) return <AppShell title="Psychology Journal" subtitle="Understand your behavior - improve your discipline"><div className="p-10 text-center text-text-muted mt-20">Aun no hay datos de psicologia suficientes. Registra mas trades.</div></AppShell>;
 
 
   return (
-    <AppShell title="Psychology Journal" subtitle="Understand your behavior Ã¢â‚¬â€ improve your discipline"> {(MOOD_DATA.length === 0 || EMOTIONS.length === 0) ? <div className="p-10 text-center text-text-muted mt-20">Aún no hay datos psicológicos suficientes. Registra más trades.</div> : <div className="w-full">
+    <AppShell title="Psychology Journal" subtitle="Understand your behavior - improve your discipline"> {(MOOD_DATA.length === 0 || EMOTIONS.length === 0) ? <div className="p-10 text-center text-text-muted mt-20">Aun no hay datos de psicologia suficientes. Registra mas trades.</div> : <div className="w-full">
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
 
         {/* Header KPIs */}
@@ -119,6 +119,10 @@ export default function PsychologyPage() {
     </div>}</AppShell>
   );
 }
+
+
+
+
 
 
 
