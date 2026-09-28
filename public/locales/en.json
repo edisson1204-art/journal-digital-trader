@@ -5,7 +5,7 @@
     "pricing": "Pricing",
     "resources": "Resources",
     "login": "Login",
-    "cta": "Start for $9/month"
+    "cta": "Start for $14.99/month"
   },
   "hero": {
     "eyebrow": "DISCIPLINE • DATA • BETTER DECISIONS",
@@ -16,7 +16,7 @@
     "feature2": "Risk Calculators",
     "feature3": "Strategy Simulator",
     "feature4": "AI Mentor 24/7",
-    "cta_primary": "Start for $9/month",
+    "cta_primary": "Start for $14.99/month",
     "cta_secondary": "See how it works",
     "disclaimer": "Cancel anytime | English & Español",
     "dashboard_greeting": "Good morning, Trader!",
@@ -64,8 +64,8 @@
   },
   "pricing": {
     "badge": "Most Popular",
-    "title": "Trading Intelligence PRO",
-    "price": "$9",
+    "title": "Journal Digital Trader Invest PRO",
+    "price": "$14.99",
     "period": "/month",
     "feature1": "Trading Journal",
     "feature2": "Advanced Analytics",
@@ -77,7 +77,7 @@
     "feature8": "Multi-Market Support",
     "feature9": "English & Español",
     "feature10": "Cancel anytime",
-    "cta": "Start for $9/month",
+    "cta": "Start for $14.99/month",
     "billing_note": "Billed monthly. Cancel anytime."
   },
   "platform": {
@@ -124,7 +124,7 @@
     "risk": "Risk Disclosure",
     "refund": "Refund Policy",
     "contact": "Contact",
-    "copyright": "© 2025 Trading Intelligence. All rights reserved."
+    "copyright": "© 2026 Journal Digital Trader Invest. All rights reserved."
   },
   "metrics": {
     "total_pnl": "Total P&L",

@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { TradeRecord, TradeStats, computeStats } from "@/lib/tradeTypes";
-import { DEMO_TRADES } from "@/lib/demoTrades";
 
 export interface TradeStore {
   // Estado
@@ -30,9 +29,9 @@ export interface TradeStore {
 export const useTradeStore = create<TradeStore>()(
   persist(
     (set, get) => ({
-      // Iniciar con la data demo para que la app no se vea vacía en el primer render
-      trades: DEMO_TRADES,
-      stats: computeStats(DEMO_TRADES),
+      // App starts completely clean for new users
+      trades: [],
+      stats: computeStats([]),
       isHydrated: false,
       
       settings: {

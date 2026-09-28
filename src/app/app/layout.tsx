@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dashboard — Trading Intelligence",
+  title: "Dashboard — Journal Digital Trader Invest",
   description: "Your trading dashboard — journal, analytics, risk tools and AI mentor.",
   robots: { index: false, follow: false },
 };

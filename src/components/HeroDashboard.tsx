@@ -112,7 +112,7 @@ export function HeroDashboard() {
   return (
     <div
       className="w-full overflow-hidden rounded-[18px] border border-border-card bg-bg-card shadow-card select-none"
-      aria-label="Trading Intelligence dashboard preview (demo data)"
+      aria-label="Journal Digital Trader Invest dashboard preview (demo data)"
       aria-hidden="true"
     >
       {/* ── Window chrome ── */}
@@ -132,7 +132,7 @@ export function HeroDashboard() {
             <rect x="25" y="14" width="5" height="14.5" rx="1.5" fill="#20E58D" />
             <rect x="6" y="28.5" width="14" height="3" rx="1.5" fill="#20E58D" />
           </svg>
-          <span className="text-[9px] font-bold tracking-[0.14em] text-text-primary uppercase">Trading Intelligence</span>
+          <span className="text-[9px] font-bold tracking-[0.14em] text-text-primary uppercase">Journal Digital Trader Invest</span>
         </div>
         {/* Avatar */}
         <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-blue-accent to-violet-accent text-[7px] font-bold text-white">

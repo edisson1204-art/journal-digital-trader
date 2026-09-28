@@ -93,7 +93,7 @@ function computePsychologyProfile(trades: TradeRecord[]) {
 
 export default function AIMentorPage() {
   const trades = useTradeStore(s => s.trades);
-  const { openAiKey, setOpenAiKey } = useSettingsStore();
+  const { openAiKey, setOpenAiKey, language } = useSettingsStore();
   const [apiKeyInput, setApiKeyInput] = useState(openAiKey);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -108,14 +108,20 @@ export default function AIMentorPage() {
     setMounted(true);
     if (!openAiKey) setIsConfigOpen(true);
   }, [openAiKey]);
-
+  // INITIAL AI MESSAGE AND PROMPT LOGIC
   const { messages, input, setInput, handleInputChange, append, isLoading, error } = useChat({
     api: "/api/chat",
     headers: {
       "Authorization": `Bearer ${openAiKey}`
     },
     initialMessages: [
-      { id: "1", role: "assistant", content: "¡Hola! Soy tu Mentor Institucional IA. Conozco a la perfección tu psicología y tus estadísticas de trading. Envíame una captura o hazme una consulta, y te guiaré con precisión quirúrgica." }
+      { 
+        id: "1", 
+        role: "assistant", 
+        content: language === 'en' 
+          ? "Hello! I am your Institutional AI Mentor. I know your psychology and trading statistics perfectly. Send me a chart screenshot or ask me a question, and I will guide you with surgical precision." 
+          : "¡Hola! Soy tu Mentor Institucional IA. Conozco a la perfección tu psicología y tus estadísticas de trading. Envíame una captura o hazme una consulta, y te guiaré con precisión quirúrgica." 
+      }
     ]
   });
 
@@ -148,7 +154,13 @@ export default function AIMentorPage() {
 
     const currentImage = selectedImage;
     setSelectedImage(null); 
-    const messageContent = input || "Evalúa esta operativa y dime mis errores basándote en conceptos institucionales.";
+    
+    // Inject the language context into the auto-prompt
+    const fallbackPrompt = language === 'en' 
+      ? "Evaluate this trade execution and tell me my mistakes based on institutional concepts. RESPOND IN ENGLISH." 
+      : "Evalúa esta operativa y dime mis errores basándote en conceptos institucionales. RESPONDE EN ESPAÑOL.";
+      
+    const messageContent = input || fallbackPrompt;
     setInput('');
 
     await append(

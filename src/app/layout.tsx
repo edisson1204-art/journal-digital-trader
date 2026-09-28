@@ -10,27 +10,27 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Trading Intelligence — Trade with data. Improve with evidence.",
+  title: "Journal Digital Trader Invest — Trade with data. Improve with evidence.",
   description:
-    "The all-in-one trading journal, analytics, risk tools and AI mentor designed to help you become a more consistent trader. Start for $9/month.",
+    "The all-in-one trading journal, analytics, risk tools and AI mentor designed to help you become a more consistent trader. Start for $14.99/mes.",
   keywords: [
     "trading journal", "trade analytics", "risk calculator", "AI trading mentor",
     "funded accounts", "forex journal", "futures journal", "trading strategy",
     "diario de trading", "analítica de trading"
   ],
   openGraph: {
-    title: "Trading Intelligence — Trade with data. Improve with evidence.",
+    title: "Journal Digital Trader Invest — Trade with data. Improve with evidence.",
     description:
-      "The all-in-one trading journal, analytics, risk tools and AI mentor. Start for $9/month.",
+      "The all-in-one trading journal, analytics, risk tools and AI mentor. Start for $14.99/mes.",
     type: "website",
     locale: "en_US",
     alternateLocale: "es_ES",
-    siteName: "Trading Intelligence",
+    siteName: "Journal Digital Trader Invest",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Trading Intelligence",
-    description: "Trade with data. Improve with evidence. Journal + Analytics + Risk + AI. $9/month.",
+    title: "Journal Digital Trader Invest",
+    description: "Trade with data. Improve with evidence. Journal + Analytics + Risk + AI. $14.99/mes.",
   },
   robots: {
     index: true,

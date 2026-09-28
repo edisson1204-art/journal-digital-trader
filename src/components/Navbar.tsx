@@ -28,7 +28,7 @@ export function Navbar() {
         aria-label="Main navigation"
       >
         {/* Logo */}
-        <Link href="/" aria-label="Trading Intelligence home">
+        <Link href="/" aria-label="Journal Digital Trader Invest home">
           <Logo size="sm" />
         </Link>
 

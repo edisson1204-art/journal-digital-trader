@@ -5,7 +5,7 @@ function LegalLayout({ title, children }: { title: string; children: React.React
     <div className="min-h-screen bg-bg-main px-6 py-20">
       <div className="max-w-3xl mx-auto">
         <Link href="/" className="text-xs text-green-primary hover:underline mb-8 block">
-          ← Back to Trading Intelligence
+          ← Back to Journal Digital Trader Invest
         </Link>
         <h1 className="text-3xl font-bold text-text-primary mb-2">{title}</h1>
         <p className="text-sm text-text-muted mb-8">Last updated: September 2025</p>
@@ -21,7 +21,7 @@ export default function RiskDisclosurePage() {
   return (
     <LegalLayout title="Risk Disclosure">
       <p className="text-yellow-warn font-semibold">
-        ⚠️ IMPORTANT: Please read this Risk Disclosure carefully before using Trading Intelligence.
+        ⚠️ IMPORTANT: Please read this Risk Disclosure carefully before using Journal Digital Trader Invest.
       </p>
       <h2 className="text-text-primary font-semibold text-base mt-6">Trading Involves Risk</h2>
       <p>
@@ -29,9 +29,9 @@ export default function RiskDisclosurePage() {
         and other instruments involves substantial risk of loss. You can lose more than your initial investment.
         Past performance is not indicative of future results.
       </p>
-      <h2 className="text-text-primary font-semibold text-base mt-6">Trading Intelligence Is Not a Broker</h2>
+      <h2 className="text-text-primary font-semibold text-base mt-6">Journal Digital Trader Invest Is Not a Broker</h2>
       <p>
-        Trading Intelligence is a trading journal, analytics, and educational software platform.
+        Journal Digital Trader Invest is a trading journal, analytics, and educational software platform.
         It does not execute trades, provide brokerage services, or manage your capital in any way.
       </p>
       <h2 className="text-text-primary font-semibold text-base mt-6">Demo Data</h2>

@@ -2,8 +2,8 @@ import { LegalShell, LegalSection } from "@/components/LegalShell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Refund Policy — Trading Intelligence",
-  description: "Refund and cancellation policy for Trading Intelligence subscriptions.",
+  title: "Refund Policy — Journal Digital Trader Invest",
+  description: "Refund and cancellation policy for Journal Digital Trader Invest subscriptions.",
 };
 
 export default function RefundPolicyPage() {
@@ -12,14 +12,14 @@ export default function RefundPolicyPage() {
 
       <LegalSection title="Overview">
         <p>
-          Trading Intelligence offers a monthly subscription at <strong className="text-green-primary">$9 USD/month</strong>.
+          Journal Digital Trader Invest offers a monthly subscription at <strong className="text-green-primary">$9 USD/month</strong>.
           We believe in being fair and transparent about our refund policy.
         </p>
       </LegalSection>
 
       <LegalSection title="1. Free Trial / First Month">
         <p>
-          If Trading Intelligence offers a promotional free trial period, charges will begin
+          If Journal Digital Trader Invest offers a promotional free trial period, charges will begin
           automatically after the trial ends. You may cancel before the trial period ends
           to avoid any charge.
         </p>

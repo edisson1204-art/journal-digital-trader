@@ -2,8 +2,8 @@ import { LegalShell, LegalSection } from "@/components/LegalShell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Trading Intelligence",
-  description: "How Trading Intelligence collects, uses, and protects your data.",
+  title: "Privacy Policy — Journal Digital Trader Invest",
+  description: "How Journal Digital Trader Invest collects, uses, and protects your data.",
 };
 
 export default function PrivacyPage() {
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="9. Children's Privacy">
         <p>
-          Trading Intelligence is not directed at persons under the age of 18.
+          Journal Digital Trader Invest is not directed at persons under the age of 18.
           We do not knowingly collect data from minors.
         </p>
       </LegalSection>

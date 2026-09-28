@@ -39,7 +39,7 @@ export function MobileAppPreview() {
   return (
     <div
       className="relative rounded-[28px] border-2 border-border-card bg-bg-main shadow-card overflow-hidden select-none"
-      style={{ width: 160, boxShadow: "0 0 40px rgba(0,0,0,0.6), 0 0 0 1px #19374D" }}
+      style={{ width: 210, boxShadow: "0 0 40px rgba(0,0,0,0.6), 0 0 0 1px #19374D" }}
     >
       {/* Phone notch */}
       <div className="h-5 bg-bg-section flex items-center justify-center">
@@ -62,8 +62,8 @@ export function MobileAppPreview() {
             <rect x="3" y="11" width="6" height="1.5" rx="0.5" fill="#20E58D" />
           </svg>
           <div>
-            <p className="text-[7px] font-bold text-text-primary tracking-widest leading-none">TRADING</p>
-            <p className="text-[6px] font-medium text-green-primary tracking-widest leading-none">INTELLIGENCE</p>
+            <p className="text-[7px] font-bold text-text-primary tracking-widest leading-none">JOURNAL DIGITAL</p>
+            <p className="text-[6px] font-medium text-green-primary tracking-widest leading-none">TRADER INVEST</p>
           </div>
         </div>
         <div className="flex flex-col gap-0.5">

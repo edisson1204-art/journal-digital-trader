@@ -36,5 +36,26 @@ export const en = {
     viewAll: "View all",
     startTrading: "You don't have any trades yet. Click 'New Trade' to begin.",
     welcome: "Welcome to your Journal!"
+  },
+  reports: {
+    title: "Performance Audit",
+    subtitle: "Generation of quantitative reports and psychological dictates.",
+    generate: "Generate Report",
+    print: "Export PDF",
+    quantAudit: "Quantitative Audit",
+    psychoProfile: "Psychological Profile",
+    selectType: "Report Type"
+  },
+  simulator: {
+    title: "Monte Carlo Simulator",
+    subtitle: "Advanced statistical projection with error tolerance.",
+    journalMode: "Journal Mode",
+    journalDesc: "Use your live trades",
+    manualMode: "Manual Mode",
+    manualDesc: "Input parameters",
+    runSim: "Run 1000 Simulations",
+    results: "Simulation Results",
+    ruin: "Risk of Ruin",
+    profitable: "Profitable Sims"
   }
 };

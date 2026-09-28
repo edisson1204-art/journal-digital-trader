@@ -180,10 +180,14 @@ export default function JournalPage() {
             </div>
 
             {/* Add trade */}
-            <button onClick={() => setModal(true)}
-              className="flex items-center gap-2 rounded-btn bg-green-primary px-5 py-2.5 text-[13px] font-bold text-bg-main shadow-green-glow hover:bg-green-primary/90 transition-all focus:outline-none focus:ring-2 focus:ring-green-primary">
-              <Plus className="h-4 w-4" /> Register Trade
-            </button>
+            <div className="relative group">
+              {/* Aura dorada pulsante */}
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500 rounded-btn blur opacity-75 animate-pulse"></div>
+              <button onClick={() => setModal(true)} translate="no"
+                className="relative flex items-center gap-2 rounded-btn bg-green-primary px-5 py-2.5 text-[13px] font-bold text-bg-main border border-amber-300 hover:scale-105 transition-all">
+                <Plus className="h-4 w-4 text-bg-main" /> Añadir Trade
+              </button>
+            </div>
           </div>
         </div>
 

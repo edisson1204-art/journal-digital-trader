@@ -1,5 +1,5 @@
 /**
- * TRADING INTELLIGENCE — Demo Trade Dataset
+ * Journal Digital Trader Invest — Demo Trade Dataset
  * 105 trades deterministicos (seed 42) — 3 meses Jun-Sep 2025
  * Distribucion realista para traders de futuros US (NQ, ES, MNQ, MES, Gold)
  */

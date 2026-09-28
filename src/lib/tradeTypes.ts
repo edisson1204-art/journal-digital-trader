@@ -1,5 +1,5 @@
 /**
- * TRADING INTELLIGENCE — Core Trade Data Types
+ * Journal Digital Trader Invest — Core Trade Data Types
  * Comprehensive type definitions for the trade registration system
  */
 

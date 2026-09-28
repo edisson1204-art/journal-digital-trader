@@ -7,7 +7,7 @@ import {
   LayoutDashboard, BookOpen, BarChart2, Calendar,
   Shield, Cpu, Brain, Target, Wallet, HeartPulse,
   FileText, ChevronLeft, ChevronRight, Bell, Settings,
-  LogOut, Menu, X, Globe
+  LogOut, Menu, X, Globe, Lightbulb
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useTranslation } from "@/lib/i18n/useTranslation";
@@ -31,10 +31,79 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
   
   // Translation Hooks
   const { t, language } = useTranslation();
-  const { setLanguage } = useSettingsStore();
+  const { setLanguage, hasAcceptedLegal, setAcceptedLegal } = useSettingsStore();
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => setMounted(true), []);
+
+  const LegalDisclaimerModal = () => (
+    <div className="fixed inset-0 z-[99999] bg-bg-main/95 backdrop-blur-md flex items-center justify-center p-4 md:p-8 overflow-y-auto">
+      <div className="max-w-[700px] bg-[#0A1622] border-2 border-red-500/30 rounded-2xl shadow-[0_0_100px_rgba(239,68,68,0.15)] relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 to-amber-500"></div>
+        <div className="p-8 md:p-10">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <Shield className="h-8 w-8 text-red-500" />
+            </div>
+            <div>
+              <h1 className="text-[20px] font-black text-white tracking-tight leading-tight">
+                {language === 'en' ? 'SEVERE RISK WARNING & LEGAL DISCLAIMER' : 'ADVERTENCIA DE RIESGO SEVERO Y EXENCIÓN LEGAL'}
+              </h1>
+              <p className="text-[12px] text-red-400 font-bold tracking-widest uppercase mt-1">
+                {language === 'en' ? 'Terms of Service Agreement (ToS)' : 'Acuerdo de Términos de Servicio (ToS)'}
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-5 text-[13px] text-text-secondary leading-relaxed bg-black/20 p-6 rounded-xl border border-white/5 h-[300px] overflow-y-auto custom-scrollbar">
+            {language === 'en' ? (
+              <>
+                <p>
+                  <b className="text-white">1. NOT FINANCIAL ADVICE (NFA):</b> The Journal Digital Trader Invest application and its "AI Mentor" operate strictly as educational and statistical analysis tools. <b>We are not financial advisors registered with the SEC, FINRA, or any other government entity.</b> Any "directive", "diagnosis", or "prescription" issued by the Artificial Intelligence is generated based on pure mathematical regressions and does not constitute investment advice. You are solely responsible for your capital decisions.
+                </p>
+                <p>
+                  <b className="text-white">2. CFTC RULE 4.41 (SIMULATED RESULTS):</b> HYPOTHETICAL OR SIMULATED PERFORMANCE RESULTS (SUCH AS THOSE FROM THE SIMULATOR MODULE) HAVE CERTAIN INHERENT LIMITATIONS. UNLIKE AN ACTUAL PERFORMANCE RECORD, SIMULATED RESULTS DO NOT REPRESENT ACTUAL TRADING. ALSO, SINCE THE TRADES HAVE NOT ACTUALLY BEEN EXECUTED, THE RESULTS MAY HAVE UNDER- OR OVER-COMPENSATED FOR THE IMPACT, IF ANY, OF CERTAIN MARKET FACTORS, SUCH AS LACK OF LIQUIDITY.
+                </p>
+                <p>
+                  <b className="text-white">3. RISK OF RUIN:</b> Trading Futures, Forex, Cryptocurrencies, and Options involves a high level of capital risk and may not be suitable for all investors. The high degree of leverage can work against you as well as for you. <b>You could lose some or all of your initial capital.</b>
+                </p>
+                <p>
+                  <b className="text-white">4. INDEMNIFICATION AGREEMENT:</b> By clicking "Accept", you explicitly waive any right to sue, file legal complaints, or hold the developers, the application, or the AI responsible for any direct or indirect financial loss suffered in your brokerage account.
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  <b className="text-white">1. NO ES ASESORÍA FINANCIERA (NFA):</b> La aplicación Journal Digital Trader Invest y su "Mentor IA" operan estrictamente como herramientas algorítmicas de educación y análisis estadístico. <b>No somos asesores financieros registrados en la SEC, FINRA ni en ninguna otra entidad gubernamental.</b> Cualquier "directriz", "diagnóstico" o "prescripción" emitida por la Inteligencia Artificial se genera basándose en regresiones matemáticas puras y no constituye una recomendación de inversión. Usted es el único responsable de sus decisiones de capital.
+                </p>
+                <p>
+                  <b className="text-white">2. CFTC RULE 4.41 (RESULTADOS SIMULADOS):</b> LOS RESULTADOS DE RENDIMIENTO SIMULADOS, HIPOTÉTICOS O DE BACKTESTING (COMO LOS DEL MÓDULO SIMULADOR) TIENEN LIMITACIONES INHERENTES. A DIFERENCIA DE UN REGISTRO DE RENDIMIENTO REAL, LOS RESULTADOS SIMULADOS NO REPRESENTAN TRADING REAL. ADEMÁS, COMO LAS OPERACIONES NO SE HAN EJECUTADO REALMENTE, LOS RESULTADOS PUEDEN HABER SUB O SOBRECOMPENSADO EL IMPACTO, SI LO HAY, DE CIERTOS FACTORES DEL MERCADO, COMO LA FALTA DE LIQUIDEZ.
+                </p>
+                <p>
+                  <b className="text-white">3. RIESGO DE RUINA:</b> El trading de Futuros, Forex, Criptomonedas y Opciones conlleva un alto nivel de riesgo patrimonial y puede no ser adecuado para todos los inversores. El alto grado de apalancamiento puede trabajar tanto en su contra como a su favor. <b>Usted podría perder parte o la totalidad de su capital inicial.</b>
+                </p>
+                <p>
+                  <b className="text-white">4. ACUERDO DE INDEMNIZACIÓN:</b> Al hacer clic en "Aceptar", usted renuncia explícitamente a cualquier derecho de demandar, presentar quejas legales o responsabilizar a los desarrolladores, a la aplicación o a la IA por cualquier pérdida financiera directa o indirecta sufrida en su cuenta de corretaje.
+                </p>
+              </>
+            )}
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-[11px] text-text-muted italic flex-1">
+              {language === 'en' ? 'By electronically signing, you confirm that you have read and understand the total risk of the financial markets.' : 'Al firmar electrónicamente, confirmas que has leído y comprendes el riesgo total de los mercados financieros.'}
+            </p>
+            <button 
+              onClick={() => setAcceptedLegal(true)}
+              className="w-full md:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white text-[13px] font-black uppercase tracking-wider transition-all transform hover:scale-105 hover:shadow-[0_0_30px_rgba(239,68,68,0.4)] flex items-center justify-center gap-2"
+            >
+              {language === 'en' ? 'Sign & Accept Risks' : 'Firmar y Aceptar Riesgos'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const NAV = [
     { icon: LayoutDashboard, label: t("sidebar.dashboard"),   href: "/app"              },
@@ -48,6 +117,7 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
     { icon: Wallet,           label: "Accounts",               href: "/app/accounts"     }, // TODO: translate
     { icon: HeartPulse,       label: t("sidebar.psychology"),  href: "/app/psychology",  accent: "violet" },
     { icon: FileText,         label: t("sidebar.reports"),     href: "/app/reports"      },
+    { icon: Lightbulb,        label: "Guía de Inicio",         href: "/app/guide",       accent: "violet" },
   ];
 
 
@@ -103,7 +173,7 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold text-text-primary truncate">Trader Pro</p>
-              <p className="text-[10px] text-green-primary">Active · $9/mo</p>
+              <p className="text-[10px] text-green-primary">Active · $14.99/mo</p>
             </div>
           </div>
         )}
@@ -213,6 +283,8 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
           {children}
         </main>
       </div>
+
+      {!hasAcceptedLegal && <LegalDisclaimerModal />}
     </div>
   );
 }

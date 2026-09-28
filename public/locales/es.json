@@ -5,7 +5,7 @@
     "pricing": "Precio",
     "resources": "Recursos",
     "login": "Iniciar sesión",
-    "cta": "Comenzar por $9/mes"
+    "cta": "Comenzar por $14.99/mes"
   },
   "hero": {
     "eyebrow": "DISCIPLINA • DATOS • MEJORES DECISIONES",
@@ -16,7 +16,7 @@
     "feature2": "Calculadoras de Riesgo",
     "feature3": "Simulador de Estrategias",
     "feature4": "Mentor IA 24/7",
-    "cta_primary": "Comenzar por $9/mes",
+    "cta_primary": "Comenzar por $14.99/mes",
     "cta_secondary": "Ver cómo funciona",
     "disclaimer": "Cancela cuando quieras | English & Español",
     "dashboard_greeting": "¡Buenos días, Trader!",
@@ -64,8 +64,8 @@
   },
   "pricing": {
     "badge": "Más Popular",
-    "title": "Trading Intelligence PRO",
-    "price": "$9",
+    "title": "Journal Digital Trader Invest PRO",
+    "price": "$14.99",
     "period": "/mes",
     "feature1": "Diario de Trading",
     "feature2": "Analítica Avanzada",
@@ -77,7 +77,7 @@
     "feature8": "Múltiples Mercados",
     "feature9": "English & Español",
     "feature10": "Cancela cuando quieras",
-    "cta": "Comenzar por $9/mes",
+    "cta": "Comenzar por $14.99/mes",
     "billing_note": "Facturación mensual. Cancela cuando quieras."
   },
   "platform": {
@@ -124,7 +124,7 @@
     "risk": "Aviso de Riesgo",
     "refund": "Política de Reembolso",
     "contact": "Contacto",
-    "copyright": "© 2025 Trading Intelligence. Todos los derechos reservados."
+    "copyright": "© 2026 Journal Digital Trader Invest. Todos los derechos reservados."
   },
   "metrics": {
     "total_pnl": "P&L Total",

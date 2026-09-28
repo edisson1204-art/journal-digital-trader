@@ -2,8 +2,8 @@ import { LegalShell, LegalSection } from "@/components/LegalShell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Trading Intelligence",
-  description: "Terms of Service for Trading Intelligence subscription platform.",
+  title: "Terms of Service — Journal Digital Trader Invest",
+  description: "Terms of Service for Journal Digital Trader Invest subscription platform.",
 };
 
 export default function TermsPage() {
@@ -12,7 +12,7 @@ export default function TermsPage() {
 
       <LegalSection title="1. Acceptance of Terms">
         <p>
-          By accessing or using Trading Intelligence (&quot;the Platform&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;),
+          By accessing or using Journal Digital Trader Invest (&quot;the Platform&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;),
           you agree to be bound by these Terms of Service. If you do not agree to these terms,
           do not use the Platform.
         </p>
@@ -20,7 +20,7 @@ export default function TermsPage() {
 
       <LegalSection title="2. Description of Service">
         <p>
-          Trading Intelligence is a software-as-a-service (SaaS) platform providing:
+          Journal Digital Trader Invest is a software-as-a-service (SaaS) platform providing:
         </p>
         <ul className="list-disc list-inside space-y-1 mt-2 text-text-muted">
           <li>Trading journal and record-keeping tools</li>
@@ -32,7 +32,7 @@ export default function TermsPage() {
           <li>Funded account monitoring</li>
         </ul>
         <p className="mt-3">
-          Trading Intelligence is an educational and decision-support tool. It is{" "}
+          Journal Digital Trader Invest is an educational and decision-support tool. It is{" "}
           <strong className="text-text-primary">not a broker</strong>,{" "}
           <strong className="text-text-primary">not a financial advisor</strong>, and does not execute
           trades on your behalf.
@@ -47,7 +47,7 @@ export default function TermsPage() {
         </p>
         <p>
           Payments are processed securely via <strong className="text-text-primary">Stripe</strong>.
-          Trading Intelligence does not store your payment card data.
+          Journal Digital Trader Invest does not store your payment card data.
         </p>
       </LegalSection>
 
@@ -73,7 +73,7 @@ export default function TermsPage() {
       <LegalSection title="6. Intellectual Property">
         <p>
           All content, features, and functionality of the Platform — including software, text,
-          graphics, logos, and designs — are the exclusive property of Trading Intelligence and
+          graphics, logos, and designs — are the exclusive property of Journal Digital Trader Invest and
           are protected by copyright and other intellectual property laws.
         </p>
         <p>
@@ -95,7 +95,7 @@ export default function TermsPage() {
 
       <LegalSection title="8. Limitation of Liability">
         <p>
-          To the maximum extent permitted by law, Trading Intelligence shall not be liable for
+          To the maximum extent permitted by law, Journal Digital Trader Invest shall not be liable for
           any indirect, incidental, special, consequential, or punitive damages, including but not
           limited to loss of profits, trading losses, data loss, or goodwill, arising from your
           use of the Platform.

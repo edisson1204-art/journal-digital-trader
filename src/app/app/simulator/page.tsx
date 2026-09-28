@@ -2,6 +2,7 @@
 
 import { AppShell } from "@/components/AppShell";
 import { useState, useMemo } from "react";
+import { useSettingsStore } from "@/store/settingsStore";
 import {
   Play, RefreshCw, BarChart2, AlertTriangle,
   CheckCircle, Info, BookOpen, Pencil, ChevronDown, ChevronUp,
@@ -176,40 +177,72 @@ function runMonteCarlo(
 /* ══════════════════════════════════════════════════════════
    REPORT GENERATOR
 ══════════════════════════════════════════════════════════ */
-function generateReport(s: SimStats, winRate: number, numTrades: number, commission: number, avgWin: number, avgLoss: number, variability: number) {
+function generateReport(s: SimStats, winRate: number, numTrades: number, commission: number, avgWin: number, avgLoss: number, variability: number, lang: string) {
   const pros: string[] = [], cons: string[] = [], recs: string[] = [];
 
-  if (s.expectancyPerTrade > 0) pros.push(`Expectancy positiva de +$${s.expectancyPerTrade.toFixed(2)}/trade → ventaja estadística confirmada.`);
-  else cons.push(`Expectancy NEGATIVA de $${s.expectancyPerTrade.toFixed(2)}/trade → la estrategia pierde dinero a largo plazo.`);
+  if (lang === 'en') {
+    if (s.expectancyPerTrade > 0) pros.push(`Positive expectancy of +$${s.expectancyPerTrade.toFixed(2)}/trade → confirmed statistical edge.`);
+    else cons.push(`NEGATIVE expectancy of $${s.expectancyPerTrade.toFixed(2)}/trade → strategy loses money long-term.`);
 
-  if (s.rrRatio >= 2)  pros.push(`R:R excelente de 1:${s.rrRatio.toFixed(2)} → cada ganancia cubre múltiples pérdidas.`);
-  else if (s.rrRatio < 1) cons.push(`R:R desfavorable de 1:${s.rrRatio.toFixed(2)} → necesitas WR > ${Math.round(100/(1+s.rrRatio))}% para sobrevivir.`);
+    if (s.rrRatio >= 2)  pros.push(`Excellent R:R of 1:${s.rrRatio.toFixed(2)} → each win covers multiple losses.`);
+    else if (s.rrRatio < 1) cons.push(`Unfavorable R:R of 1:${s.rrRatio.toFixed(2)} → needs WR > ${Math.round(100/(1+s.rrRatio))}% to survive.`);
 
-  if (s.pctProfitable >= 75) pros.push(`Alta probabilidad de rentabilidad: ${s.pctProfitable.toFixed(1)}% de las simulaciones terminan en positivo.`);
-  else if (s.pctProfitable < 50) cons.push(`Solo el ${s.pctProfitable.toFixed(1)}% de las simulaciones son rentables — riesgo alto.`);
+    if (s.pctProfitable >= 75) pros.push(`High profitability chance: ${s.pctProfitable.toFixed(1)}% of simulations end positive.`);
+    else if (s.pctProfitable < 50) cons.push(`Only ${s.pctProfitable.toFixed(1)}% of simulations are profitable — high risk.`);
 
-  if (s.pctRuin < 2)   pros.push(`Riesgo de ruina casi nulo: ${s.pctRuin.toFixed(2)}%.`);
-  else if (s.pctRuin > 10) cons.push(`⚠️ Riesgo de ruina elevado: ${s.pctRuin.toFixed(1)}% — reduce tamaño de posición.`);
+    if (s.pctRuin < 2)   pros.push(`Risk of ruin almost nil: ${s.pctRuin.toFixed(2)}%.`);
+    else if (s.pctRuin > 10) cons.push(`⚠️ Elevated Risk of Ruin: ${s.pctRuin.toFixed(1)}% — reduce position size.`);
 
-  if (s.medianMaxDD < 10) pros.push(`Drawdown mediano contenido: ${s.medianMaxDD.toFixed(1)}% — estrategia estable.`);
-  else if (s.medianMaxDD > 20) cons.push(`Drawdown mediano de ${s.medianMaxDD.toFixed(1)}% → viola reglas típicas de funded accounts (8-10% límite).`);
+    if (s.medianMaxDD < 10) pros.push(`Contained median drawdown: ${s.medianMaxDD.toFixed(1)}% — stable strategy.`);
+    else if (s.medianMaxDD > 20) cons.push(`Median drawdown of ${s.medianMaxDD.toFixed(1)}% → violates funded account limits (8-10% typical).`);
 
-  if (s.sharpeRatio > 1.5) pros.push(`Sharpe Ratio de ${s.sharpeRatio.toFixed(2)} → calidad institucional (>${1} requerido para funded).`);
-  else if (s.sharpeRatio < 0.5) cons.push(`Sharpe Ratio bajo (${s.sharpeRatio.toFixed(2)}) → alto riesgo relativo al retorno.`);
+    if (s.sharpeRatio > 1.5) pros.push(`Sharpe Ratio of ${s.sharpeRatio.toFixed(2)} → institutional quality (>1 required).`);
+    else if (s.sharpeRatio < 0.5) cons.push(`Low Sharpe Ratio (${s.sharpeRatio.toFixed(2)}) → high risk relative to return.`);
 
-  if (variability > 60) cons.push(`Alta variabilidad (${variability}%) → inconsistencia entre trades, señal de edge poco definido.`);
+    if (variability > 60) cons.push(`High variability (${variability}%) → inconsistent trades, poorly defined edge.`);
 
-  const commImpact = commission / Math.max(avgWin, 1);
-  if (commImpact > 0.15) cons.push(`Comisiones representan ${(commImpact*100).toFixed(0)}% del avg win → impacto significativo en rentabilidad.`);
+    const commImpact = commission / Math.max(avgWin, 1);
+    if (commImpact > 0.15) cons.push(`Commissions take ${(commImpact*100).toFixed(0)}% of avg win → severe profit impact.`);
 
-  // Error-adjusted recommendations
-  if (s.sampleAdequacy === "poor" || s.sampleAdequacy === "minimal")
-    recs.push(`Muestra histórica insuficiente → añade más trades para proyecciones confiables (mínimo 50 recomendados).`);
-  if (s.pctRuin > 5)     recs.push(`Reduce riesgo por trade al 0.5-1% del balance para bajar P(ruina) < 5%.`);
-  if (s.medianMaxDD > 15) recs.push(`Implementa regla de stop diario al 3-5% para controlar drawdown en días adversos.`);
-  if (s.pctProfitable >= 70 && s.pctRuin < 5) recs.push(`Sistema viable para funded account. Valida con datos históricos reales adicionales.`);
-  if (s.medianConsecLoss >= 6) recs.push(`Prepara protocolo: si llegas a ${Math.round(s.medianConsecLoss*0.7)} pérdidas seguidas, descansa 1 día.`);
-  recs.push(`El IC del 95% de expectancy es [$${s.ciExpLow.toFixed(0)}, $${s.ciExpHigh.toFixed(0)}]/trade — trabaja en reducir este rango aumentando la muestra.`);
+    if (s.sampleAdequacy === "poor" || s.sampleAdequacy === "minimal")
+      recs.push(`Insufficient historical sample → add more trades for reliable projections (min 50).`);
+    if (s.pctRuin > 5)     recs.push(`Reduce risk per trade to 0.5-1% to drop P(ruin) below 5%.`);
+    if (s.medianMaxDD > 15) recs.push(`Implement a 3-5% daily stop to control drawdown.`);
+    if (s.pctProfitable >= 70 && s.pctRuin < 5) recs.push(`Viable system for funded accounts. Validate with live data.`);
+    if (s.medianConsecLoss >= 6) recs.push(`Protocol: if you hit ${Math.round(s.medianConsecLoss*0.7)} consecutive losses, stop trading for 1 day.`);
+    recs.push(`The 95% Confidence Interval for Expectancy is [$${s.ciExpLow.toFixed(0)}, $${s.ciExpHigh.toFixed(0)}]/trade — work on narrowing this by increasing sample size.`);
+  } else {
+    if (s.expectancyPerTrade > 0) pros.push(`Expectancy positiva de +$${s.expectancyPerTrade.toFixed(2)}/trade → ventaja estadística confirmada.`);
+    else cons.push(`Expectancy NEGATIVA de $${s.expectancyPerTrade.toFixed(2)}/trade → la estrategia pierde dinero a largo plazo.`);
+
+    if (s.rrRatio >= 2)  pros.push(`R:R excelente de 1:${s.rrRatio.toFixed(2)} → cada ganancia cubre múltiples pérdidas.`);
+    else if (s.rrRatio < 1) cons.push(`R:R desfavorable de 1:${s.rrRatio.toFixed(2)} → necesitas WR > ${Math.round(100/(1+s.rrRatio))}% para sobrevivir.`);
+
+    if (s.pctProfitable >= 75) pros.push(`Alta probabilidad de rentabilidad: ${s.pctProfitable.toFixed(1)}% de las simulaciones terminan en positivo.`);
+    else if (s.pctProfitable < 50) cons.push(`Solo el ${s.pctProfitable.toFixed(1)}% de las simulaciones son rentables — riesgo alto.`);
+
+    if (s.pctRuin < 2)   pros.push(`Riesgo de ruina casi nulo: ${s.pctRuin.toFixed(2)}%.`);
+    else if (s.pctRuin > 10) cons.push(`⚠️ Riesgo de ruina elevado: ${s.pctRuin.toFixed(1)}% — reduce tamaño de posición.`);
+
+    if (s.medianMaxDD < 10) pros.push(`Drawdown mediano contenido: ${s.medianMaxDD.toFixed(1)}% — estrategia estable.`);
+    else if (s.medianMaxDD > 20) cons.push(`Drawdown mediano de ${s.medianMaxDD.toFixed(1)}% → viola reglas típicas de funded accounts (8-10% límite).`);
+
+    if (s.sharpeRatio > 1.5) pros.push(`Sharpe Ratio de ${s.sharpeRatio.toFixed(2)} → calidad institucional (>1 requerido para funded).`);
+    else if (s.sharpeRatio < 0.5) cons.push(`Sharpe Ratio bajo (${s.sharpeRatio.toFixed(2)}) → alto riesgo relativo al retorno.`);
+
+    if (variability > 60) cons.push(`Alta variabilidad (${variability}%) → inconsistencia entre trades, señal de edge poco definido.`);
+
+    const commImpact = commission / Math.max(avgWin, 1);
+    if (commImpact > 0.15) cons.push(`Comisiones representan ${(commImpact*100).toFixed(0)}% del avg win → impacto significativo en rentabilidad.`);
+
+    if (s.sampleAdequacy === "poor" || s.sampleAdequacy === "minimal")
+      recs.push(`Muestra histórica insuficiente → añade más trades para proyecciones confiables (mínimo 50 recomendados).`);
+    if (s.pctRuin > 5)     recs.push(`Reduce riesgo por trade al 0.5-1% del balance para bajar P(ruina) < 5%.`);
+    if (s.medianMaxDD > 15) recs.push(`Implementa regla de stop diario al 3-5% para controlar drawdown en días adversos.`);
+    if (s.pctProfitable >= 70 && s.pctRuin < 5) recs.push(`Sistema viable para funded account. Valida con datos históricos reales adicionales.`);
+    if (s.medianConsecLoss >= 6) recs.push(`Prepara protocolo: si llegas a ${Math.round(s.medianConsecLoss*0.7)} pérdidas seguidas, descansa 1 día.`);
+    recs.push(`El IC del 95% de expectancy es [$${s.ciExpLow.toFixed(0)}, $${s.ciExpHigh.toFixed(0)}]/trade — trabaja en reducir este rango aumentando la muestra.`);
+  }
 
   const score =
     (s.expectancyPerTrade > 0 ? 25 : 0) +
@@ -355,6 +388,7 @@ function Gauge({ value, max, label, color }: { value: number; max: number; label
 type Mode = "journal" | "manual";
 
 export default function SimulatorPage() {
+  const language = useSettingsStore(s => s.language);
   const [mode, setMode]           = useState<Mode>("journal");
   const [balance, setBalance]     = useState("10000");
   const [winRate, setWinRate]     = useState("60");
@@ -403,8 +437,8 @@ export default function SimulatorPage() {
   };
 
   const report = useMemo(() =>
-    stats ? generateReport(stats, WR, NT, CM, AW, AL, VA) : null,
-    [stats]
+    stats ? generateReport(stats, WR, NT, CM, AW, AL, VA, language) : null,
+    [stats, language]
   );
 
   const adequacyLabel: Record<SimStats["sampleAdequacy"], { label: string; color: string }> = {

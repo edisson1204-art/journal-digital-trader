@@ -1,21 +1,60 @@
 "use client";
 
-import { useI18n } from "@/lib/i18n";
 import { Logo } from "@/components/Logo";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 export default function SignupPage() {
-  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Connect to Stripe Checkout flow
-    console.log("Signup initiated", { email, name });
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        }
+      }
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      setSuccess(true);
+      setLoading(false);
+    }
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-bg-main flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-md bg-bg-card border border-border-card rounded-card p-8 shadow-card text-center">
+          <h2 className="text-2xl font-bold text-green-primary mb-4">¡Cuenta Creada!</h2>
+          <p className="text-text-secondary text-sm mb-6">
+            Tu cuenta ha sido pre-aprobada en Supabase. Si esto fuera producción, habríamos enviado un correo de verificación.
+          </p>
+          <Link href="/login" className="text-green-primary hover:underline text-sm font-semibold">
+            Ir a Iniciar Sesión
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg-main flex items-center justify-center px-6 py-12">
@@ -28,17 +67,23 @@ export default function SignupPage() {
         {/* Card */}
         <div className="bg-bg-card border border-border-card rounded-card p-8 shadow-card">
           <h1 className="text-2xl font-bold text-text-primary text-center mb-2">
-            Start your free trial
+            Únete a la Plataforma
           </h1>
           <p className="text-sm text-text-muted text-center mb-8">
-            Join Trading Intelligence for{" "}
-            <span className="text-green-primary font-semibold">$9/month</span>
+            Accede a Journal Digital Trader Invest por{" "}
+            <span className="text-green-primary font-semibold">$14.99/mes</span>
           </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+            {error && (
+              <div className="bg-red-loss/10 border border-red-loss/20 text-red-loss text-sm px-4 py-3 rounded-lg text-center">
+                {error}
+              </div>
+            )}
+            
             <div>
               <label htmlFor="name" className="block text-xs font-medium text-text-secondary mb-1.5">
-                Full name
+                Nombre completo
               </label>
               <input
                 id="name"
@@ -48,12 +93,12 @@ export default function SignupPage() {
                 required
                 autoComplete="name"
                 className="w-full px-4 py-3 rounded-btn bg-bg-section border border-border-card text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-green-primary focus:ring-1 focus:ring-green-primary transition-colors"
-                placeholder="Your name"
+                placeholder="Tu nombre"
               />
             </div>
             <div>
               <label htmlFor="email" className="block text-xs font-medium text-text-secondary mb-1.5">
-                Email address
+                Correo Electrónico
               </label>
               <input
                 id="email"
@@ -63,12 +108,12 @@ export default function SignupPage() {
                 required
                 autoComplete="email"
                 className="w-full px-4 py-3 rounded-btn bg-bg-section border border-border-card text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-green-primary focus:ring-1 focus:ring-green-primary transition-colors"
-                placeholder="you@email.com"
+                placeholder="tu@email.com"
               />
             </div>
             <div>
               <label htmlFor="password" className="block text-xs font-medium text-text-secondary mb-1.5">
-                Password
+                Contraseña
               </label>
               <input
                 id="password"
@@ -79,33 +124,27 @@ export default function SignupPage() {
                 minLength={8}
                 autoComplete="new-password"
                 className="w-full px-4 py-3 rounded-btn bg-bg-section border border-border-card text-text-primary text-sm placeholder:text-text-muted focus:outline-none focus:border-green-primary focus:ring-1 focus:ring-green-primary transition-colors"
-                placeholder="Min. 8 characters"
+                placeholder="Min. 8 caracteres"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-3.5 font-bold text-bg-main bg-green-primary rounded-btn hover:bg-green-primary/90 transition-all shadow-green-glow text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-green-primary focus:ring-offset-2 focus:ring-offset-bg-card"
+              disabled={loading}
+              className="w-full py-3.5 font-bold text-bg-main bg-green-primary rounded-btn hover:bg-green-primary/90 transition-all shadow-green-glow text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-green-primary focus:ring-offset-2 focus:ring-offset-bg-card disabled:opacity-50"
             >
-              Continue to Payment →
+              {loading ? "Creando cuenta..." : "Crear Cuenta Segura"}
             </button>
           </form>
 
           <p className="text-center text-xs text-text-muted mt-6">
-            Already have an account?{" "}
-            <Link href="/login" className="text-green-primary hover:underline">Log in</Link>
-          </p>
-
-          <p className="text-center text-[11px] text-text-muted mt-4">
-            By signing up you agree to our{" "}
-            <Link href="/terms" className="hover:text-text-secondary transition-colors">Terms</Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="hover:text-text-secondary transition-colors">Privacy Policy</Link>.
+            ¿Ya tienes una cuenta?{" "}
+            <Link href="/login" className="text-green-primary hover:underline">Iniciar Sesión</Link>
           </p>
         </div>
 
         <p className="text-center text-xs text-text-muted mt-6">
-          🔒 Secure payment via Stripe. Cancel anytime.
+          🔒 Seguridad cifrada por Supabase Auth. Cancela en cualquier momento.
         </p>
       </div>
     </div>
