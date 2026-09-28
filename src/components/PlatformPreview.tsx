@@ -5,7 +5,7 @@ import { useState } from "react";
 
 /* ── Equity data for the analytics chart ── */
 const equityPoints = [62, 68, 64, 72, 80, 76, 88, 92, 87, 98, 105, 112, 118, 124, 120, 132, 140];
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun"];
 
 function EquityChart() {
   const max = Math.max(...equityPoints);

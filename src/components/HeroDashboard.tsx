@@ -207,7 +207,7 @@ export function HeroDashboard() {
               <div className="flex flex-col gap-1.5">
                 {/* Table header */}
                 <div className="grid grid-cols-[3fr_2fr_3fr_3fr] gap-1 mb-1">
-                  {["Instrument","Date","Side","P&L"].map((h) => (
+                  {[t("common.instrument") || "Instrument", t("common.date") || "Date", t("common.side") || "Side", "P&L"].map((h) => (
                     <span key={h} className="text-[7px] text-text-muted uppercase tracking-wide">{h}</span>
                   ))}
                 </div>
@@ -235,9 +235,9 @@ export function HeroDashboard() {
               </div>
               <div className="flex flex-col gap-1">
                 {[
-                  { label: "Win",       color: "bg-green-primary" },
-                  { label: "Loss",      color: "bg-red-loss"      },
-                  { label: "Breakeven", color: "bg-yellow-warn"   },
+                  { label: t("metrics.win") || "Win",       color: "bg-green-primary" },
+                  { label: t("metrics.loss") || "Loss",      color: "bg-red-loss"      },
+                  { label: t("metrics.breakeven") || "Breakeven", color: "bg-yellow-warn"   },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-1.5">
                     <span className={`h-1.5 w-1.5 rounded-full ${item.color}`} />
