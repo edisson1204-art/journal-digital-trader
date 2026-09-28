@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { AppShell } from "@/components/AppShell";
 import { useState } from "react";
@@ -6,7 +6,7 @@ import { useState } from "react";
 const STRATEGIES: any[] = [];
 
 export default function StrategiesPage() {
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(null); if (STRATEGIES.length === 0) return <div className="p-10 text-center text-text-muted">Aún no hay estrategias registradas. Empieza a operar para ver tus estadísticas.</div>;
   const sel = STRATEGIES.find(s => s.id === selected);
 
   const gradeColor = (g: string) =>
@@ -16,10 +16,10 @@ export default function StrategiesPage() {
     "text-yellow-warn bg-yellow-warn/10 border-yellow-warn/20";
 
   return (
-    <AppShell title="Libro de Estrategias" subtitle="Gestiona y evalúa cada estrategia de trading">
+    <AppShell title="Libro de Estrategias" subtitle="Gestiona y evalÃºa cada estrategia de trading">
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 w-full max-w-[1800px] mx-auto">
 
-        {/* ── Strategy list ── */}
+        {/* â”€â”€ Strategy list â”€â”€ */}
         <div className="flex flex-col gap-3">
           {STRATEGIES.map(s => (
             <button
@@ -62,7 +62,7 @@ export default function StrategiesPage() {
               </div>
 
               <div className="flex flex-wrap gap-1.5 mt-3">
-                {s.instruments.map(ins => (
+                {s.instruments.map((ins: string) => (
                   <span key={ins} className="rounded-full bg-violet-accent/10 border border-violet-accent/20 px-2 py-0.5 text-[9px] text-violet-accent">{ins}</span>
                 ))}
               </div>
@@ -75,7 +75,7 @@ export default function StrategiesPage() {
           ))}
         </div>
 
-        {/* ── Detail panel ── */}
+        {/* â”€â”€ Detail panel â”€â”€ */}
         <div className="rounded-card border border-border-card bg-bg-card p-6">
           {sel ? (
             <>
@@ -89,7 +89,7 @@ export default function StrategiesPage() {
               </div>
 
               <div className="flex flex-col gap-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Estadísticas</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">EstadÃ­sticas</p>
                 {[
                   { label:"Win Rate",       value:`${sel.winRate}%`,  color: sel.winRate>=65?"text-green-primary":"text-blue-accent" },
                   { label:"Avg R:R",        value: sel.avgRR,          color:"text-blue-accent"   },
@@ -107,7 +107,7 @@ export default function StrategiesPage() {
                 <div className="mt-2">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2">Instrumentos</p>
                   <div className="flex flex-wrap gap-2">
-                    {sel.instruments.map(ins => (
+                    {sel.instruments.map((ins: string) => (
                       <span key={ins} className="rounded-full bg-violet-accent/10 border border-violet-accent/20 px-3 py-1 text-[11px] text-violet-accent">{ins}</span>
                     ))}
                   </div>
@@ -116,7 +116,7 @@ export default function StrategiesPage() {
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full py-16 text-center gap-3">
-              <p className="text-4xl">📘</p>
+              <p className="text-4xl">ðŸ“˜</p>
               <p className="text-sm text-text-secondary">Selecciona una estrategia para ver su detalle</p>
             </div>
           )}
@@ -125,4 +125,6 @@ export default function StrategiesPage() {
     </AppShell>
   );
 }
+
+
 

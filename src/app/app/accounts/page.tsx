@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { AppShell } from "@/components/AppShell";
 import { useState } from "react";
 import { AlertTriangle, CheckCircle, Clock, TrendingUp } from "lucide-react";
 
-/* ── Funded account rules ── */
+/* â”€â”€ Funded account rules â”€â”€ */
 const ACCOUNTS: any[] = [];
 
 function ProgressBar({ value, max, color = "bg-green-primary" }: {
@@ -33,7 +33,7 @@ function RuleRow({ label, current, limit, invert = false, format = "dollar", war
   const fmt = (v: number) =>
     format === "dollar"  ? `$${Math.abs(v).toLocaleString()}` :
     format === "percent" ? `${v}%` :
-    format === "days"    ? `${v} días` :
+    format === "days"    ? `${v} dÃ­as` :
     String(v);
 
   return (
@@ -53,7 +53,7 @@ function RuleRow({ label, current, limit, invert = false, format = "dollar", war
 }
 
 export default function AccountsPage() {
-  const [selected, setSelected] = useState(ACCOUNTS[0].id);
+  const [selected, setSelected] = useState(ACCOUNTS[0]?.id); if (ACCOUNTS.length === 0) return <div className="p-10 text-center text-text-muted">Aún no hay cuentas registradas. Empieza a operar para ver tus estadísticas.</div>;
   const account = ACCOUNTS.find(a => a.id === selected)!;
 
   const remainingProfit = account.profit_target > 0 ? account.profit_target - account.current_profit : null;
@@ -62,7 +62,7 @@ export default function AccountsPage() {
   const bestDayOk = consistencyLimit ? account.best_day_pnl <= consistencyLimit : true;
 
   return (
-    <AppShell title="Cuentas de Trading" subtitle="Reglas, límites y estado de cada cuenta">
+    <AppShell title="Cuentas de Trading" subtitle="Reglas, lÃ­mites y estado de cada cuenta">
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
 
         {/* Account selector */}
@@ -84,13 +84,13 @@ export default function AccountsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
 
-          {/* ── Main rules card ── */}
+          {/* â”€â”€ Main rules card â”€â”€ */}
           <div className="rounded-card border border-border-card bg-bg-card p-6">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <p className="text-[10px] text-text-muted">{account.type}</p>
                 <h2 className="text-[16px] font-bold text-text-primary">{account.broker}</h2>
-                <p className="text-[13px] text-text-secondary">{account.size} · {account.status}</p>
+                <p className="text-[13px] text-text-secondary">{account.size} Â· {account.status}</p>
               </div>
               <span className="flex items-center gap-1.5 rounded-full bg-green-primary/15 border border-green-primary/30 px-3 py-1 text-[11px] font-bold text-green-primary">
                 <CheckCircle className="h-3.5 w-3.5" /> En regla
@@ -108,7 +108,7 @@ export default function AccountsPage() {
                 />
               )}
               <RuleRow
-                label="Pérdida Máxima Diaria (Daily Loss Limit)"
+                label="PÃ©rdida MÃ¡xima Diaria (Daily Loss Limit)"
                 current={Math.abs(account.daily_loss_today)}
                 limit={account.max_daily_loss}
                 format="dollar"
@@ -116,7 +116,7 @@ export default function AccountsPage() {
               />
               {account.max_total_loss > 0 && (
                 <RuleRow
-                  label="Pérdida Máxima Total (Trailing Drawdown)"
+                  label="PÃ©rdida MÃ¡xima Total (Trailing Drawdown)"
                   current={account.max_total_loss - (account.current_balance - (account.current_balance - account.current_profit))}
                   limit={account.max_total_loss}
                   format="dollar"
@@ -125,7 +125,7 @@ export default function AccountsPage() {
               )}
               {account.min_trading_days > 0 && (
                 <RuleRow
-                  label="Días Mínimos de Trading"
+                  label="DÃ­as MÃ­nimos de Trading"
                   current={account.days_traded}
                   limit={account.min_trading_days}
                   format="days"
@@ -135,7 +135,7 @@ export default function AccountsPage() {
               {account.consistency_rule > 0 && (
                 <div>
                   <RuleRow
-                    label={`Regla de Consistencia — Mejor día ≤ ${account.consistency_rule}% del profit total`}
+                    label={`Regla de Consistencia â€” Mejor dÃ­a â‰¤ ${account.consistency_rule}% del profit total`}
                     current={account.best_day_pnl}
                     limit={consistencyLimit ?? 0}
                     format="dollar"
@@ -144,7 +144,7 @@ export default function AccountsPage() {
                   {!bestDayOk && (
                     <div className="mt-2 flex items-center gap-2 rounded-lg border border-red-loss/30 bg-red-loss/10 px-3 py-2 text-[11px] text-red-loss">
                       <AlertTriangle className="h-3.5 w-3.5" />
-                      Tu mejor día supera el límite de consistencia. Verifica con tu prop firm.
+                      Tu mejor dÃ­a supera el lÃ­mite de consistencia. Verifica con tu prop firm.
                     </div>
                   )}
                 </div>
@@ -152,7 +152,7 @@ export default function AccountsPage() {
             </div>
           </div>
 
-          {/* ── Summary sidebar ── */}
+          {/* â”€â”€ Summary sidebar â”€â”€ */}
           <div className="flex flex-col gap-4">
             <div className="rounded-card border border-border-card bg-bg-card p-5">
               <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-4">Balance</p>
@@ -160,8 +160,8 @@ export default function AccountsPage() {
                 {[
                   { label:"Balance actual",     value:`$${account.current_balance.toLocaleString()}`,      color:"text-text-primary"  },
                   { label:"Profit acumulado",   value:`+$${account.current_profit.toLocaleString()}`,      color:"text-green-primary" },
-                  { label:"Días operados",       value:`${account.days_traded} días`,                        color:"text-blue-accent"   },
-                  { label:"Mejor día",           value:`+$${account.best_day_pnl.toLocaleString()}`,        color:"text-green-primary" },
+                  { label:"DÃ­as operados",       value:`${account.days_traded} dÃ­as`,                        color:"text-blue-accent"   },
+                  { label:"Mejor dÃ­a",           value:`+$${account.best_day_pnl.toLocaleString()}`,        color:"text-green-primary" },
                   { label:"P&L hoy",             value: account.daily_loss_today === 0 ? "$0 (sin operaciones)" : `${account.daily_loss_today>0?"+":""}$${account.daily_loss_today}`, color: account.daily_loss_today >= 0 ? "text-green-primary" : "text-red-loss" },
                   ...(remainingProfit !== null ? [{ label:"Profit restante para meta", value:`$${remainingProfit.toLocaleString()}`, color:"text-yellow-warn" }] : []),
                 ].map(r => (
@@ -179,8 +179,8 @@ export default function AccountsPage() {
                 {[
                   { ok: Math.abs(account.daily_loss_today) < account.max_daily_loss,    label: "Dentro del Daily Loss Limit" },
                   { ok: account.current_profit < account.profit_target || account.profit_target === 0, label: "Sin pasar el objetivo (si aplica)" },
-                  { ok: bestDayOk,  label: "Consistencia del mejor día OK" },
-                  { ok: account.days_traded >= account.min_trading_days || account.min_trading_days === 0, label: "Días mínimos cumplidos" },
+                  { ok: bestDayOk,  label: "Consistencia del mejor dÃ­a OK" },
+                  { ok: account.days_traded >= account.min_trading_days || account.min_trading_days === 0, label: "DÃ­as mÃ­nimos cumplidos" },
                   { ok: account.status === "Active", label: "Cuenta activa" },
                 ].map((c, i) => (
                   <div key={i} className="flex items-center gap-2.5 text-[12px]">
@@ -196,10 +196,12 @@ export default function AccountsPage() {
         </div>
 
         <p className="text-[11px] text-text-muted italic text-center pb-2">
-          ⚠️ Verifica siempre las reglas vigentes directamente con tu prop firm. Las reglas pueden cambiar.
+          âš ï¸ Verifica siempre las reglas vigentes directamente con tu prop firm. Las reglas pueden cambiar.
         </p>
       </div>
     </AppShell>
   );
 }
+
+
 
