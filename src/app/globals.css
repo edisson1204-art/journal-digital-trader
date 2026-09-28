@@ -2,14 +2,14 @@
 
 @theme {
   /* ─── Backgrounds ─── */
-  --color-bg-main: #061421;
-  --color-bg-alt: #081725;
-  --color-bg-section: #0B1B2B;
-  --color-bg-card: #0D2133;
-  --color-bg-card-raised: #10283B;
+  --color-bg-main: #030A12;
+  --color-bg-alt: #040D18;
+  --color-bg-section: #061320;
+  --color-bg-card: #091A2A;
+  --color-bg-card-raised: #0C2237;
 
   /* ─── Borders ─── */
-  --color-border-card: #19374D;
+  --color-border-card: #1F435F;
   --color-border-subtle: #1A3347;
 
   /* ─── Brand Accents ─── */
@@ -22,8 +22,8 @@
 
   /* ─── Text ─── */
   --color-text-primary: #F8FAFC;
-  --color-text-secondary: #9CA3AF;
-  --color-text-muted: #6B7280;
+  --color-text-secondary: #CBD5E1;
+  --color-text-muted: #94A3B8;
 
   /* ─── Typography ─── */
   --font-sans: "Inter", "Geist", system-ui, sans-serif;
