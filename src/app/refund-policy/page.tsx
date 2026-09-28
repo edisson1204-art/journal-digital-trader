@@ -1,8 +1,8 @@
-import { LegalShell, LegalSection } from "@/components/LegalShell";
+﻿import { LegalShell, LegalSection } from "@/components/LegalShell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Refund Policy — Journal Digital Trader Invest",
+  title: "Refund Policy â€” Journal Digital Trader Invest",
   description: "Refund and cancellation policy for Journal Digital Trader Invest subscriptions.",
 };
 
@@ -12,7 +12,7 @@ export default function RefundPolicyPage() {
 
       <LegalSection title="Overview">
         <p>
-          Journal Digital Trader Invest offers a monthly subscription at <strong className="text-green-primary">$9 USD/month</strong>.
+          Journal Digital Trader Invest offers a monthly subscription at <strong className="text-green-primary">$14.99 USD/month</strong>.
           We believe in being fair and transparent about our refund policy.
         </p>
       </LegalSection>
@@ -60,7 +60,7 @@ export default function RefundPolicyPage() {
         </ul>
         <p className="mt-3">
           We will respond within 3 business days. Approved refunds are processed through
-          Stripe and typically appear within 5–10 business days depending on your bank.
+          Stripe and typically appear within 5â€“10 business days depending on your bank.
         </p>
       </LegalSection>
 

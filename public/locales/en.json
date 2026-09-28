@@ -5,10 +5,10 @@
     "pricing": "Pricing",
     "resources": "Resources",
     "login": "Login",
-    "cta": "Start for $14.99/month"
+    "cta": "Start 7-Day Free Trial"
   },
   "hero": {
-    "eyebrow": "DISCIPLINE • DATA • BETTER DECISIONS",
+    "eyebrow": "DISCIPLINE â€¢ DATA â€¢ BETTER DECISIONS",
     "title1": "Trade with Data.",
     "title2": "Improve with Evidence.",
     "subtitle": "The all-in-one trading journal, analytics, risk tools and AI mentor designed to help you become a more consistent trader.",
@@ -16,9 +16,9 @@
     "feature2": "Risk Calculators",
     "feature3": "Strategy Simulator",
     "feature4": "AI Mentor 24/7",
-    "cta_primary": "Start for $14.99/month",
+    "cta_primary": "Start 7-Day Free Trial",
     "cta_secondary": "See how it works",
-    "disclaimer": "Cancel anytime | English & Español",
+    "disclaimer": "7 days free, then .99/mo. Cancel anytime.",
     "dashboard_greeting": "Good morning, Trader!",
     "dashboard_quote": "\"Discipline today, freedom tomorrow.\""
   },
@@ -75,9 +75,9 @@
     "feature6": "Funded Accounts",
     "feature7": "Psychology Tools",
     "feature8": "Multi-Market Support",
-    "feature9": "English & Español",
+    "feature9": "English & EspaÃ±ol",
     "feature10": "Cancel anytime",
-    "cta": "Start for $14.99/month",
+    "cta": "Start 7-Day Free Trial",
     "billing_note": "Billed monthly. Cancel anytime."
   },
   "platform": {
@@ -108,7 +108,7 @@
     "cloud_title": "Cloud Sync",
     "cloud_desc": "Access your data from anywhere, any device.",
     "bilingual_title": "Bilingual",
-    "bilingual_desc": "English & Español.",
+    "bilingual_desc": "English & EspaÃ±ol.",
     "updates_title": "Regular Updates",
     "updates_desc": "New features continuously."
   },
@@ -124,7 +124,7 @@
     "risk": "Risk Disclosure",
     "refund": "Refund Policy",
     "contact": "Contact",
-    "copyright": "© 2026 Journal Digital Trader Invest. All rights reserved."
+    "copyright": "Â© 2026 Journal Digital Trader Invest. All rights reserved."
   },
   "metrics": {
     "total_pnl": "Total P&L",

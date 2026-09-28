@@ -1,8 +1,8 @@
-import { LegalShell, LegalSection } from "@/components/LegalShell";
+﻿import { LegalShell, LegalSection } from "@/components/LegalShell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Journal Digital Trader Invest",
+  title: "Terms of Service â€” Journal Digital Trader Invest",
   description: "Terms of Service for Journal Digital Trader Invest subscription platform.",
 };
 
@@ -41,7 +41,7 @@ export default function TermsPage() {
 
       <LegalSection title="3. Subscription and Billing">
         <p>
-          The Platform is offered as a monthly subscription at <strong className="text-green-primary">$9 USD/month</strong>.
+          The Platform is offered as a monthly subscription at <strong className="text-green-primary">$14.99 USD/month</strong>.
           Subscriptions are billed monthly in advance. You may cancel at any time and retain access
           until the end of your current billing period.
         </p>
@@ -72,8 +72,8 @@ export default function TermsPage() {
 
       <LegalSection title="6. Intellectual Property">
         <p>
-          All content, features, and functionality of the Platform — including software, text,
-          graphics, logos, and designs — are the exclusive property of Journal Digital Trader Invest and
+          All content, features, and functionality of the Platform â€” including software, text,
+          graphics, logos, and designs â€” are the exclusive property of Journal Digital Trader Invest and
           are protected by copyright and other intellectual property laws.
         </p>
         <p>
@@ -88,7 +88,7 @@ export default function TermsPage() {
           that the Platform will be error-free, uninterrupted, or meet your specific requirements.
         </p>
         <p className="font-semibold text-yellow-warn mt-2">
-          ⚠️ Past trading performance does not guarantee future results. Backtesting and simulation
+          âš ï¸ Past trading performance does not guarantee future results. Backtesting and simulation
           results are hypothetical and subject to inherent limitations.
         </p>
       </LegalSection>
