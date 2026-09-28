@@ -16,7 +16,7 @@ export default function StrategiesPage() {
     "text-yellow-warn bg-yellow-warn/10 border-yellow-warn/20";
 
   return (
-    <AppShell title="Libro de Estrategias" subtitle="Gestiona y evalÃºa cada estrategia de trading">
+    <AppShell title="Libro de Estrategias" subtitle="Gestiona y evalÃºa cada estrategia de trading"> {STRATEGIES.length === 0 ? <div className="p-10 text-center text-text-muted mt-20">Aún no hay estrategias registradas. Empieza a operar para ver tus estadísticas.</div> : <div className="w-full">
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 w-full max-w-[1800px] mx-auto">
 
         {/* â”€â”€ Strategy list â”€â”€ */}
@@ -122,9 +122,10 @@ export default function StrategiesPage() {
           )}
         </div>
       </div>
-    </AppShell>
+    </div>}</AppShell>
   );
 }
+
 
 
 

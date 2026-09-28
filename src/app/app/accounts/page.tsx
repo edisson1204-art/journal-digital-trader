@@ -62,7 +62,7 @@ export default function AccountsPage() {
   const bestDayOk = consistencyLimit ? account.best_day_pnl <= consistencyLimit : true;
 
   return (
-    <AppShell title="Cuentas de Trading" subtitle="Reglas, lÃ­mites y estado de cada cuenta">
+    <AppShell title="Cuentas de Trading" subtitle="Reglas, lÃ­mites y estado de cada cuenta"> {ACCOUNTS.length === 0 ? <div className="p-10 text-center text-text-muted mt-20">Aún no hay cuentas registradas. Empieza a operar para ver tus estadísticas.</div> : <div className="w-full">
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
 
         {/* Account selector */}
@@ -199,9 +199,10 @@ export default function AccountsPage() {
           âš ï¸ Verifica siempre las reglas vigentes directamente con tu prop firm. Las reglas pueden cambiar.
         </p>
       </div>
-    </AppShell>
+    </div>}</AppShell>
   );
 }
+
 
 
 

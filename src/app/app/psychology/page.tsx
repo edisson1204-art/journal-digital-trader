@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { AppShell } from "@/components/AppShell";
 import { HeartPulse, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
@@ -11,11 +11,11 @@ const EMOTIONS: any[] = [];
 const totalEmotions = EMOTIONS.reduce((s, e) => s + e.count, 0);
 
 export default function PsychologyPage() {
-  const moodColors = ["", "bg-red-loss","bg-red-loss/60","bg-yellow-warn","bg-green-primary/70","bg-green-primary"]; const moodLabels = ["","Poor","Low","Neutral","Good","Excellent"]; if (MOOD_DATA.length === 0 || EMOTIONS.length === 0) return <div className="p-10 text-center text-text-muted">No hay datos psicológicos suficientes. Registra más trades.</div>;
+  const moodColors = ["", "bg-red-loss","bg-red-loss/60","bg-yellow-warn","bg-green-primary/70","bg-green-primary"]; const moodLabels = ["","Poor","Low","Neutral","Good","Excellent"]; if (MOOD_DATA.length === 0 || EMOTIONS.length === 0) return <div className="p-10 text-center text-text-muted">No hay datos psicolÃ³gicos suficientes. Registra mÃ¡s trades.</div>;
 
 
   return (
-    <AppShell title="Psychology Journal" subtitle="Understand your behavior â€” improve your discipline">
+    <AppShell title="Psychology Journal" subtitle="Understand your behavior Ã¢â‚¬â€ improve your discipline"> {(MOOD_DATA.length === 0 || EMOTIONS.length === 0) ? <div className="p-10 text-center text-text-muted mt-20">Aún no hay datos psicológicos suficientes. Registra más trades.</div> : <div className="w-full">
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
 
         {/* Header KPIs */}
@@ -59,7 +59,7 @@ export default function PsychologyPage() {
               ))}
             </div>
             <p className="mt-4 text-[10px] text-text-muted border-t border-border-card/50 pt-3">
-              ðŸ’¡ Pattern detected: Low mood days (â‰¤2) have 38% lower win rate.
+              Ã°Å¸â€™Â¡ Pattern detected: Low mood days (Ã¢â€°Â¤2) have 38% lower win rate.
             </p>
           </div>
 
@@ -114,11 +114,12 @@ export default function PsychologyPage() {
           </div>
         </div>
 
-        <p className="text-[11px] text-text-muted italic text-center pb-2">âš ï¸ Demo data â€” not real trading results.</p>
+        <p className="text-[11px] text-text-muted italic text-center pb-2">Ã¢Å¡Â Ã¯Â¸Â Demo data Ã¢â‚¬â€ not real trading results.</p>
       </div>
-    </AppShell>
+    </div>}</AppShell>
   );
 }
+
 
 
 
