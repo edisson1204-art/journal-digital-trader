@@ -3,29 +3,11 @@
 import { AppShell } from "@/components/AppShell";
 import { HeartPulse, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
 
-const MOOD_DATA = [
-  { day:"Mon", mood:4, trades:3, pnl:"+$280" },
-  { day:"Tue", mood:3, trades:2, pnl:"+$95" },
-  { day:"Wed", mood:2, trades:4, pnl:"-$180" },
-  { day:"Thu", mood:4, trades:3, pnl:"+$320" },
-  { day:"Fri", mood:1, trades:5, pnl:"-$240" },
-];
+const MOOD_DATA: any[] = [];
 
-const BEHAVIORS = [
-  { behavior:"Revenge trading",        frequency:"High",   impact:"-$420",  color:"text-red-loss",      bg:"bg-red-loss/10",      icon: AlertTriangle },
-  { behavior:"FOMO entries",           frequency:"Medium", impact:"-$180",  color:"text-yellow-warn",   bg:"bg-yellow-warn/10",   icon: AlertTriangle },
-  { behavior:"Moving stop loss",       frequency:"Medium", impact:"-$150",  color:"text-yellow-warn",   bg:"bg-yellow-warn/10",   icon: AlertTriangle },
-  { behavior:"Following the plan",     frequency:"High",   impact:"+$890",  color:"text-green-primary", bg:"bg-green-primary/10", icon: CheckCircle   },
-  { behavior:"Waiting for confluence", frequency:"Medium", impact:"+$430",  color:"text-green-primary", bg:"bg-green-primary/10", icon: CheckCircle   },
-];
+const BEHAVIORS: any[] = [];
 
-const EMOTIONS = [
-  { label:"Confident",     count:45, color:"bg-green-primary" },
-  { label:"Neutral",       count:32, color:"bg-blue-accent" },
-  { label:"Anxious",       count:24, color:"bg-yellow-warn" },
-  { label:"Overconfident", count:14, color:"bg-red-loss" },
-  { label:"Focused",       count:9,  color:"bg-violet-accent" },
-];
+const EMOTIONS: any[] = [];
 const totalEmotions = EMOTIONS.reduce((s, e) => s + e.count, 0);
 
 export default function PsychologyPage() {
@@ -137,3 +119,4 @@ export default function PsychologyPage() {
     </AppShell>
   );
 }
+

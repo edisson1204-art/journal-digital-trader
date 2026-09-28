@@ -3,14 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { useState } from "react";
 
-const STRATEGIES = [
-  { id:1, name:"Breakout EMA200",     type:"Breakout",        instruments:["NQ","ES"],   winRate:73, avgRR:"1:3.1", trades:48, netPnl:"+$4,280", grade:"A+", active:true,  notes:"Breakout de EMA200 en H1, confirmación en M15 con volumen." },
-  { id:2, name:"VWAP Reclaim",        type:"Mean Reversion",  instruments:["ES","NQ"],   winRate:67, avgRR:"1:2.2", trades:35, netPnl:"+$2,100", grade:"A",  active:true,  notes:"Reclamación del VWAP tras fakeout. Entrada en cierre de vela." },
-  { id:3, name:"London Open Break",   type:"Breakout",        instruments:["EURUSD","GBPUSD"],winRate:61, avgRR:"1:2.8", trades:28, netPnl:"+$980", grade:"B", active:true, notes:"Ruptura del rango de 7:00-8:30 AM London en la apertura." },
-  { id:4, name:"Gap Fill Daily",      type:"Mean Reversion",  instruments:["NQ","ES"],   winRate:55, avgRR:"1:1.8", trades:18, netPnl:"+$320",   grade:"B",  active:false, notes:"Llenado de gap de apertura del mercado. En revisión." },
-  { id:5, name:"ICT Order Block",     type:"SMC/ICT",         instruments:["NQ","Gold"], winRate:70, avgRR:"1:3.5", trades:22, netPnl:"+$1,860", grade:"A",  active:true,  notes:"Order block en zona premium/discount con FVG de confirmación." },
-  { id:6, name:"5-min Scalp VWAP",   type:"Scalping",        instruments:["MNQ","MES"], winRate:52, avgRR:"1:1.2", trades:60, netPnl:"+$180",   grade:"C",  active:false, notes:"Scalp rápido alrededor del VWAP. Baja eficiencia — pausado." },
-];
+const STRATEGIES: any[] = [];
 
 export default function StrategiesPage() {
   const [selected, setSelected] = useState<number | null>(null);
@@ -132,3 +125,4 @@ export default function StrategiesPage() {
     </AppShell>
   );
 }
+

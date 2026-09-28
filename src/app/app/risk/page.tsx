@@ -41,11 +41,11 @@ function ResultCard({ label, value, color = "text-text-primary", large = false }
 
 export default function RiskToolsPage() {
   // Position size calculator
-  const [accountSize, setAccountSize] = useState("50000");
-  const [riskPct, setRiskPct] = useState("1");
-  const [entry, setEntry] = useState("18240");
-  const [stop, setStop] = useState("18190");
-  const [target, setTarget] = useState("18390");
+  const [accountSize, setAccountSize] = useState("");
+  const [riskPct, setRiskPct] = useState("");
+  const [entry, setEntry] = useState("");
+  const [stop, setStop] = useState("");
+  const [target, setTarget] = useState("");
   const [assetClass, setAssetClass] = useState<AssetClass>("Futures");
 
   const config = ASSET_CLASS_CONFIG[assetClass];

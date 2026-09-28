@@ -7,7 +7,7 @@ import {
   Play, RefreshCw, BarChart2, AlertTriangle,
   CheckCircle, Info, BookOpen, Pencil, ChevronDown, ChevronUp,
 } from "lucide-react";
-import { DEMO_TRADES } from "@/lib/demoTrades";
+import { useTradeStore } from "@/store/tradeStore";
 import { computeStats } from "@/lib/tradeTypes";
 
 /* ══════════════════════════════════════════════════════════
@@ -403,8 +403,8 @@ export default function SimulatorPage() {
   const [showReport, setShowReport] = useState(true);
 
   /* ── Journal mode: compute stats from DEMO_TRADES ── */
-  const journalStats = useMemo(() => computeStats(DEMO_TRADES), []);
-  const journalN     = DEMO_TRADES.length;
+  const trades = useTradeStore(s => s.trades); const closed = trades.filter(t => t.result !== "Open"); const journalStats = useMemo(() => computeStats(closed), [closed]);
+  const journalN = closed.length;
 
   // Effective params (journal or manual)
   const B  = parseFloat(balance) || 10000;

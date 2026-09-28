@@ -5,65 +5,7 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle, Clock, TrendingUp } from "lucide-react";
 
 /* ── Funded account rules ── */
-const ACCOUNTS = [
-  {
-    id: "apex-50k",
-    broker: "Apex Trader Funding",
-    type: "Evaluation",
-    size: "$50,000",
-    profit_target: 3000,
-    max_daily_loss: 1000,
-    max_total_loss: 2500,
-    min_trading_days: 7,
-    consistency_rule: 40, // max % of total profit from one day
-    current_balance: 51280,
-    current_profit: 1280,
-    days_traded: 9,
-    best_day_pnl: 480,
-    daily_loss_today: -120,
-    status: "Active",
-    color: "text-green-primary",
-    bg: "border-green-primary/20 bg-green-primary/5",
-  },
-  {
-    id: "topstep-100k",
-    broker: "TopStep",
-    type: "Funded",
-    size: "$100,000",
-    profit_target: 6000,
-    max_daily_loss: 2000,
-    max_total_loss: 5000,
-    min_trading_days: 0,
-    consistency_rule: 50,
-    current_balance: 102840,
-    current_profit: 2840,
-    days_traded: 14,
-    best_day_pnl: 840,
-    daily_loss_today: 0,
-    status: "Active",
-    color: "text-blue-accent",
-    bg: "border-blue-accent/20 bg-blue-accent/5",
-  },
-  {
-    id: "ninja-personal",
-    broker: "NinjaTrader (Personal)",
-    type: "Live",
-    size: "$25,000",
-    profit_target: 0,
-    max_daily_loss: 500,
-    max_total_loss: 0,
-    min_trading_days: 0,
-    consistency_rule: 0,
-    current_balance: 26480,
-    current_profit: 1480,
-    days_traded: 22,
-    best_day_pnl: 680,
-    daily_loss_today: 0,
-    status: "Active",
-    color: "text-violet-accent",
-    bg: "border-violet-accent/20 bg-violet-accent/5",
-  },
-];
+const ACCOUNTS: any[] = [];
 
 function ProgressBar({ value, max, color = "bg-green-primary" }: {
   value: number; max: number; color?: string;
@@ -260,3 +202,4 @@ export default function AccountsPage() {
     </AppShell>
   );
 }
+
