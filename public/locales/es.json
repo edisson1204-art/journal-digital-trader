@@ -1,4 +1,4 @@
-{
+﻿{
   "nav": {
     "product": "Producto",
     "features": "Funciones",
@@ -18,7 +18,7 @@
     "feature4": "Mentor IA 24/7",
     "cta_primary": "Prueba 7 Días Gratis",
     "cta_secondary": "Ver cÃ³mo funciona",
-    "disclaimer": "7 días gratis, luego .99/mes. Cancela cuando quieras.",
+    "disclaimer": "7 días gratis, luego $14.99/mes. Cancela cuando quieras.",
     "dashboard_greeting": "Â¡Buenos dÃ­as, Trader!",
     "dashboard_quote": "\"La disciplina de hoy construye la libertad de maÃ±ana.\""
   },

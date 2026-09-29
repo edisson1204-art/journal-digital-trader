@@ -1,4 +1,4 @@
-{
+﻿{
   "nav": {
     "product": "Product",
     "features": "Features",
@@ -18,7 +18,7 @@
     "feature4": "AI Mentor 24/7",
     "cta_primary": "Start 7-Day Free Trial",
     "cta_secondary": "See how it works",
-    "disclaimer": "7 days free, then .99/mo. Cancel anytime.",
+    "disclaimer": "7 days free, then $14.99/mo. Cancel anytime.",
     "dashboard_greeting": "Good morning, Trader!",
     "dashboard_quote": "\"Discipline today, freedom tomorrow.\""
   },
