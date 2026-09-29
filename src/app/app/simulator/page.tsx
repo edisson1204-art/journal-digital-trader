@@ -456,7 +456,7 @@ export default function SimulatorPage() {
         {/* ── MODE TOGGLE ── */}
         <div className="flex items-center gap-3 rounded-card border border-border-card bg-bg-card p-1.5 w-fit">
           {([
-            { m:"journal" as Mode, icon:BookOpen,  label:"Modo Journal", sub:"Usa mis 105 trades reales" },
+            { m:"journal" as Mode, icon:BookOpen,  label:"Modo Journal", sub:`Usa mis ${journalN} trades reales` },
             { m:"manual"  as Mode, icon:Pencil,    label:"Modo Manual",  sub:"Ingresar parámetros" },
           ] as const).map(({ m, icon:Icon, label, sub }) => (
             <button key={m} onClick={() => { setMode(m); setStats(null); }}

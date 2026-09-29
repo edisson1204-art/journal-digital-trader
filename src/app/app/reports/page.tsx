@@ -82,12 +82,34 @@ export function calculateQuantStats(trades: TradeRecord[]) {
 
   const stats = computeStats(closed);
   const wr = stats.winRate / 100;
-  const pf = stats.profitFactor;
+
+  // ✅ FÓRMULA CORRECTA DE RISK OF RUIN (Ralph Vince Academic Model)
+  // RoR = ((1 - Edge) / (1 + Edge)) ^ Capital_Units
+  // donde Edge = WinRate - LossRate * (AvgLoss/AvgWin)
   let riskOfRuin = 0;
-  if (wr > 0 && pf > 0) {
-    const edge = (wr * pf) - (1 - wr);
-    riskOfRuin = edge > 0 ? parseFloat(Math.max(0.1, (1 - edge) * 10).toFixed(1)) : 99.9;
+  if (wr > 0 && stats.avgWin > 0 && stats.avgLoss > 0) {
+    const rr = stats.avgLoss / stats.avgWin; // Ratio riesgo/beneficio
+    const edge = wr - (1 - wr) * rr;         // Ventaja estadística real
+    if (edge <= 0) {
+      riskOfRuin = 99.9; // Sin ventaja = ruina casi segura
+    } else {
+      // Capital Units = 20 (representando 20 unidades de riesgo)
+      const rorRaw = Math.pow((1 - edge) / (1 + edge), 20) * 100;
+      riskOfRuin = parseFloat(Math.min(99.9, Math.max(0.01, rorRaw)).toFixed(2));
+    }
   }
+
+  // ✅ DÍAS DE RECUPERACIÓN REALES (basado en P&L diario promedio)
+  const dailyPnlMap: Record<string, number> = {};
+  closed.forEach(t => {
+    const day = t.dateOpen;
+    dailyPnlMap[day] = (dailyPnlMap[day] || 0) + (t.netPnl || 0);
+  });
+  const dailyPnls = Object.values(dailyPnlMap).filter(v => v > 0);
+  const avgDailyPnl = dailyPnls.length ? dailyPnls.reduce((a,b) => a+b, 0) / dailyPnls.length : 0;
+  const recoveryDays = avgDailyPnl > 0
+    ? parseFloat((Math.abs(stats.maxDrawdown) / avgDailyPnl).toFixed(1))
+    : 0;
 
   return {
     longWinRate: Math.round(longWinRate * 10) / 10,
@@ -97,7 +119,7 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     riskOfRuin, mae: Math.round(mae), mfe: Math.round(mfe),
     efficiencyPassive: Math.round(efficiencyPassive),
     efficiencyActive: Math.round(efficiencyActive),
-    recoveryDays: 4.2,
+    recoveryDays,
     sessions, holdingTimes, setups
   };
 }
@@ -224,8 +246,9 @@ const generateNarrative = (type: string, stats: any, quant: any, lang: string) =
 export default function ReportsPage() {
   const [selType, setSelType] = useState("monthly");
   const [selPeriod, setSelPeriod] = useState("month");
-  const [selMonth, setSelMonth] = useState("2024-03");
-  const [selYear, setSelYear] = useState("2024");
+  // ✅ Fecha dinámica: usa el mes y año actual por defecto
+  const [selMonth, setSelMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selYear, setSelYear] = useState(() => String(new Date().getFullYear()));
   const [generated, setGenerated] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
 
@@ -446,10 +469,10 @@ export default function ReportsPage() {
                 <p className="text-[11px] print:text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-4 print:mb-2">Resumen Ejecutivo</p>
                 <div className="grid grid-cols-4 gap-4 print:gap-2 mb-10 print:mb-6">
                   {[
-                    { label:"Net P&L",          value:`+$${STATS.totalNet.toLocaleString()}`, color:"text-emerald-600" },
+                    { label:"Net P&L",          value:`${STATS.totalNet >= 0 ? "+" : ""}$${STATS.totalNet.toLocaleString()}`, color: STATS.totalNet >= 0 ? "text-emerald-600" : "text-red-600" },
                     { label:"Win Rate",          value:`${STATS.winRate}%`,                  color:"text-blue-600"  },
-                    { label:"Profit Factor",     value:String(STATS.profitFactor),           color:"text-emerald-600"},
-                    { label:"Expectancy",        value:`+$${STATS.expectancy.toLocaleString()}`, color:"text-emerald-600"},
+                    { label:"Profit Factor",     value:String(STATS.profitFactor),           color: STATS.profitFactor >= 1.5 ? "text-emerald-600" : "text-amber-600" },
+                    { label:"Expectancy",        value:`${STATS.expectancy >= 0 ? "+" : ""}$${STATS.expectancy.toFixed(2)}`, color: STATS.expectancy >= 0 ? "text-emerald-600" : "text-red-600" },
                   ].map(s => (
                     <div key={s.label} className="rounded-xl border border-slate-200 bg-slate-50 p-5 print:p-3">
                       <p className="text-[11px] print:text-[9px] text-slate-500 font-medium mb-1">{s.label}</p>

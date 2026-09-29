@@ -452,7 +452,7 @@ export default function JournalPage() {
 
         {/* Demo notice */}
         <p className="text-[10px] text-text-muted italic text-center pb-1">
-          ⚠️ Seed demo data shown. Register your real trades using the &ldquo;Register Trade&rdquo; button. Data is stored in this session only — database persistence coming soon.
+          ☁️ Tus operaciones se sincronizan automáticamente con la nube (Supabase). Tus datos están seguros y disponibles en cualquier dispositivo.
         </p>
       </div>
 

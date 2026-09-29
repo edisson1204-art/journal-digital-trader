@@ -40,49 +40,62 @@ export default function AnalyticsPage() {
   const [period, setPeriod] = useState("6M");
   const { trades, stats, isHydrated } = useTradeStore();
 
-  // 1. Data para Curva Equity
+  // Helper: filtrar trades por período seleccionado
+  const filteredByPeriod = useMemo(() => {
+    const now = new Date();
+    const cutoff = new Date();
+    if (period === "1W")        cutoff.setDate(now.getDate() - 7);
+    else if (period === "1M")   cutoff.setMonth(now.getMonth() - 1);
+    else if (period === "3M")   cutoff.setMonth(now.getMonth() - 3);
+    else if (period === "6M")   cutoff.setMonth(now.getMonth() - 6);
+    else if (period === "1Y")   cutoff.setFullYear(now.getFullYear() - 1);
+    else cutoff.setFullYear(2000); // "Todos"
+
+    return trades
+      .filter(t => t.result !== "Open" && new Date(t.dateOpen) >= cutoff)
+      .sort((a, b) => new Date(a.dateOpen).getTime() - new Date(b.dateOpen).getTime());
+  }, [trades, period]);
+
+  // 1. Data para Curva Equity — ORDEN CRONOLÓGICO CORRECTO (antiguo → reciente)
   const equityData = useMemo(() => {
-    const closed = [...trades].filter(t => t.result !== "Open").reverse();
     const result = [{ date: "Inicio", equity: 0 }];
     let current = 0;
-    for (const t of closed) {
+    for (const t of filteredByPeriod) {
       current += t.netPnl || 0;
-      result.push({ date: t.dateOpen, equity: current });
+      result.push({ date: t.dateOpen, equity: parseFloat(current.toFixed(2)) });
     }
     return result.length > 1 ? result : [{ date: "Inicio", equity: 0 }, { date: "Hoy", equity: 0 }];
-  }, [trades]);
+  }, [filteredByPeriod]);
 
-  // 2. Data para Weekly P&L
+  // 2. Data para Weekly P&L — ISO Week correcto
   const weeklyPnl = useMemo(() => {
-    const closed = [...trades].filter(t => t.result !== "Open").reverse();
+    const getISOWeek = (d: Date) => {
+      const date = new Date(d); date.setHours(0,0,0,0);
+      date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+      const week1 = new Date(date.getFullYear(), 0, 4);
+      return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+    };
     const weeks: Record<string, number> = {};
-    for (const t of closed) {
-      // Agrupar por semana usando ISO week approx
+    for (const t of filteredByPeriod) {
       const d = new Date(t.dateOpen);
-      const weekNum = Math.ceil(d.getDate() / 7);
-      const key = `${d.toLocaleString('default', { month: 'short' })} W${weekNum}`;
+      const key = `${d.getFullYear()}-W${String(getISOWeek(d)).padStart(2, "0")}`;
       weeks[key] = (weeks[key] || 0) + (t.netPnl || 0);
     }
-    const result = Object.entries(weeks).map(([label, value]) => ({ label, value }));
-    // Tomar las ultimas 10 semanas
-    return result.slice(-10);
-  }, [trades]);
+    return Object.entries(weeks).sort(([a],[b]) => a.localeCompare(b)).slice(-12)
+      .map(([label, value]) => ({ label: label.replace(/^\d{4}-/,""), value: parseFloat(value.toFixed(2)) }));
+  }, [filteredByPeriod]);
 
-  // 3. Performance por Estrategia
+  // 3. Performance por Estrategia (basado en período filtrado)
   const strategyData = useMemo(() => {
-    const closed = trades.filter(t => t.result !== "Open");
     const map: Record<string, { wins: number; total: number; pnl: number }> = {};
-    
-    for (const t of closed) {
+    for (const t of filteredByPeriod) {
       const s = t.strategy || "Sin Estrategia";
       if (!map[s]) map[s] = { wins: 0, total: 0, pnl: 0 };
       map[s].total++;
       if (t.result === "Win") map[s].wins++;
       map[s].pnl += (t.netPnl || 0);
     }
-
     const colors = ["bg-blue-accent", "bg-green-primary", "bg-violet-accent", "bg-yellow-warn", "bg-text-secondary"];
-    
     return Object.entries(map)
       .map(([name, data], idx) => ({
         name,
@@ -92,22 +105,19 @@ export default function AnalyticsPage() {
         pnl: `${data.pnl >= 0 ? "+" : ""}$${Math.abs(data.pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
         color: colors[idx % colors.length]
       }))
-      .sort((a, b) => b.pnlRaw - a.pnlRaw); // Order by PnL desc
-  }, [trades]);
+      .sort((a, b) => b.pnlRaw - a.pnlRaw);
+  }, [filteredByPeriod]);
 
-  // 4. Performance por Instrumento
+  // 4. Performance por Instrumento (basado en período filtrado)
   const instrumentData = useMemo(() => {
-    const closed = trades.filter(t => t.result !== "Open");
     const map: Record<string, { wins: number; total: number; pnl: number }> = {};
-    
-    for (const t of closed) {
+    for (const t of filteredByPeriod) {
       const i = t.instrument;
       if (!map[i]) map[i] = { wins: 0, total: 0, pnl: 0 };
       map[i].total++;
       if (t.result === "Win") map[i].wins++;
       map[i].pnl += (t.netPnl || 0);
     }
-
     return Object.entries(map)
       .map(([sym, data]) => ({
         sym,
@@ -116,8 +126,9 @@ export default function AnalyticsPage() {
         pnlRaw: data.pnl,
         pnl: `${data.pnl >= 0 ? "+" : ""}$${Math.abs(data.pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
       }))
-      .sort((a, b) => b.pnlRaw - a.pnlRaw); // Order by PnL desc
-  }, [trades]);
+      .sort((a, b) => b.pnlRaw - a.pnlRaw);
+  }, [filteredByPeriod]);
+
 
   if (!isHydrated) return null;
 
