@@ -41,3 +41,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+
+// Restarting Vercel to load SUPABASE_SERVICE_ROLE_KEY
