@@ -1,9 +1,9 @@
-/**
- * Journal Digital Trader Invest — Core Trade Data Types
+﻿/**
+ * Journal Digital Trader Invest â€” Core Trade Data Types
  * Comprehensive type definitions for the trade registration system
  */
 
-/* ─── Asset Classes ─── */
+/* â”€â”€â”€ Asset Classes â”€â”€â”€ */
 export type AssetClass =
   | "Futures"
   | "Forex"
@@ -15,11 +15,11 @@ export type AssetClass =
   | "Commodities"
   | "CFDs";
 
-/* ─── Trade direction ─── */
+/* â”€â”€â”€ Trade direction â”€â”€â”€ */
 export type TradeSide = "Buy" | "Sell";
 export type TradeResult = "Win" | "Loss" | "Breakeven" | "Open";
 
-/* ─── Session ─── */
+/* â”€â”€â”€ Session â”€â”€â”€ */
 export type TradingSession =
   | "Pre-Market"
   | "NYSE Open (9:30-11)"
@@ -31,10 +31,10 @@ export type TradingSession =
   | "Asian Session"
   | "Other";
 
-/* ─── Setup quality grade ─── */
+/* â”€â”€â”€ Setup quality grade â”€â”€â”€ */
 export type SetupGrade = "A+" | "A" | "B" | "C" | "D";
 
-/* ─── Broker commission models ─── */
+/* â”€â”€â”€ Broker commission models â”€â”€â”€ */
 export interface BrokerCommission {
   name: string;
   perSide: number;       // $ per contract per side (entry OR exit, not both)
@@ -123,21 +123,21 @@ export const BROKER_PRESETS: Record<string, BrokerCommission> = {
   },
 };
 
-/* ─── Multiple entries (scaling in) ─── */
+/* â”€â”€â”€ Multiple entries (scaling in) â”€â”€â”€ */
 export interface TradeEntry_Scale {
   price: number;
   contracts: number;
   time?: string;
 }
 
-/* ─── Partial exit ─── */
+/* â”€â”€â”€ Partial exit â”€â”€â”€ */
 export interface TradeExit_Partial {
   price: number;
   contracts: number;
   time?: string;
 }
 
-/* ─── Core Trade Record ─── */
+/* â”€â”€â”€ Core Trade Record â”€â”€â”€ */
 export interface TradeRecord {
   // Identity
   id: string;
@@ -158,7 +158,7 @@ export interface TradeRecord {
   holdTimeMinutes?: number;     // Auto-calculated
   session: TradingSession;
 
-  // Execution — entries (supports scaling in)
+  // Execution â€” entries (supports scaling in)
   entries: TradeEntry_Scale[];  // At least one entry required
   avgEntryPrice: number;        // Weighted average of entries
   totalContracts: number;       // Total contracts / units
@@ -214,7 +214,7 @@ export interface TradeRecord {
   screenshotUrl?: string;
 }
 
-/* ─── Daily session summary ─── */
+/* â”€â”€â”€ Daily session summary â”€â”€â”€ */
 export interface DailySummary {
   date: string;
   trades: number;
@@ -231,7 +231,7 @@ export interface DailySummary {
   rMultipleSum: number;
 }
 
-/* ─── Statistics ─── */
+/* â”€â”€â”€ Statistics â”€â”€â”€ */
 export interface TradeStats {
   totalTrades: number;
   wins: number;
@@ -254,7 +254,7 @@ export interface TradeStats {
   planFollowRate: number;        // %
 }
 
-/* ─── Utility: calculate trade ─── */
+/* â”€â”€â”€ Utility: calculate trade â”€â”€â”€ */
 export function calculateTrade(
   side: TradeSide,
   avgEntry: number,
@@ -291,9 +291,9 @@ export function calculateTrade(
   };
 }
 
-/* ─── Compute statistics from trade list ─── */
+/* â”€â”€â”€ Compute statistics from trade list â”€â”€â”€ */
 export function computeStats(trades: TradeRecord[]): TradeStats {
-  const closed = trades.filter(t => t.result !== "Open");
+  const closed = trades.filter(t => t.result !== "Open").sort((a, b) => new Date(a.dateOpen).getTime() - new Date(b.dateOpen).getTime());
   const wins   = closed.filter(t => t.result === "Win");
   const losses = closed.filter(t => t.result === "Loss");
   const be     = closed.filter(t => t.result === "Breakeven");
@@ -356,7 +356,7 @@ export function computeStats(trades: TradeRecord[]): TradeStats {
   };
 }
 
-/* ─── Asset class config ─── */
+/* â”€â”€â”€ Asset class config â”€â”€â”€ */
 export const ASSET_CLASS_CONFIG: Record<AssetClass, {
   pipValue: number;   // Default $ per point per contract
   unit: string;       // "contracts" | "lots" | "shares"
@@ -442,3 +442,5 @@ export const TAGS_SUGGESTED = [
   "trend-day","range-day","gap-fill","FOMO","revenge","overtrading",
   "scaled-in","partial-exit","runner","breakeven-stop","missed-entry",
 ];
+
+

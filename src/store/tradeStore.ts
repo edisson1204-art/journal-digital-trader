@@ -1,14 +1,14 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { TradeRecord, TradeStats, computeStats } from "@/lib/tradeTypes";
+import { supabase } from "@/lib/supabase/client";
 
 export interface TradeStore {
-  // Estado
   trades: TradeRecord[];
   stats: TradeStats;
   isHydrated: boolean;
+  isSyncing: boolean;
   
-  // Ajustes de Usuario
   settings: {
     currency: string;
     language: "en" | "es";
@@ -17,10 +17,10 @@ export interface TradeStore {
     accountSize: number;
   };
   
-  // Acciones
-  addTrade: (trade: TradeRecord) => void;
-  updateTrade: (id: string, updates: Partial<TradeRecord>) => void;
-  deleteTrade: (id: string) => void;
+  fetchTradesFromCloud: () => Promise<void>;
+  addTrade: (trade: TradeRecord) => Promise<void>;
+  updateTrade: (id: string, updates: Partial<TradeRecord>) => Promise<void>;
+  deleteTrade: (id: string) => Promise<void>;
   clearTrades: () => void;
   setHydrated: (state: boolean) => void;
   updateSettings: (settings: Partial<TradeStore["settings"]>) => void;
@@ -29,10 +29,10 @@ export interface TradeStore {
 export const useTradeStore = create<TradeStore>()(
   persist(
     (set, get) => ({
-      // App starts completely clean for new users
       trades: [],
       stats: computeStats([]),
       isHydrated: false,
+      isSyncing: false,
       
       settings: {
         currency: "USD",
@@ -42,22 +42,73 @@ export const useTradeStore = create<TradeStore>()(
         accountSize: 50000,
       },
 
-      addTrade: (trade) => set((state) => {
-        const newTrades = [trade, ...state.trades];
-        // Ordenar del más reciente al más antiguo
+      fetchTradesFromCloud: async () => {
+        set({ isSyncing: true });
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (!sessionData.session?.user) {
+            set({ isSyncing: false });
+            return;
+          }
+
+          // Descarga todos los trades del usuario desde la columna JSONB
+          const { data, error } = await supabase
+            .from("trades")
+            .select("data")
+            .eq("user_id", sessionData.session.user.id);
+
+          if (!error && data) {
+            const cloudTrades: TradeRecord[] = data.map(row => row.data as TradeRecord);
+            cloudTrades.sort((a, b) => new Date(b.dateOpen).getTime() - new Date(a.dateOpen).getTime());
+            set({ trades: cloudTrades, stats: computeStats(cloudTrades) });
+          }
+        } catch (error) {
+          console.error("Error syncing from cloud:", error);
+        } finally {
+          set({ isSyncing: false });
+        }
+      },
+
+      addTrade: async (trade) => {
+        const currentTrades = get().trades;
+        const newTrades = [trade, ...currentTrades];
         newTrades.sort((a, b) => new Date(b.dateOpen).getTime() - new Date(a.dateOpen).getTime());
-        return { trades: newTrades, stats: computeStats(newTrades) };
-      }),
+        set({ trades: newTrades, stats: computeStats(newTrades) });
 
-      updateTrade: (id, updates) => set((state) => {
-        const newTrades = state.trades.map(t => t.id === id ? { ...t, ...updates } : t);
-        return { trades: newTrades, stats: computeStats(newTrades) };
-      }),
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.user) {
+          await supabase.from("trades").insert([{
+            id: trade.id,
+            user_id: sessionData.session.user.id,
+            data: trade
+          }]);
+        }
+      },
 
-      deleteTrade: (id) => set((state) => {
-        const newTrades = state.trades.filter(t => t.id !== id);
-        return { trades: newTrades, stats: computeStats(newTrades) };
-      }),
+      updateTrade: async (id, updates) => {
+        const currentTrades = get().trades;
+        let updatedTrade = currentTrades.find(t => t.id === id);
+        if (!updatedTrade) return;
+        
+        updatedTrade = { ...updatedTrade, ...updates };
+        const newTrades = currentTrades.map(t => t.id === id ? updatedTrade! : t);
+        set({ trades: newTrades, stats: computeStats(newTrades) });
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.user) {
+          await supabase.from("trades").update({ data: updatedTrade }).eq("id", id).eq("user_id", sessionData.session.user.id);
+        }
+      },
+
+      deleteTrade: async (id) => {
+        const newTrades = get().trades.filter(t => t.id !== id);
+        set({ trades: newTrades, stats: computeStats(newTrades) });
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.user) {
+          await supabase.from("trades").delete().eq("id", id).eq("user_id", sessionData.session.user.id);
+        }
+      },
 
       clearTrades: () => set({ trades: [], stats: computeStats([]) }),
       
@@ -72,6 +123,7 @@ export const useTradeStore = create<TradeStore>()(
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated(true);
+        state?.fetchTradesFromCloud();
       },
     }
   )
