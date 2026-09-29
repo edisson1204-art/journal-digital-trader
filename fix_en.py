@@ -1,4 +1,6 @@
-{
+import json
+
+en = {
   "nav": {
     "product": "Product",
     "features": "Features",
@@ -8,7 +10,7 @@
     "cta": "Start 7-Day Free Trial"
   },
   "hero": {
-    "eyebrow": "DISCIPLINE • DATA • BETTER DECISIONS",
+    "eyebrow": "DISCIPLINE \u2022 DATA \u2022 BETTER DECISIONS",
     "title1": "Trade with Data.",
     "title2": "Improve with Evidence.",
     "subtitle": "The all-in-one trading journal, analytics, risk tools and AI mentor designed to help you become a more consistent trader.",
@@ -75,7 +77,7 @@
     "feature6": "Funded Accounts",
     "feature7": "Psychology Tools",
     "feature8": "Multi-Market Support",
-    "feature9": "English & Español",
+    "feature9": "English & Espa\u00f1ol",
     "feature10": "Cancel anytime",
     "cta": "Start 7-Day Free Trial",
     "billing_note": "Billed monthly. Cancel anytime."
@@ -108,7 +110,7 @@
     "cloud_title": "Cloud Sync",
     "cloud_desc": "Access your data from anywhere, any device.",
     "bilingual_title": "Bilingual",
-    "bilingual_desc": "English & Español.",
+    "bilingual_desc": "English & Espa\u00f1ol.",
     "updates_title": "Regular Updates",
     "updates_desc": "New features continuously."
   },
@@ -124,7 +126,7 @@
     "risk": "Risk Disclosure",
     "refund": "Refund Policy",
     "contact": "Contact",
-    "copyright": "© 2026 Journal Digital Trader Invest. All rights reserved."
+    "copyright": "\u00a9 2026 Journal Digital Trader Invest. All rights reserved."
   },
   "metrics": {
     "total_pnl": "Total P&L",
@@ -138,3 +140,8 @@
     "breakeven": "Breakeven"
   }
 }
+
+with open("public/locales/en.json", "w", encoding="utf-8") as f:
+    json.dump(en, f, ensure_ascii=False, indent=2)
+
+print("EN dictionary written successfully")
