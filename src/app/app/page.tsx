@@ -24,7 +24,9 @@ function CustomTooltip({ active, payload, label }: any) {
 function EquityChart({ trades }: { trades: any[] }) {
   // Generar curva de equity interactiva
   const data = useMemo(() => {
-    const closed = [...trades].filter(t => t.result !== "Open").reverse();
+    const closed = [...trades]
+      .filter(t => t.result !== "Open")
+      .sort((a, b) => new Date(a.dateOpen).getTime() - new Date(b.dateOpen).getTime());
     const result = [{ date: "Inicio", equity: 0 }];
     let current = 0;
     for (const t of closed) {

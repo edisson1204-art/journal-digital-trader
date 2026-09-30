@@ -10,37 +10,55 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Journal Digital Trader Invest — Trade with data. Improve with evidence.",
+  title: "Journal Digital Trader Invest — Opera con Datos. Mejora con Evidencia.",
   description:
-    "The all-in-one trading journal, analytics, risk tools and AI mentor designed to help you become a more consistent trader. Start for $14.99/mes.",
+    "El diario de trading profesional con analítica avanzada, calculadoras de riesgo, simulador Monte Carlo y Mentor IA. Empieza gratis 7 días. $14.99/mes.",
   keywords: [
-    "trading journal", "trade analytics", "risk calculator", "AI trading mentor",
-    "funded accounts", "forex journal", "futures journal", "trading strategy",
-    "diario de trading", "analítica de trading"
+    "trading journal", "diario de trading", "trade analytics", "analítica de trading",
+    "risk calculator", "calculadora de riesgo", "AI trading mentor", "mentor de trading IA",
+    "funded accounts", "cuentas fondeadas", "forex journal", "futures journal",
+    "trading strategy", "estrategia de trading", "monte carlo simulator", "simulador monte carlo",
+    "FTMO journal", "prop firm tracker", "psychology trading journal",
   ],
   openGraph: {
-    title: "Journal Digital Trader Invest — Trade with data. Improve with evidence.",
+    title: "Journal Digital Trader Invest — Opera con Datos. Mejora con Evidencia.",
     description:
-      "The all-in-one trading journal, analytics, risk tools and AI mentor. Start for $14.99/mes.",
+      "Diario de trading + analítica avanzada + calculadoras de riesgo + Mentor IA. 7 días gratis, luego $14.99/mes.",
     type: "website",
-    locale: "en_US",
-    alternateLocale: "es_ES",
+    url: "https://journal-digital-trader.vercel.app",
+    locale: "es_ES",
+    alternateLocale: "en_US",
     siteName: "Journal Digital Trader Invest",
+    images: [
+      {
+        url: "https://journal-digital-trader.vercel.app/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Journal Digital Trader Invest — Opera con Datos. Mejora con Evidencia.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Journal Digital Trader Invest",
-    description: "Trade with data. Improve with evidence. Journal + Analytics + Risk + AI. $14.99/mes.",
+    description: "Opera con Datos. Mejora con Evidencia. Journal + Analítica + Riesgo + IA. 7 días gratis.",
+    images: ["https://journal-digital-trader.vercel.app/og-image.png"],
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   alternates: {
-    canonical: "/",
+    canonical: "https://journal-digital-trader.vercel.app",
     languages: {
-      "en-US": "/en",
-      "es-ES": "/es",
+      "es": "https://journal-digital-trader.vercel.app",
+      "en": "https://journal-digital-trader.vercel.app/en",
     },
   },
 };
