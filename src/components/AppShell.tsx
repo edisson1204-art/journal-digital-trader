@@ -213,6 +213,7 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
         className={`hidden md:flex flex-col flex-shrink-0 border-r border-border-card bg-bg-card transition-all duration-200 ${
           collapsed ? "w-14" : "w-52"
         }`}
+        aria-label="Navegación principal"
       >
         <SidebarContent />
 
@@ -259,20 +260,22 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Demo data badge */}
-            <span className="hidden sm:inline-flex rounded border border-yellow-warn/25 bg-yellow-warn/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-yellow-warn">
-              DEMO DATA
-            </span>
-
+      <div className="flex items-center gap-3">
             {/* Notifications */}
-            <button className="relative text-text-muted hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-green-primary rounded-md" aria-label="Notifications">
-              <Bell className="h-4 w-4" />
+            <button
+              className="relative text-text-muted hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-green-primary rounded-md"
+              aria-label="Notificaciones"
+            >
+              <Bell className="h-4 w-4" aria-hidden="true" />
               <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-green-primary" aria-hidden="true" />
             </button>
 
             {/* Avatar */}
-            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-accent to-violet-accent flex items-center justify-center text-[10px] font-bold text-white">
+            <div
+              className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-accent to-violet-accent flex items-center justify-center text-[10px] font-bold text-white"
+              aria-label="Perfil de usuario"
+              title="Trader Pro"
+            >
               T
             </div>
           </div>
