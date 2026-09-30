@@ -558,9 +558,18 @@ export default function ReportsPage() {
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-4 italic border-t border-slate-100 pt-3">
-                  Dictamen: Tus operaciones de menos de 15 minutos (Scalping) son consistentemente perdedoras. Tienes una afinidad estadística natural hacia el Intraday largo (1-4 horas).
-                </p>
+                {QUANT_STATS.holdingTimes.length > 0 && (() => {
+                  const best  = [...QUANT_STATS.holdingTimes].sort((a:any,b:any) => b.pnl - a.pnl)[0];
+                  const worst = [...QUANT_STATS.holdingTimes].sort((a:any,b:any) => a.pnl - b.pnl)[0];
+                  if (!best || !worst || best.type === worst.type) return null;
+                  return (
+                    <p className="text-[11px] text-slate-500 mt-4 italic border-t border-slate-100 pt-3">
+                      Dictamen: Tu mejor rendimiento se concentra en operaciones de tipo <strong>{best.type}</strong> ({best.winRate}% WR, {best.pnl >= 0 ? '+' : ''}${best.pnl}). 
+                      Las operaciones de tipo <strong>{worst.type}</strong> son tu punto débil con {worst.winRate}% WR ({worst.pnl >= 0 ? '+' : ''}${worst.pnl}). 
+                      Matemáticamente, concentrar tu operativa en {best.type} maximizaría tu edge.
+                    </p>
+                  );
+                })()}
               </div>
             </div>
 
@@ -596,7 +605,7 @@ export default function ReportsPage() {
             </div>
 
             <div className="mt-auto pt-6 border-t-2 border-slate-200 text-center">
-              <p className="text-[10px] text-slate-400 font-medium">Documento generado algorítmicamente mediante simulaciones de Monte Carlo y regresiones de datos históricos (Conectado a Store Local).</p>
+              <p className="text-[10px] text-slate-400 font-medium">Documento generado algorítmicamente mediante simulaciones de Monte Carlo y regresiones de datos históricos (Conectado a Supabase Cloud).</p>
               <p className="text-[10px] text-slate-400 font-bold mt-1">CONFIDENCIAL</p>
             </div>
           </div>
