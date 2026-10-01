@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Journal Digital Trader Invest â€” Core Trade Data Types
  * Comprehensive type definitions for the trade registration system
  */
@@ -6,6 +6,7 @@
 /* â”€â”€â”€ Asset Classes â”€â”€â”€ */
 export type AssetClass =
   | "Futures"
+  | "Futures_Micro"
   | "Forex"
   | "Stocks"
   | "Options"
@@ -364,10 +365,16 @@ export const ASSET_CLASS_CONFIG: Record<AssetClass, {
   instruments: string[];
 }> = {
   Futures: {
-    pipValue: 1,
+    pipValue: 1,      // Default — overridden per-instrument in risk calc
     unit: "contracts",
     decimalPlaces: 2,
-    instruments: ["NQ","ES","YM","RTY","CL","GC","SI","ZB","ZN","6E","6B","6J","6A","NG","HO","MNQ","MES","MYM"],
+    instruments: ["NQ","ES","YM","RTY","CL","GC","SI","ZB","ZN","6E","6B","6J","6A","NG","HO"],
+  },
+  Futures_Micro: {
+    pipValue: 2,      // Default MNQ=$2/pt — user selects per instrument
+    unit: "micro-contratos",
+    decimalPlaces: 2,
+    instruments: ["MNQ","MES","MYM","M2K","MGC","MCL","MBT","M6E","M6B","MHNG"],
   },
   Forex: {
     pipValue: 10,    // Per standard lot per pip

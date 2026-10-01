@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { AppShell } from "@/components/AppShell";
 import { Sparkles, Brain, Send, RefreshCw, AlertTriangle, Lock, ImagePlus, X, TrendingUp, TrendingDown, Target, Activity } from "lucide-react";
@@ -23,7 +23,7 @@ export default function AIMentorPage() {
       {
         id: "sys-1",
         role: "assistant",
-        content: "Bienvenido. He analizado el historial completo de tu cuenta de trading. Â¿Deseas que desglose algÃºn patrÃ³n de tu comportamiento o tienes un grÃ¡fico para que yo analice?"
+        content: "Bienvenido. He analizado el historial completo de tu cuenta de trading. ¿Deseas que desglose algún patrón de tu comportamiento, o tienes un gráfico para que yo analice?"
       }
     ]
   });
@@ -77,7 +77,7 @@ export default function AIMentorPage() {
         type: "info",
         icon: <Activity className="h-5 w-5 text-blue-accent" />,
         title: "Datos Insuficientes",
-        body: `Se requieren al menos 5 operaciones cerradas para auditar patrones matemÃ¡ticos (Tienes ${closed.length}). Sigue documentando tus trades.`,
+        body: `Se requieren al menos 5 operaciones cerradas para auditar patrones matemáticos (Tienes ${closed.length}). Sigue documentando tus trades.`,
         confidence: 100,
         color: "border-blue-accent/30 bg-blue-accent/5",
       }];
@@ -85,8 +85,8 @@ export default function AIMentorPage() {
 
     const insights = [];
 
-    // 1. AnÃ¡lisis de DÃ­as de la Semana
-    const days = ['Domingo', 'Lunes', 'Martes', 'MiÃ©rcoles', 'Jueves', 'Viernes', 'SÃ¡bado'];
+    // 1. Análisis de Días de la Semana
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const pnlByDay: Record<string, number> = {};
     closed.forEach(t => {
       const d = days[new Date(t.dateOpen).getDay()];
@@ -107,8 +107,8 @@ export default function AIMentorPage() {
       insights.push({
         type: "performance",
         icon: <TrendingUp className="h-5 w-5 text-green-primary" />,
-        title: `Estructura Ã³ptima los ${bestDay}s`,
-        body: `Tus ${bestDay}s generan el mayor beneficio histÃ³rico ($${maxPnl.toFixed(2)}). Tu psicologÃ­a de ejecuciÃ³n parece estar mejor sincronizada con la liquidez de este dÃ­a.`,
+        title: `Estructura óptima los ${bestDay}s`,
+        body: `Tus ${bestDay}s generan el mayor beneficio histórico ($${maxPnl.toFixed(2)}). Tu psicología de ejecuciÃ³n parece estar mejor sincronizada con la liquidez de este día.`,
         confidence: 85,
         color: "border-green-primary/30 bg-green-primary/5",
       });
@@ -119,7 +119,7 @@ export default function AIMentorPage() {
         type: "performance",
         icon: <TrendingDown className="h-5 w-5 text-red-loss" />,
         title: `Fuga de Capital los ${worstDay}s`,
-        body: `Cuidado: Pierdes la mayor parte de tus ganancias los ${worstDay}s (P&L: $${minPnl.toFixed(2)}). Considera reducir tu apalancamiento a la mitad en este dÃ­a.`,
+        body: `Cuidado: Pierdes la mayor parte de tus ganancias los ${worstDay}s (P&L: $${minPnl.toFixed(2)}). Considera reducir tu apalancamiento a la mitad en este día.`,
         confidence: 92,
         color: "border-red-loss/30 bg-red-loss/5",
       });
@@ -139,19 +139,19 @@ export default function AIMentorPage() {
         type: "pattern",
         icon: <Target className="h-5 w-5 text-violet-accent" />,
         title: `Especialidad Cuantitativa: ${bestAsset}`,
-        body: `Tus datos sugieren una clara ventaja en ${bestAsset} con $${maxAssetPnl.toFixed(2)} netos. ConcÃ©ntrate en tu "Edge" estadÃ­stico y filtra los activos tÃ³xicos.`,
+        body: `Tus datos sugieren una clara ventaja en ${bestAsset} con $${maxAssetPnl.toFixed(2)} netos. Concéntrate en tu "Edge" estadístico y filtra los activos tóxicos.`,
         confidence: 88,
         color: "border-violet-accent/30 bg-violet-accent/5",
       });
     }
 
-    // 3. Revenge Trading (PatrÃ³n destructivo)
+    // 3. Revenge Trading (Patrón destructivo)
     let revengeCount = 0;
     for (let i = 0; i < closed.length - 1; i++) {
       if (closed[i].result === "Loss") {
         const nextTrade = closed[i+1];
         const timeDiff = new Date(nextTrade.dateOpen).getTime() - new Date(closed[i].dateOpen).getTime();
-        // Si el siguiente trade fue el mismo dÃ­a, y con mayor apalancamiento
+        // Si el siguiente trade fue el mismo día, y con mayor apalancamiento
         if (timeDiff < 24 * 60 * 60 * 1000 && nextTrade.totalContracts > closed[i].totalContracts) {
           revengeCount++;
         }
@@ -163,7 +163,7 @@ export default function AIMentorPage() {
         type: "risk",
         icon: <AlertTriangle className="h-5 w-5 text-yellow-warn" />,
         title: `Revenge Trading Detectado (${revengeCount} casos)`,
-        body: `Has aumentado el tamaÃ±o del lote inmediatamente despuÃ©s de una pÃ©rdida ${revengeCount} veces. MatemÃ¡ticamente, este sesgo de recuperaciÃ³n aumenta tu riesgo de ruina un 42%.`,
+        body: `Has aumentado el tamaño del lote inmediatamente después de una pérdida ${revengeCount} veces. Matemáticamente, este sesgo de recuperaciÃ³n aumenta tu riesgo de ruina un 42%.`,
         confidence: 96,
         color: "border-yellow-warn/30 bg-yellow-warn/5",
       });
@@ -180,7 +180,7 @@ export default function AIMentorPage() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-violet-accent" />
-            <h2 className="text-sm font-semibold text-text-primary">AuditorÃ­a Cuantitativa - {trades.filter(t => t.result !== "Open").length} trades analizados</h2>
+            <h2 className="text-sm font-semibold text-text-primary">Auditoría Cuantitativa - {trades.filter(t => t.result !== "Open").length} trades analizados</h2>
           </div>
 
           {dynamicInsights.map((ins, i) => (
@@ -191,7 +191,7 @@ export default function AIMentorPage() {
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <h3 className="text-[13px] font-semibold text-text-primary">{ins.title}</h3>
                     <span className="flex-shrink-0 rounded-full bg-black/20 px-2 py-0.5 text-[9px] font-bold text-text-primary uppercase tracking-wider">
-                      {ins.confidence}% precisiÃ³n
+                      {ins.confidence}% precisión
                     </span>
                   </div>
                   <p className="text-[12px] text-text-secondary leading-relaxed">{ins.body}</p>
@@ -317,7 +317,7 @@ export default function AIMentorPage() {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isLoading}
-                    title="Adjuntar grÃ¡fico (Screenshot)"
+                    title="Adjuntar gráfico (Screenshot)"
                     className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-btn bg-bg-section border border-border-card text-text-muted hover:text-violet-accent hover:border-violet-accent/50 disabled:opacity-40 transition-all focus:outline-none"
                   >
                     <ImagePlus className="h-4 w-4" />
