@@ -10,7 +10,7 @@ import { useState, useMemo } from "react";
 import {
   Plus, Search, Tag, Trash2, BarChart2,
   ChevronUp, ChevronDown, TrendingUp, TrendingDown,
-  AlertTriangle, Clock, Camera, X
+  AlertTriangle, Clock, Camera, X, Pencil
 } from "lucide-react";
 
 import { useTradeStore } from "@/store/tradeStore";
@@ -55,8 +55,10 @@ export default function JournalPage() {
   const trades = useTradeStore(s => s.trades);
   const addTrade = useTradeStore(s => s.addTrade);
   const deleteTrade = useTradeStore(s => s.deleteTrade);
+  const updateTrade = useTradeStore(s => s.updateTrade);
 
   const [modalOpen, setModal]         = useState(false);
+  const [editTrade, setEditTrade]     = useState<TradeRecord | null>(null);
   const [search, setSearch]           = useState("");
   const [filterResult, setFilter]     = useState("All");
   const [filterAsset, setFilterAsset] = useState("All");
@@ -125,9 +127,16 @@ export default function JournalPage() {
     <AppShell title="Trade Journal" subtitle="Full record of your operativas">
 
       <RegisterTradeModal
-        open={modalOpen}
-        onClose={() => setModal(false)}
-        onSave={t => addTrade(t)}
+        open={modalOpen || editTrade !== null}
+        onClose={() => { setModal(false); setEditTrade(null); }}
+        initialData={editTrade ?? undefined}
+        onSave={t => {
+          if (editTrade) {
+            updateTrade(editTrade.id, t);
+          } else {
+            addTrade(t);
+          }
+        }}
       />
 
       <div className="flex flex-col gap-4 w-full max-w-[1800px] mx-auto">
@@ -303,10 +312,20 @@ export default function JournalPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2.5 pr-5">
-                          <button onClick={() => handleDelete(t.id)}
-                            className="text-text-muted hover:text-red-loss transition-colors opacity-0 group-hover:opacity-100" aria-label="Delete">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => setEditTrade(t)}
+                              className="text-text-muted hover:text-blue-accent transition-colors"
+                              aria-label="Editar trade"
+                              title="Editar operación"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button onClick={() => handleDelete(t.id)}
+                              className="text-text-muted hover:text-red-loss transition-colors" aria-label="Eliminar trade">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

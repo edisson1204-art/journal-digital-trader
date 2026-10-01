@@ -373,9 +373,11 @@ interface RegisterTradeModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (trade: TradeRecord) => void;
+  initialData?: TradeRecord; // ← NUEVO: modo edición
 }
 
-export function RegisterTradeModal({ open, onClose, onSave }: RegisterTradeModalProps) {
+export function RegisterTradeModal({ open, onClose, onSave, initialData }: RegisterTradeModalProps) {
+  const isEditing = !!initialData;
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   /* ── Step 1 ── */
@@ -424,26 +426,66 @@ export function RegisterTradeModal({ open, onClose, onSave }: RegisterTradeModal
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  /* Reset on open */
+  /* Reset on open — pre-fills if editing */
   useEffect(() => {
     if (!open) return;
     setStep(1);
-    setAssetClass("Futures"); setInstrument("NQ"); setCustomInstr(""); setTicker("");
-    setSide("Buy");
-    setDateOpen(new Date().toISOString().slice(0, 10));
-    setTimeOpen(new Date().toTimeString().slice(0, 5));
-    setDateClose(""); setTimeClose(""); setSession("NYSE Open (9:30-11)"); setIsFunded(false);
-    setEntries([{ price: 0, contracts: 1, time: "" }]);
-    setStopLoss(""); setInitialSL(""); setTP1(""); setTP2(""); setTP3("");
-    setBroker("ninjatrader_lease"); setCustomComm("0");
-    setStrategy("Breakout"); setSetup(""); setSetupGrade("A");
-    setPlanFollowed(true); setConfluence("3"); setMae(""); setMfe("");
-    setExits([{ price: 0, contracts: 1, time: "" }]); setIsBreakeven(false);
-    setChartImage(null);
-    setEmotionEntry("Confident"); setEmotionExit("Neutral");
-    setMistakeType(""); setTags([]); setTagInput(""); setNotes(""); setLessons("");
+    if (initialData) {
+      // ── Pre-fill all fields from existing trade ──
+      setAssetClass(initialData.assetClass);
+      setInstrument(initialData.instrument in ASSET_CLASS_CONFIG[initialData.assetClass]?.instruments ? initialData.instrument : "Custom");
+      setCustomInstr(initialData.instrument);
+      setTicker(initialData.tickerSymbol || "");
+      setSide(initialData.side);
+      setDateOpen(initialData.dateOpen);
+      setTimeOpen(initialData.timeOpen || new Date().toTimeString().slice(0, 5));
+      setDateClose(initialData.dateClose || "");
+      setTimeClose(initialData.timeClose || "");
+      setSession(initialData.session);
+      setIsFunded(initialData.isFundedAccount);
+      setEntries(initialData.entries.length > 0 ? initialData.entries : [{ price: initialData.avgEntryPrice, contracts: initialData.totalContracts, time: "" }]);
+      setStopLoss(String(initialData.stopLoss));
+      setInitialSL(String(initialData.initialStopLoss || initialData.stopLoss));
+      setTP1(initialData.takeProfit ? String(initialData.takeProfit) : "");
+      setTP2(initialData.takeProfit2 ? String(initialData.takeProfit2) : "");
+      setTP3(initialData.takeProfit3 ? String(initialData.takeProfit3) : "");
+      setBroker(initialData.brokerId);
+      setCustomComm(String(initialData.commissionPerSide));
+      setStrategy(initialData.strategy);
+      setSetup(initialData.setup);
+      setSetupGrade(initialData.setupGrade);
+      setPlanFollowed(initialData.planFollowed);
+      setConfluence(String(initialData.confluenceCount));
+      setMae(initialData.mae ? String(initialData.mae) : "");
+      setMfe(initialData.mfe ? String(initialData.mfe) : "");
+      setExits(initialData.exits.length > 0 ? initialData.exits : [{ price: initialData.avgExitPrice || 0, contracts: initialData.contractsExited || 1, time: "" }]);
+      setIsBreakeven(initialData.isBreakeven);
+      setChartImage(initialData.screenshotUrl || null);
+      setEmotionEntry(initialData.emotionEntry);
+      setEmotionExit(initialData.emotionExit || "Neutral");
+      setMistakeType(initialData.mistakeType || "");
+      setTags(initialData.tags);
+      setNotes(initialData.notes);
+      setLessons(initialData.lessonsLearned || "");
+    } else {
+      // ── Reset to defaults for new trade ──
+      setAssetClass("Futures"); setInstrument("NQ"); setCustomInstr(""); setTicker("");
+      setSide("Buy");
+      setDateOpen(new Date().toISOString().slice(0, 10));
+      setTimeOpen(new Date().toTimeString().slice(0, 5));
+      setDateClose(""); setTimeClose(""); setSession("NYSE Open (9:30-11)"); setIsFunded(false);
+      setEntries([{ price: 0, contracts: 1, time: "" }]);
+      setStopLoss(""); setInitialSL(""); setTP1(""); setTP2(""); setTP3("");
+      setBroker("ninjatrader_lease"); setCustomComm("0");
+      setStrategy("Breakout"); setSetup(""); setSetupGrade("A");
+      setPlanFollowed(true); setConfluence("3"); setMae(""); setMfe("");
+      setExits([{ price: 0, contracts: 1, time: "" }]); setIsBreakeven(false);
+      setChartImage(null);
+      setEmotionEntry("Confident"); setEmotionExit("Neutral");
+      setMistakeType(""); setTags([]); setTagInput(""); setNotes(""); setLessons("");
+    }
     setErrors({});
-  }, [open]);
+  }, [open, initialData]);
 
   /* Escape key */
   useEffect(() => {
@@ -589,10 +631,23 @@ export function RegisterTradeModal({ open, onClose, onSave }: RegisterTradeModal
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-border-card/60 px-6 py-4">
+          <div className={`flex items-center justify-between border-b px-6 py-4 ${isEditing ? "border-blue-accent/40 bg-blue-accent/5" : "border-border-card/60"}`}>
             <div>
-              <h2 className="text-[15px] font-bold text-text-primary">Registro de Trade / Operativa</h2>
-              <p className="text-[11px] text-text-muted">Completa todos los campos para obtener estadísticas precisas</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-[15px] font-bold text-text-primary">
+                  {isEditing ? "✏️ Editar Operación" : "Registro de Trade / Operativa"}
+                </h2>
+                {isEditing && (
+                  <span className="rounded-full bg-blue-accent/15 border border-blue-accent/30 px-2 py-0.5 text-[9px] font-bold text-blue-accent uppercase tracking-wider">
+                    MODO EDICIÓN
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-text-muted">
+                {isEditing
+                  ? `Editando: ${initialData?.instrument} · ${initialData?.dateOpen} · ${initialData?.side}`
+                  : "Completa todos los campos para obtener estadísticas precisas"}
+              </p>
             </div>
             <button
               onClick={onClose}
