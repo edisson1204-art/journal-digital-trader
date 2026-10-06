@@ -6,7 +6,10 @@ export const runtime = 'edge';
 
 export async function POST(req: Request) {
   try {
-    const { messages, tradeContext, imageUrl } = await req.json();
+    const body = await req.json();
+    const { messages, tradeContext } = body;
+    // ai SDK 3.x: handleSubmit(e, { data: { imageUrl } }) envía la imagen en body.data
+    const imageUrl: string | undefined = body.data?.imageUrl ?? body.imageUrl;
 
     // ✅ FIX: leer la API key del header correcto
     const apiKey = req.headers.get('x-openai-key') || req.headers.get('Authorization')?.replace('Bearer ', '');

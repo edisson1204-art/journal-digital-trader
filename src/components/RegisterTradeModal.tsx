@@ -9,7 +9,7 @@ import {
   type TradeRecord, type AssetClass, type TradeSide, type TradingSession,
   type SetupGrade, type TradeEntry_Scale, type TradeExit_Partial,
   BROKER_PRESETS, ASSET_CLASS_CONFIG, STRATEGIES, EMOTIONS, MISTAKE_TYPES,
-  TAGS_SUGGESTED, calculateTrade, getPointValue,
+  TAGS_SUGGESTED, calculateTrade, getPointValue, localDateKey,
 } from "@/lib/tradeTypes";
 
 /* ─── Prevent browser auto-translate from mangling trading terms ─── */
@@ -386,7 +386,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
   const [customInstrument, setCustomInstr]  = useState("");
   const [tickerSymbol, setTicker]           = useState("");
   const [side, setSide]                     = useState<TradeSide>("Buy");
-  const [dateOpen, setDateOpen]             = useState(new Date().toISOString().slice(0, 10));
+  const [dateOpen, setDateOpen]             = useState(localDateKey());
   const [timeOpen, setTimeOpen]             = useState(new Date().toTimeString().slice(0, 5));
   const [dateClose, setDateClose]           = useState("");
   const [timeClose, setTimeClose]           = useState("");
@@ -471,7 +471,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
       // ── Reset to defaults for new trade ──
       setAssetClass("Futures"); setInstrument("NQ"); setCustomInstr(""); setTicker("");
       setSide("Buy");
-      setDateOpen(new Date().toISOString().slice(0, 10));
+      setDateOpen(localDateKey());
       setTimeOpen(new Date().toTimeString().slice(0, 5));
       setDateClose(""); setTimeClose(""); setSession("NYSE Open (9:30-11)"); setIsFunded(false);
       setEntries([{ price: 0, contracts: 1, time: "" }]);

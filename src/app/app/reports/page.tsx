@@ -14,7 +14,27 @@ const REPORT_TYPES = [
 ];
 
 import { useTradeStore } from "@/store/tradeStore";
-import { computeStats, type TradeRecord } from "@/lib/tradeTypes";
+import { computeStats, localDateKey, type TradeRecord } from "@/lib/tradeTypes";
+
+export type ReportAccount = "all" | "personal" | "funded";
+
+/** Filtra los trades del reporte por periodo y tipo de cuenta. */
+export function filterReportTrades(
+  trades: TradeRecord[], period: string, month: string, year: string, account: ReportAccount
+): TradeRecord[] {
+  return trades.filter(t => {
+    const d = t.dateOpen || "";
+    let inPeriod = false;
+    if (period === "month") inPeriod = d.startsWith(month);
+    else if (period === "year") inPeriod = d.startsWith(year);
+    else if (period === "h1" || period === "h2") {
+      const m = parseInt(d.slice(5, 7), 10);
+      inPeriod = d.startsWith(year) && (period === "h1" ? m >= 1 && m <= 6 : m >= 7 && m <= 12);
+    }
+    const inAccount = account === "all" || (account === "funded" ? !!t.isFundedAccount : !t.isFundedAccount);
+    return inPeriod && inAccount;
+  });
+}
 
 export function calculateQuantStats(trades: TradeRecord[]) {
   const closed = trades.filter(t => t.result !== "Open");
@@ -246,11 +266,25 @@ const generateNarrative = (type: string, stats: any, quant: any, lang: string) =
 export default function ReportsPage() {
   const [selType, setSelType] = useState("monthly");
   const [selPeriod, setSelPeriod] = useState("month");
-  // ✅ Fecha dinámica: usa el mes y año actual por defecto
-  const [selMonth, setSelMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  // Fecha local (no UTC) como mes y año por defecto
+  const [selMonth, setSelMonth] = useState(() => localDateKey().slice(0, 7));
   const [selYear, setSelYear] = useState(() => String(new Date().getFullYear()));
+  const [selAccount, setSelAccount] = useState<ReportAccount>("all");
   const [generated, setGenerated] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+
+  const storeTrades = useTradeStore(s => s.trades);
+  const availableYears = Array.from(new Set([
+    String(new Date().getFullYear()),
+    ...storeTrades.map(t => t.dateOpen?.slice(0, 4)).filter(Boolean),
+  ])).sort().reverse();
+  const accountCounts = {
+    all: storeTrades.length,
+    personal: storeTrades.filter(t => !t.isFundedAccount).length,
+    funded: storeTrades.filter(t => t.isFundedAccount).length,
+  };
+  const periodLabel = selPeriod === "month" ? selMonth : selPeriod === "year" ? selYear : `${selYear} ${selPeriod.toUpperCase()}`;
+  const periodTradeCount = filterReportTrades(storeTrades, selPeriod, selMonth, selYear, selAccount).length;
 
   const generate = () => setGenerated(true);
   const startPrintMode = () => setIsPrinting(true);
@@ -262,9 +296,10 @@ export default function ReportsPage() {
   }, [isPrinting]);
 
   const ReportContent = () => {
-    const trades = useTradeStore(s => s.trades);
+    const allTrades = useTradeStore(s => s.trades);
     const language = useSettingsStore(s => s.language);
-    
+
+    const trades = filterReportTrades(allTrades, selPeriod, selMonth, selYear, selAccount);
     const STATS = computeStats(trades);
     const QUANT_STATS = calculateQuantStats(trades) || {
       longWinRate: 0, shortWinRate: 0, bestAsset: "N/A", bestAssetPnl: 0, worstAsset: "N/A", worstAssetPnl: 0,
@@ -672,18 +707,32 @@ export default function ReportsPage() {
                 <label className="text-[11px] text-text-secondary font-medium block mb-1.5">Seleccionar Año</label>
                 <select value={selYear} onChange={e => { setSelYear(e.target.value); setGenerated(false); }}
                   className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2.5 text-[13px] text-text-primary focus:outline-none focus:border-green-primary transition-colors">
-                  <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
             )}
             <div>
-              <label className="text-[11px] text-text-secondary font-medium block mb-1.5">Cuenta (Portafolio)</label>
-              <select className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2.5 text-[13px] text-text-primary focus:outline-none focus:border-green-primary transition-colors">
-                <option>Cuenta Principal (Live)</option>
-                <option>Evaluación Prop Firm 100k</option>
+              <label className="text-[11px] text-text-secondary font-medium block mb-1.5">Cuenta</label>
+              <select value={selAccount} onChange={e => { setSelAccount(e.target.value as ReportAccount); setGenerated(false); }}
+                className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2.5 text-[13px] text-text-primary focus:outline-none focus:border-green-primary transition-colors">
+                <option value="all">Todas las cuentas ({accountCounts.all})</option>
+                <option value="personal">Cuenta personal ({accountCounts.personal})</option>
+                <option value="funded">Cuenta fondeada / Prop Firm ({accountCounts.funded})</option>
               </select>
             </div>
+            <div className="flex flex-col justify-end">
+              <p className="text-[11px] text-text-muted">Trades en el periodo</p>
+              <p className={`text-[18px] font-bold tabular-nums ${periodTradeCount > 0 ? "text-text-primary" : "text-yellow-warn"}`}>
+                {periodTradeCount}
+              </p>
+            </div>
           </div>
+
+          {periodTradeCount === 0 && (
+            <p className="mb-4 text-[11px] text-yellow-warn">
+              No hay operaciones registradas en {periodLabel} para la cuenta seleccionada. El reporte saldrá vacío.
+            </p>
+          )}
 
           <div className="border-t border-border-card pt-5">
             <button onClick={generate}
@@ -699,9 +748,9 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-card/60 bg-green-primary/5">
               <div>
                 <p className="text-[13px] font-bold text-text-primary">
-                  {selType === "psychology" ? `Evaluación Psicológica - ${selMonth}` : 
-                   selType === "technical" ? `Auditoría Quant (Multipage) - ${selMonth}` :
-                   `Reporte - ${selMonth}`}
+                  {selType === "psychology" ? `Evaluación Psicológica - ${periodLabel}` : 
+                   selType === "technical" ? `Auditoría Quant (Multipage) - ${periodLabel}` :
+                   `Reporte - ${periodLabel}`}
                 </p>
                 <p className="text-[11px] text-text-muted">Vista Previa de Impresión</p>
               </div>

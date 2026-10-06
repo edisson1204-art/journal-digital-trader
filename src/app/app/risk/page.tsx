@@ -1,6 +1,6 @@
 "use client";
 
-import { ASSET_CLASS_CONFIG, AssetClass, INSTRUMENT_POINT_VALUES } from "@/lib/tradeTypes";
+import { ASSET_CLASS_CONFIG, AssetClass, INSTRUMENT_POINT_VALUES, localDateKey } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { useTradeStore } from "@/store/tradeStore";
 import { useState, useMemo } from "react";
@@ -94,7 +94,7 @@ export default function RiskToolsPage() {
 
   /* ── Daily Risk Rules calculadas desde datos reales ── */
   const riskRules = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateKey();
     const todayTrades  = trades.filter(t => t.dateOpen === today && t.result !== "Open");
     const todayPnl     = todayTrades.reduce((s, t) => s + (t.netPnl || 0), 0);
     const todayLosses  = todayTrades.filter(t => t.result === "Loss").length;
@@ -108,7 +108,7 @@ export default function RiskToolsPage() {
     })();
 
     const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const weekKey   = weekStart.toISOString().slice(0, 10);
+    const weekKey   = localDateKey(weekStart);
     const weekTrades = trades.filter(t => t.dateOpen >= weekKey && t.result !== "Open");
     const weekPnl    = weekTrades.reduce((s, t) => s + (t.netPnl || 0), 0);
 

@@ -426,6 +426,11 @@ export const ASSET_CLASS_CONFIG: Record<AssetClass, {
   },
 };
 
+/** Fecha YYYY-MM-DD en la zona horaria del usuario (toISOString() devuelve UTC). */
+export function localDateKey(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /* ─── Valor en USD de un movimiento de 1.0 en el precio, por contrato/lote ───
    Fuente: especificaciones oficiales de contratos CME Group.
    Ej: NQ sube 10.00 puntos × $20 = $200 por contrato. */

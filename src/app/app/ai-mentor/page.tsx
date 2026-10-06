@@ -168,25 +168,39 @@ export default function AIMentorPage() {
     setSelectedImage(null);
   }, [input, selectedImage, handleSubmit]);
 
-  const handleQuickQuestion = useCallback((q: string) => {
-    const syntheticEvent = { preventDefault: () => {} } as React.FormEvent<HTMLFormElement>;
-    handleSubmit(syntheticEvent, { options: { body: { tradeContext } } });
-    // Inject question manually via input simulation
-    const fakeEvent = { target: { value: q } } as React.ChangeEvent<HTMLInputElement>;
-    handleInputChange(fakeEvent);
-    setTimeout(() => {
-      const form = document.querySelector("form[data-chat]") as HTMLFormElement;
-      if (form) form.requestSubmit();
-    }, 50);
-  }, [handleSubmit, handleInputChange, tradeContext]);
+  /* ── Historial persistente: se guarda por usuario en este navegador ── */
+  const ownerId = useTradeStore(s => s.ownerId);
+  const chatKey = `ai-mentor-chat-${ownerId ?? "anon"}`;
+  const historyLoadedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (historyLoadedRef.current === chatKey) return;
+    historyLoadedRef.current = chatKey;
+    try {
+      const saved = localStorage.getItem(chatKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
+      }
+    } catch { /* historial corrupto: se ignora */ }
+  }, [chatKey, setMessages]);
+
+  useEffect(() => {
+    if (isLoading || historyLoadedRef.current !== chatKey) return;
+    try {
+      const toSave = messages.slice(-40).map(m => ({ id: m.id, role: m.role, content: m.content }));
+      localStorage.setItem(chatKey, JSON.stringify(toSave));
+    } catch { /* localStorage lleno o bloqueado */ }
+  }, [messages, isLoading, chatKey]);
 
   const clearChat = useCallback(() => {
+    try { localStorage.removeItem(chatKey); } catch {}
     setMessages([{
       id: `sys-${Date.now()}`,
       role: "assistant",
       content: `Chat reiniciado. Sigo teniendo acceso a tus ${trades.filter(t => t.result !== "Open").length} operaciones. ¿En qué puedo ayudarte?`,
     }]);
-  }, [setMessages, trades]);
+  }, [setMessages, trades, chatKey]);
 
   /* ════════════════════════════════════════════════════
      INSIGHTS ALGORÍTMICOS (sin IA, cálculo local)
