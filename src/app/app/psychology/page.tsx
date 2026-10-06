@@ -149,11 +149,29 @@ export default function PsychologyPage() {
       });
     }
 
+    // 8. Análisis de Errores (Mistakes)
+    const mistakeMap: Record<string, { count: number; pnl: number }> = {};
+    for (const t of closed) {
+      if (t.mistakeType && t.mistakeType !== "None") {
+        const m = t.mistakeType;
+        if (!mistakeMap[m]) mistakeMap[m] = { count: 0, pnl: 0 };
+        mistakeMap[m].count++;
+        mistakeMap[m].pnl += t.netPnl || 0;
+      }
+    }
+    const mistakes = Object.entries(mistakeMap)
+      .map(([label, d]) => ({
+        label,
+        count: d.count,
+        pnl: Math.round(d.pnl)
+      }))
+      .sort((a, b) => b.count - a.count);
+
     return {
       emotions, bestEmotion, worstEmotion, emotionalPnlDiff,
       dowStats, bestDay, worstDay,
       planFollowRate, disciplineScore, winRate,
-      behaviors, totalTrades: closed.length,
+      behaviors, mistakes, totalTrades: closed.length,
     };
   }, [trades]);
 
@@ -284,63 +302,100 @@ export default function PsychologyPage() {
           </div>
         </div>
 
-        {/* Patrones de comportamiento detectados */}
-        <div className="rounded-card border border-border-card bg-bg-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border-card/60">
-            <h2 className="text-sm font-semibold text-text-primary">Patrones de Comportamiento Detectados</h2>
-            <p className="text-[11px] text-text-muted">Análisis algorítmico basado en tus {psych.totalTrades} operaciones reales</p>
-          </div>
-          {psych.behaviors.length === 0 ? (
-            <p className="text-[12px] text-text-muted text-center py-8">No se detectaron patrones con la muestra actual. Continúa registrando trades.</p>
-          ) : (
-            <div className="divide-y divide-border-card/30">
-              {psych.behaviors.map((b, i) => (
-                <div key={i} className="flex items-start justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${b.positive ? "bg-green-primary/10" : "bg-red-loss/10"}`}>
-                      {b.positive
-                        ? <TrendingUp className={`h-4 w-4 text-green-primary`} />
-                        : <AlertTriangle className={`h-4 w-4 text-red-loss`} />}
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-semibold text-text-primary">{b.behavior}</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">{b.detail}</p>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <span className={`text-[13px] font-bold tabular-nums ${b.positive ? "text-green-primary" : "text-red-loss"}`}>
-                      {b.impact}
-                    </span>
-                  </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Columna Izquierda: Patrones de comportamiento */}
+          <div className="flex flex-col">
+            <div className="rounded-card border border-border-card bg-bg-card overflow-hidden h-full flex flex-col">
+              <div className="px-5 py-4 border-b border-border-card/60">
+                <h2 className="text-sm font-semibold text-text-primary">Patrones de Comportamiento Detectados</h2>
+                <p className="text-[11px] text-text-muted">Análisis algorítmico basado en tus {psych.totalTrades} operaciones reales</p>
+              </div>
+              {psych.behaviors.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <p className="text-[12px] text-text-muted text-center">No se detectaron patrones con la muestra actual. Continúa registrando trades.</p>
                 </div>
-              ))}
+              ) : (
+                <div className="divide-y divide-border-card/30 flex-1">
+                  {psych.behaviors.map((b, i) => (
+                    <div key={i} className="flex items-start justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${b.positive ? "bg-green-primary/10" : "bg-red-loss/10"}`}>
+                          {b.positive
+                            ? <TrendingUp className={`h-4 w-4 text-green-primary`} />
+                            : <AlertTriangle className={`h-4 w-4 text-red-loss`} />}
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-semibold text-text-primary">{b.behavior}</p>
+                          <p className="text-[11px] text-text-muted mt-0.5">{b.detail}</p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <span className={`text-[13px] font-bold tabular-nums ${b.positive ? "text-green-primary" : "text-red-loss"}`}>
+                          {b.impact}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Discipline Score visual */}
-        <div className="rounded-card border border-border-card bg-bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-semibold text-text-primary">Puntuación de Disciplina</h2>
-              <p className="text-[11px] text-text-muted">Calculado de: adherencia al plan (40%), win rate (30%), consistencia (30%)</p>
+          {/* Columna Derecha: Discipline Score y Errores */}
+          <div className="flex flex-col gap-5">
+            {/* Discipline Score visual */}
+            <div className="rounded-card border border-border-card bg-bg-card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-text-primary">Puntuación de Disciplina</h2>
+                  <p className="text-[11px] text-text-muted">Calculado de: adherencia al plan (40%), win rate (30%), consistencia (30%)</p>
+                </div>
+                <span className={`text-[32px] font-extrabold tabular-nums ${scoreColor}`}>{psych.disciplineScore}<span className="text-[16px] text-text-muted">/100</span></span>
+              </div>
+              <div className="h-4 rounded-full bg-border-card overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    psych.disciplineScore >= 75 ? "bg-green-primary" :
+                    psych.disciplineScore >= 50 ? "bg-blue-accent" :
+                    psych.disciplineScore >= 30 ? "bg-yellow-warn" : "bg-red-loss"
+                  }`}
+                  style={{ width: `${psych.disciplineScore}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-2 text-[9px] text-text-muted">
+                <span>Plan Follow: {psych.planFollowRate}%</span>
+                <span>Win Rate: {psych.winRate}%</span>
+                <span>Score: {psych.disciplineScore}/100</span>
+              </div>
             </div>
-            <span className={`text-[32px] font-extrabold tabular-nums ${scoreColor}`}>{psych.disciplineScore}<span className="text-[16px] text-text-muted">/100</span></span>
-          </div>
-          <div className="h-4 rounded-full bg-border-card overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${
-                psych.disciplineScore >= 75 ? "bg-green-primary" :
-                psych.disciplineScore >= 50 ? "bg-blue-accent" :
-                psych.disciplineScore >= 30 ? "bg-yellow-warn" : "bg-red-loss"
-              }`}
-              style={{ width: `${psych.disciplineScore}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-2 text-[9px] text-text-muted">
-            <span>Plan Follow: {psych.planFollowRate}%</span>
-            <span>Win Rate: {psych.winRate}%</span>
-            <span>Score: {psych.disciplineScore}/100</span>
+
+            {/* Impacto de Errores */}
+            <div className="rounded-card border border-border-card bg-bg-card p-5 flex-1">
+              <h2 className="text-sm font-semibold text-text-primary mb-1">Impacto de Errores Detectados</h2>
+              <p className="text-[11px] text-text-muted mb-4">Cuánto te cuestan tus errores técnicos y conductuales</p>
+              {psych.mistakes.length === 0 ? (
+                <p className="text-[12px] text-text-muted text-center py-4">No has registrado errores en tus trades (o aún no hay muestra).</p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {psych.mistakes.slice(0, 4).map(m => (
+                    <div key={m.label} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-xl bg-red-loss/10 flex items-center justify-center flex-shrink-0">
+                          <AlertTriangle className="h-4 w-4 text-red-loss" />
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-semibold text-text-primary">{m.label}</p>
+                          <p className="text-[11px] text-text-muted">{m.count} {m.count === 1 ? 'ocurrencia' : 'ocurrencias'}</p>
+                        </div>
+                      </div>
+                      <span className={`text-[13px] font-bold tabular-nums ${m.pnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
+                        {m.pnl >= 0 ? "+" : ""}${m.pnl.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
