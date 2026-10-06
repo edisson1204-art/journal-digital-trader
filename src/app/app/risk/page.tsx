@@ -1,36 +1,18 @@
 "use client";
 
-import { ASSET_CLASS_CONFIG, AssetClass } from "@/lib/tradeTypes";
+import { ASSET_CLASS_CONFIG, AssetClass, INSTRUMENT_POINT_VALUES } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { useTradeStore } from "@/store/tradeStore";
 import { useState, useMemo } from "react";
 import { Info, AlertTriangle } from "lucide-react";
 
-/* ── Valores de punto reales por instrumento (CME oficial) ── */
-const INSTRUMENT_PIP_VALUES: Record<string, { pip: number; label: string }> = {
-  // Full Futures
-  NQ:  { pip: 20,    label: "NQ — $20/punto" },
-  ES:  { pip: 50,    label: "ES — $50/punto" },
-  YM:  { pip: 5,     label: "YM — $5/punto" },
-  RTY: { pip: 50,    label: "RTY — $50/punto" },
-  CL:  { pip: 1000,  label: "CL — $1,000/punto" },
-  GC:  { pip: 100,   label: "GC — $100/punto" },
-  SI:  { pip: 5000,  label: "SI — $5,000/punto" },
-  ZB:  { pip: 1000,  label: "ZB — $1,000/punto" },
-  ZN:  { pip: 1000,  label: "ZN — $1,000/punto" },
-  "6E": { pip: 125000, label: "6E — $125,000/punto" },
-  NG:  { pip: 10000, label: "NG — $10,000/punto" },
-  // Micro Futures
-  MNQ: { pip: 2,     label: "MNQ — $2/punto" },
-  MES: { pip: 5,     label: "MES — $5/punto" },
-  MYM: { pip: 0.5,   label: "MYM — $0.50/punto" },
-  M2K: { pip: 5,     label: "M2K — $5/punto" },
-  MGC: { pip: 10,    label: "MGC — $10/punto" },
-  MCL: { pip: 100,   label: "MCL — $100/punto" },
-  M6E: { pip: 6.25,  label: "M6E — $6.25/punto" },
-  M6B: { pip: 6.25,  label: "M6B — $6.25/punto" },
-  MBT: { pip: 0.1,   label: "MBT — $0.10/punto" },
-};
+/* ── Valores por punto: misma tabla oficial que usa el registro de trades ── */
+const INSTRUMENT_PIP_VALUES: Record<string, { pip: number; label: string }> = Object.fromEntries(
+  Object.entries(INSTRUMENT_POINT_VALUES).map(([sym, v]) => [
+    sym,
+    { pip: v, label: `${sym} — $${v.toLocaleString("en-US", { maximumFractionDigits: 2 })} por 1.0 de precio` },
+  ])
+);
 
 function InputField({ label, id, value, onChange, unit, type = "number", step = "any", disabled = false, hint }: {
   label: string; id: string; value: string;

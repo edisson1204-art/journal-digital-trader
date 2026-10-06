@@ -9,7 +9,7 @@ import {
   type TradeRecord, type AssetClass, type TradeSide, type TradingSession,
   type SetupGrade, type TradeEntry_Scale, type TradeExit_Partial,
   BROKER_PRESETS, ASSET_CLASS_CONFIG, STRATEGIES, EMOTIONS, MISTAKE_TYPES,
-  TAGS_SUGGESTED, calculateTrade,
+  TAGS_SUGGESTED, calculateTrade, getPointValue,
 } from "@/lib/tradeTypes";
 
 /* ─── Prevent browser auto-translate from mangling trading terms ─── */
@@ -104,11 +104,11 @@ function Section({ title, children, collapsible = false }: {
 
 /* ─── Live P&L preview ─── */
 function PnlPreview({
-  entries, exits, side, sl, broker, customComm, assetClass, contracts
+  entries, exits, side, sl, broker, customComm, assetClass, contracts, instrument
 }: {
   entries: TradeEntry_Scale[]; exits: TradeExit_Partial[];
   side: TradeSide; sl: number; broker: string; customComm: number;
-  assetClass: AssetClass; contracts: number;
+  assetClass: AssetClass; contracts: number; instrument: string;
 }) {
   if (!entries.length || !entries[0].price) return null;
 
@@ -121,14 +121,14 @@ function PnlPreview({
     : undefined;
 
   const commPerSide = broker === "custom" ? customComm : BROKER_PRESETS[broker]?.perSide ?? 0;
-  const assetCfg = ASSET_CLASS_CONFIG[assetClass];
-  const calc = calculateTrade(side, avgEntry, avgExit, sl, contracts, commPerSide, assetCfg.pipValue);
+  const pointValue = getPointValue(assetClass, instrument);
+  const calc = calculateTrade(side, avgEntry, avgExit, sl, contracts, commPerSide, pointValue);
 
   const slDist = Math.abs(avgEntry - sl);
   const tp1 = exits[0]?.price || 0;
   const tpDist = tp1 ? Math.abs(tp1 - avgEntry) : 0;
   const potentialRR = slDist > 0 && tpDist > 0 ? (tpDist / slDist).toFixed(2) : null;
-  const potentialRisk = slDist * contracts * assetCfg.pipValue;
+  const potentialRisk = slDist * contracts * pointValue;
   const totalComm = contracts * 2 * commPerSide;
 
   return (
@@ -433,7 +433,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
     if (initialData) {
       // ── Pre-fill all fields from existing trade ──
       setAssetClass(initialData.assetClass);
-      setInstrument(initialData.instrument in ASSET_CLASS_CONFIG[initialData.assetClass]?.instruments ? initialData.instrument : "Custom");
+      setInstrument(ASSET_CLASS_CONFIG[initialData.assetClass]?.instruments.includes(initialData.instrument) ? initialData.instrument : "Custom");
       setCustomInstr(initialData.instrument);
       setTicker(initialData.tickerSymbol || "");
       setSide(initialData.side);
@@ -569,7 +569,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
     const avgExitN = hasExit
       ? exits.reduce((s, e) => s + e.price * e.contracts, 0) / (contractsExited || 1)
       : undefined;
-    const calc = calculateTrade(side, avgEntry, avgExitN, slN, totalContracts, commPerSide, assetCfg.pipValue);
+    const calc = calculateTrade(side, avgEntry, avgExitN, slN, totalContracts, commPerSide, getPointValue(assetClass, finalInstr));
 
     let holdTimeMinutes: number | undefined;
     if (dateOpen && timeOpen && timeClose) {
@@ -579,7 +579,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
     }
 
     const record: TradeRecord = {
-      id: `t-${Date.now()}`,
+      id: initialData?.id ?? crypto.randomUUID(),
       assetClass, instrument: finalInstr, tickerSymbol: tickerSymbol || undefined,
       side, dateOpen, timeOpen, dateClose: dateClose || undefined, timeClose: timeClose || undefined,
       holdTimeMinutes, session,
@@ -978,6 +978,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                   sl={parseFloat(stopLoss) || 0} broker={broker}
                   customComm={parseFloat(customCommission) || 0}
                   assetClass={assetClass} contracts={totalContracts}
+                  instrument={instrument === "Custom" ? customInstrument : instrument}
                 />
               </>
             )}
@@ -1077,6 +1078,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                   sl={parseFloat(stopLoss) || 0} broker={broker}
                   customComm={parseFloat(customCommission) || 0}
                   assetClass={assetClass} contracts={totalContracts}
+                  instrument={instrument === "Custom" ? customInstrument : instrument}
                 />
               </>
             )}

@@ -56,6 +56,8 @@ export default function JournalPage() {
   const addTrade = useTradeStore(s => s.addTrade);
   const deleteTrade = useTradeStore(s => s.deleteTrade);
   const updateTrade = useTradeStore(s => s.updateTrade);
+  const syncError = useTradeStore(s => s.syncError);
+  const clearSyncError = useTradeStore(s => s.clearSyncError);
 
   const [modalOpen, setModal]         = useState(false);
   const [editTrade, setEditTrade]     = useState<TradeRecord | null>(null);
@@ -140,6 +142,18 @@ export default function JournalPage() {
       />
 
       <div className="flex flex-col gap-4 w-full max-w-[1800px] mx-auto">
+
+        {syncError && (
+          <div role="alert" className="flex items-start justify-between gap-3 rounded-card border border-red-loss/40 bg-red-loss/10 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-loss flex-shrink-0 mt-0.5" />
+              <p className="text-[12px] text-red-loss">{syncError}</p>
+            </div>
+            <button onClick={clearSyncError} className="text-red-loss/70 hover:text-red-loss" aria-label="Cerrar aviso">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* ─── Toolbar ─── */}
         <div className="flex flex-wrap items-center gap-3 justify-between">

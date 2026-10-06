@@ -426,6 +426,36 @@ export const ASSET_CLASS_CONFIG: Record<AssetClass, {
   },
 };
 
+/* ─── Valor en USD de un movimiento de 1.0 en el precio, por contrato/lote ───
+   Fuente: especificaciones oficiales de contratos CME Group.
+   Ej: NQ sube 10.00 puntos × $20 = $200 por contrato. */
+export const INSTRUMENT_POINT_VALUES: Record<string, number> = {
+  // Futuros E-mini / estándar
+  NQ: 20, ES: 50, YM: 5, RTY: 50,
+  CL: 1000, NG: 10000, HO: 42000,
+  GC: 100, SI: 5000,
+  ZB: 1000, ZN: 1000,
+  "6E": 125000, "6B": 62500, "6J": 12500000, "6A": 100000,
+  // Micro futuros
+  MNQ: 2, MES: 5, MYM: 0.5, M2K: 5,
+  MGC: 10, MCL: 100, MHNG: 1000,
+  MBT: 0.1, M6E: 12500, M6B: 6250,
+  // Forex con USD como divisa cotizada (1 lote estándar = 100,000 unidades)
+  EURUSD: 100000, GBPUSD: 100000, AUDUSD: 100000, NZDUSD: 100000,
+};
+
+/** Devuelve el valor en USD de un movimiento de 1.0 en el precio, por contrato. */
+export function getPointValue(assetClass: AssetClass, instrument: string): number {
+  const key = (instrument || "").trim().toUpperCase();
+  if (key in INSTRUMENT_POINT_VALUES) return INSTRUMENT_POINT_VALUES[key];
+  return ASSET_CLASS_CONFIG[assetClass]?.pipValue ?? 1;
+}
+
+/** true si el instrumento tiene un valor por punto oficial en la tabla. */
+export function hasOfficialPointValue(instrument: string): boolean {
+  return (instrument || "").trim().toUpperCase() in INSTRUMENT_POINT_VALUES;
+}
+
 export const STRATEGIES = [
   "Breakout","Trend Following","Mean Reversion","Scalping",
   "News/Event","Support & Resistance","VWAP","Order Flow",
