@@ -2,23 +2,40 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { streamText, CoreMessage } from 'ai';
 import { AI_MENTOR_SYSTEM_PROMPT } from '@/lib/aiSystemPrompt';
 
+import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
+
 export const runtime = 'edge';
+
+const MAX_BODY_BYTES = 6 * 1024 * 1024; // incluye una imagen en base64
+const MAX_MESSAGES = 40;
+
+const json = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 export async function POST(req: Request) {
   try {
+    // 1) Autenticación: el endpoint ya no es un proxy abierto hacia OpenAI.
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return json({ error: 'Sesión requerida. Inicia sesión para usar el mentor.' }, 401);
+
+    // 2) Límites de tamaño antes de parsear.
+    const declared = Number(req.headers.get('content-length') ?? '0');
+    if (declared > MAX_BODY_BYTES) return json({ error: 'Solicitud demasiado grande.' }, 413);
+
     const body = await req.json();
     const { messages, tradeContext } = body;
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
+      return json({ error: 'Número de mensajes no válido.' }, 400);
+    }
     // ai SDK 3.x: handleSubmit(e, { data: { imageUrl } }) envía la imagen en body.data
     const imageUrl: string | undefined = body.data?.imageUrl ?? body.imageUrl;
 
-    // ✅ FIX: leer la API key del header correcto
-    const apiKey = req.headers.get('x-openai-key') || req.headers.get('Authorization')?.replace('Bearer ', '');
+    // 3) Clave BYOK del usuario. Nunca se registra en logs.
+    const apiKey = req.headers.get('x-openai-key')?.trim();
 
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'API Key no configurada. Ve a AI Mentor → ícono de candado → ingresa tu OpenAI API Key.' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
+      return json({ error: 'API Key no configurada. Ve a AI Mentor → ícono de candado → ingresa tu OpenAI API Key.' }, 401);
     }
 
     const customOpenAI = createOpenAI({ apiKey });
@@ -37,7 +54,7 @@ export async function POST(req: Request) {
 📊 ESTADÍSTICAS GLOBALES:
 - Total Trades: ${stats.totalTrades} (${stats.wins}W / ${stats.losses}L / ${stats.breakevenCount}BE)
 - Win Rate: ${stats.winRate}%
-- Profit Factor: ${stats.profitFactor}
+- Profit Factor (neto): ${stats.profitFactor ?? (stats.profitFactorState === 'NO_LOSSES_OBSERVED' ? 'no finito (sin pérdidas observadas)' : 'no calculable')}
 - Expectancy por trade: $${stats.expectancy}
 - Net P&L total: $${stats.totalNet}
 - Max Drawdown: -$${stats.maxDrawdown}
@@ -114,8 +131,10 @@ export async function POST(req: Request) {
     return result.toAIStreamResponse();
 
   } catch (error: any) {
-    console.error('AI API Error:', error);
-    const msg = error?.message || 'Error procesando la solicitud de IA.';
+    // No se registra ni se devuelve el mensaje crudo: los errores de OpenAI pueden incluir fragmentos de la clave.
+    console.error('AI API Error:', error?.name, error?.statusCode ?? '');
+    const status = Number(error?.statusCode);
+    const msg = status === 401 ? 'La API Key de OpenAI no es válida o fue revocada.' : status === 429 ? 'OpenAI rechazó la solicitud por límite de uso o cuota.' : 'Error procesando la solicitud de IA.';
     return new Response(
       JSON.stringify({ error: msg }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

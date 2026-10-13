@@ -12,6 +12,8 @@ import {
 import { Logo } from "@/components/Logo";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useSettingsStore } from "@/store/settingsStore";
+import { logout } from "@/lib/auth/logout";
+import { supabase } from "@/lib/supabase/client";
 
 const accentMap: Record<string, string> = {
   violet: "text-violet-accent bg-violet-accent/10",
@@ -33,8 +35,12 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
   const { t, language } = useTranslation();
   const { setLanguage, hasAcceptedLegal, setAcceptedLegal } = useSettingsStore();
   const [mounted, setMounted] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? null));
+  }, []);
 
   const LegalDisclaimerModal = () => (
     <div className="fixed inset-0 z-[99999] bg-bg-main/95 backdrop-blur-md flex items-center justify-center p-4 md:p-8 overflow-y-auto">
@@ -172,8 +178,8 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
               T
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold text-text-primary truncate">Trader Pro</p>
-              <p className="text-[10px] text-green-primary">Active · $14.99/mo</p>
+              <p className="text-[11px] font-semibold text-text-primary truncate">{userEmail ?? "…"}</p>
+              <p className="text-[10px] text-text-muted">Sesión activa</p>
             </div>
           </div>
         )}
@@ -198,10 +204,14 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
           <Settings className="h-3.5 w-3.5" />
           {!collapsed && t("sidebar.settings")}
         </Link>
-        <Link href="/" className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] text-text-muted hover:text-red-loss hover:bg-red-loss/5 transition-colors ${collapsed ? "justify-center" : ""}`}>
+        <button
+          type="button"
+          onClick={() => { void logout(); }}
+          className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] text-text-muted hover:text-red-loss hover:bg-red-loss/5 transition-colors w-full ${collapsed ? "justify-center" : ""}`}
+        >
           <LogOut className="h-3.5 w-3.5" />
           {!collapsed && t("sidebar.logout")}
-        </Link>
+        </button>
       </div>
     </>
   );

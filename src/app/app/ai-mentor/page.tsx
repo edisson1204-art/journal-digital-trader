@@ -416,7 +416,7 @@ export default function AIMentorPage() {
               </div>
               <h3 className="text-[14px] font-bold mb-1 text-text-primary">Conexión Segura BYOK</h3>
               <p className="text-[11px] text-text-muted max-w-xs mb-6 leading-relaxed">
-                El Mentor usa tu propia API Key de OpenAI. <strong className="text-text-secondary">Nunca se envía a nuestros servidores</strong> — se almacena encriptada en tu navegador (localStorage).
+                El Mentor usa tu propia API Key de OpenAI. <strong className="text-text-secondary">Se envía a nuestro servidor solo para reenviarla a OpenAI en cada consulta; no se guarda</strong> — se almacena ofuscada, no cifrada, en tu navegador (localStorage) y se borra al cerrar sesión.
               </p>
               <input
                 type="password"

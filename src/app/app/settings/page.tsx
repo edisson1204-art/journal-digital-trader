@@ -54,7 +54,7 @@ export default function SettingsPage() {
                 <p className="text-[13px] font-bold text-text-secondary mb-1">Privacidad y Seguridad Garantizada</p>
                 <p className="text-[12px] text-text-muted leading-relaxed">
                   Para proteger tus datos financieros y ahorrar en suscripciones costosas, operamos bajo el estándar BYOK. 
-                  Tu <b>API Key de OpenAI</b> se encripta y guarda exclusivamente en el almacenamiento local de tu navegador. 
+                  Tu <b>API Key de OpenAI</b> se guarda solo en el almacenamiento local de este navegador, ofuscada pero NO cifrada. Se envía a nuestro servidor únicamente en cada consulta al mentor, para reenviarla a OpenAI, y no se guarda allí. Se borra al cerrar sesión. 
                   Ningún servidor externo (ni nosotros) tiene acceso a tu llave ni a tu facturación.
                 </p>
                 <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-accent hover:underline mt-3">

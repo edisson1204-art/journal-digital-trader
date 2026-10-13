@@ -1,20 +1,30 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+
+/** Comparación en tiempo constante para no filtrar el secreto por diferencias de tiempo. */
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return ba.length === bb.length && timingSafeEqual(ba, bb);
+}
 
 export async function POST(req: Request) {
   try {
-    // ✅ SEGURIDAD: Verificar el secreto del webhook para que nadie más pueda crear cuentas gratis
-    const incomingSecret = req.headers.get("x-webhook-secret") || req.headers.get("x-systeme-secret");
+    // SEGURIDAD: fallar cerrado. Sin secreto configurado NO se acepta ninguna petición
+    // (antes, si faltaba la variable, cualquiera podía crear cuentas con la service role).
     const expectedSecret = process.env.SYSTEME_WEBHOOK_SECRET;
-
-    // Solo validar si el secreto está configurado en las variables de entorno
-    if (expectedSecret && incomingSecret !== expectedSecret) {
-      console.warn("[Webhook] Acceso rechazado — secreto inválido");
+    if (!expectedSecret) {
+      console.error("[Systeme Webhook] SYSTEME_WEBHOOK_SECRET no está configurado: petición rechazada");
+      return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+    }
+    const incomingSecret = req.headers.get("x-webhook-secret") || req.headers.get("x-systeme-secret") || "";
+    if (!safeEqual(incomingSecret, expectedSecret)) {
+      console.warn("[Systeme Webhook] Acceso rechazado — secreto inválido");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const payload = await req.json();
-    console.log("[Systeme Webhook] Payload recibido:", JSON.stringify(payload, null, 2));
 
     // Extraer el correo del payload de Systeme.io
     const email =
@@ -31,12 +41,12 @@ export async function POST(req: Request) {
 
     // Validación básica de formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      console.error("[Systeme Webhook] Error: Email inválido:", email);
+    if (typeof email !== "string" || !emailRegex.test(email)) {
+      console.error("[Systeme Webhook] Error: formato de email inválido");
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
     }
 
-    console.log("[Systeme Webhook] Procesando acceso para:", email);
+    console.log("[Systeme Webhook] Procesando acceso (email omitido del log)");
 
     // Invitar al usuario a Supabase (crea la cuenta y envía el correo de bienvenida)
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
@@ -53,7 +63,7 @@ export async function POST(req: Request) {
         userError.message.includes("already been invited") ||
         userError.status === 422
       ) {
-        console.log(`[Systeme Webhook] El usuario ${email} ya tiene acceso.`);
+        console.log("[Systeme Webhook] El usuario ya tiene acceso.");
         return NextResponse.json({ message: "User already has access.", email }, { status: 200 });
       }
 
@@ -61,7 +71,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: userError.message }, { status: 500 });
     }
 
-    console.log(`[Systeme Webhook] Éxito! Cuenta creada e invitación enviada a: ${email}`);
+    console.log("[Systeme Webhook] Cuenta creada e invitación enviada.");
 
     return NextResponse.json({
       success: true,

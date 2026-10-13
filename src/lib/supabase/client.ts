@@ -1,7 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-// Cliente seguro para el navegador (usando la llave anónima, protegida por RLS)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Cliente único del navegador. Usa la MISMA sesión (cookies) que el login y el proxy del servidor.
+// Antes este archivo creaba un segundo cliente con localStorage, que podía no ver la sesión del login.
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+);
