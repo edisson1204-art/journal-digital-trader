@@ -1,5 +1,6 @@
 "use client";
 
+import { formatProfitFactor } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { useState, useMemo } from "react";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -491,7 +492,7 @@ export default function SimulatorPage() {
                     { label:"Win Rate",          value:`${journalStats.winRate}%`,                       color: journalStats.winRate >= 50 ? "text-green-primary":"text-red-loss" },
                     { label:"Avg. Win",           value:`+$${Math.abs(journalStats.avgWin).toFixed(2)}`,  color:"text-green-primary" },
                     { label:"Avg. Loss",          value:`$${Math.abs(journalStats.avgLoss).toFixed(2)}`,  color:"text-red-loss" },
-                    { label:"Profit Factor",      value:journalStats.profitFactor.toFixed(2),             color: journalStats.profitFactor >= 1.5 ? "text-green-primary":"text-yellow-warn" },
+                    { label:"Profit Factor",      value:formatProfitFactor(journalStats),             color: (journalStats.profitFactor ?? 0) >= 1.5 ? "text-green-primary":"text-yellow-warn" },
                     { label:"Expectancy/trade",   value:`${journalStats.expectancy >= 0?"+":""}$${journalStats.expectancy.toFixed(2)}`, color: journalStats.expectancy >= 0 ? "text-green-primary":"text-red-loss" },
                     { label:"Max Drawdown",       value:`$${journalStats.maxDrawdown.toFixed(2)}`,        color:"text-red-loss" },
                     { label:"Plan follow rate",   value:`${journalStats.planFollowRate}%`,                color:"text-blue-accent" },

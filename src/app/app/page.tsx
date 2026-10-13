@@ -1,5 +1,6 @@
 "use client";
 
+import { formatProfitFactor } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { TrendingUp, TrendingDown, BarChart2, Target } from "lucide-react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -88,7 +89,7 @@ export default function AppDashboard() {
   const topMetrics = [
     { label: t("dashboard.netPnl"),         value:`${stats.totalNet >= 0?"+":""}$${stats.totalNet.toLocaleString()}`, change:"Global",  icon: TrendingUp,   color: stats.totalNet >= 0 ? "text-green-primary" : "text-red-loss", bg: stats.totalNet >= 0 ? "bg-green-primary/10" : "bg-red-loss/10",  positive: stats.totalNet >= 0 },
     { label: t("dashboard.winRate"),        value:`${stats.winRate}%`,       change:"Global",   icon: Target,        color:"text-blue-accent",   bg:"bg-blue-accent/10",    positive: stats.winRate >= 50  },
-    { label: t("dashboard.profitFactor"),   value:`${stats.profitFactor}`,   change:"Global",   icon: BarChart2,     color: stats.profitFactor >= 1.5 ? "text-green-primary" : "text-yellow-warn", bg: stats.profitFactor >= 1.5 ? "bg-green-primary/10" : "bg-yellow-warn/10",  positive: stats.profitFactor >= 1  },
+    { label: t("dashboard.profitFactor"),   value:`${formatProfitFactor(stats)}`,   change:"Global",   icon: BarChart2,     color: (stats.profitFactor ?? 0) >= 1.5 ? "text-green-primary" : "text-yellow-warn", bg: (stats.profitFactor ?? 0) >= 1.5 ? "bg-green-primary/10" : "bg-yellow-warn/10",  positive: (stats.profitFactor ?? 0) >= 1  },
     { label: "Max Drawdown",    value:`-$${stats.maxDrawdown.toLocaleString()}`, change:"Global",   icon: TrendingDown,  color:"text-red-loss",      bg:"bg-red-loss/10",       positive:false },
   ];
 

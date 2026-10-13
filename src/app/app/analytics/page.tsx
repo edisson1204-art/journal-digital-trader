@@ -1,5 +1,6 @@
 "use client";
 
+import { formatProfitFactor } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { useState, useMemo } from "react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -290,7 +291,7 @@ export default function AnalyticsPage() {
           {[
             { label: "Net P&L",       value: `${stats.totalNet >= 0 ? "+" : ""}$${stats.totalNet.toLocaleString()}`,       color: stats.totalNet >= 0 ? "text-green-primary" : "text-red-loss" },
             { label: "Win Rate",      value: `${stats.winRate}%`,                                                           color: stats.winRate >= 50 ? "text-blue-accent" : "text-yellow-warn" },
-            { label: "Profit Factor", value: `${stats.profitFactor}`,                                                       color: stats.profitFactor >= 1.5 ? "text-green-primary" : "text-yellow-warn" },
+            { label: "Profit Factor", value: `${formatProfitFactor(stats)}`,                                                       color: (stats.profitFactor ?? 0) >= 1.5 ? "text-green-primary" : "text-yellow-warn" },
             { label: "Avg R:R",       value: `1:${stats.avgRMultiple}`,                                                     color: "text-text-primary" },
             { label: "Max Drawdown",  value: `-$${Math.abs(stats.maxDrawdown).toLocaleString()}`,                           color: "text-red-loss" },
             { label: "Expectancy",    value: `${stats.expectancy >= 0 ? "+" : ""}$${stats.expectancy.toFixed(2)}`,         color: stats.expectancy >= 0 ? "text-green-primary" : "text-red-loss" },

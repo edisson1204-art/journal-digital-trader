@@ -1,5 +1,6 @@
 "use client";
 
+import { formatProfitFactor } from "@/lib/tradeTypes";
 import { useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FileText, Calendar as CalendarIcon, Briefcase, Landmark, Download, BarChart2, X, Brain, Cpu, Target, TrendingUp, AlertTriangle, Clock, Crosshair, Globe } from "lucide-react";
@@ -506,7 +507,7 @@ export default function ReportsPage() {
                   {[
                     { label:"Net P&L",          value:`${STATS.totalNet >= 0 ? "+" : ""}$${STATS.totalNet.toLocaleString()}`, color: STATS.totalNet >= 0 ? "text-emerald-600" : "text-red-600" },
                     { label:"Win Rate",          value:`${STATS.winRate}%`,                  color:"text-blue-600"  },
-                    { label:"Profit Factor",     value:String(STATS.profitFactor),           color: STATS.profitFactor >= 1.5 ? "text-emerald-600" : "text-amber-600" },
+                    { label:"Profit Factor",     value:formatProfitFactor(STATS),           color: (STATS.profitFactor ?? 0) >= 1.5 ? "text-emerald-600" : "text-amber-600" },
                     { label:"Expectancy",        value:`${STATS.expectancy >= 0 ? "+" : ""}$${STATS.expectancy.toFixed(2)}`, color: STATS.expectancy >= 0 ? "text-emerald-600" : "text-red-600" },
                   ].map(s => (
                     <div key={s.label} className="rounded-xl border border-slate-200 bg-slate-50 p-5 print:p-3">

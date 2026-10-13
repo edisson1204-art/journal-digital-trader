@@ -1,5 +1,6 @@
 "use client";
 
+import { formatProfitFactor } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { RegisterTradeModal } from "@/components/RegisterTradeModal";
 import {
@@ -219,7 +220,7 @@ export default function JournalPage() {
           <StatCard label="Total Trades"    value={String(stats.totalTrades)}        icon={BarChart2} />
           <StatCard label="Net P&L"         value={`${stats.totalNet>=0?"+":""}$${Math.abs(stats.totalNet).toFixed(2)}`}   color={stats.totalNet>=0?"text-green-primary":"text-red-loss"} icon={stats.totalNet>=0?TrendingUp:TrendingDown} />
           <StatCard label="Win Rate"        value={`${stats.winRate}%`}              color="text-blue-accent"   sub={`${stats.wins}W / ${stats.losses}L / ${stats.breakevenCount}BE`} />
-          <StatCard label="Profit Factor"   value={String(stats.profitFactor)}       color={stats.profitFactor>=1.5?"text-green-primary":"text-yellow-warn"} />
+          <StatCard label="Profit Factor"   value={formatProfitFactor(stats)}       color={(stats.profitFactor ?? 0) >=1.5?"text-green-primary":"text-yellow-warn"} />
           <StatCard label="Expectancy"      value={`${stats.expectancy>=0?"+":""}$${Math.abs(stats.expectancy).toFixed(2)}`} sub="avg net per trade" color={stats.expectancy>=0?"text-green-primary":"text-red-loss"} />
           <StatCard label="Total Commission" value={`-$${stats.totalCommissions.toFixed(2)}`} color="text-yellow-warn" icon={AlertTriangle} />
           <StatCard label="Max Drawdown"    value={`-$${stats.maxDrawdown.toFixed(2)}`} color="text-red-loss" />
@@ -409,7 +410,7 @@ export default function JournalPage() {
                   { label:"Avg Win",             v:`+$${stats.avgWin.toFixed(2)}`,                                            c:"text-green-primary" },
                   { label:"Avg Loss",            v:`$${stats.avgLoss.toFixed(2)}`,                                            c:"text-red-loss" },
                   { label:"Expectancy / trade",  v:`${stats.expectancy>=0?"+":""}$${Math.abs(stats.expectancy).toFixed(2)}`, c:stats.expectancy>=0?"text-green-primary":"text-red-loss", bold:true },
-                  { label:"Profit Factor",       v:String(stats.profitFactor),                                                c:stats.profitFactor>=1.5?"text-green-primary":"text-yellow-warn" },
+                  { label:"Profit Factor",       v:formatProfitFactor(stats),                                                c:(stats.profitFactor ?? 0) >=1.5?"text-green-primary":"text-yellow-warn" },
                   { label:"Max Drawdown",        v:`-$${stats.maxDrawdown.toFixed(2)}`,                                       c:"text-red-loss" },
                   { label:"Max Consec. Wins",    v:String(stats.maxConsecWins),                                               c:"text-green-primary" },
                   { label:"Max Consec. Losses",  v:String(stats.maxConsecLosses),                                             c:"text-red-loss" },

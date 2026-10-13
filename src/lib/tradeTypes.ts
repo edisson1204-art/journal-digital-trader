@@ -3,6 +3,17 @@
  * Comprehensive type definitions for the trade registration system
  */
 
+import Decimal from "decimal.js";
+import {
+  computeSnapshot, parseDecimalStrict, estimatedCommission, CALCULATION_VERSION,
+  type Execution, type TradeStatus as LedgerTradeStatus,
+} from "./ledger/ledger";
+import { initialRiskGross, realizedRNet } from "./ledger/risk";
+import {
+  profitFactor as ledgerProfitFactor, winRate as ledgerWinRate, expectancy as ledgerExpectancy,
+  maxRealizedDrawdown, sampleState, type SampleState, type MetricValue,
+} from "./ledger/metrics";
+
 /* â”€â”€â”€ Asset Classes â”€â”€â”€ */
 export type AssetClass =
   | "Futures"
@@ -240,7 +251,11 @@ export interface TradeStats {
   breakevenCount: number;
   openTrades: number;
   winRate: number;               // %
-  profitFactor: number;          // gross wins / gross losses
+  profitFactor: number | null;   // net wins / net losses; null si no es calculable
+  profitFactorState: MetricValue["state"];
+  closedTrades: number;
+  sampleState: SampleState;
+  calculationVersion: string;
   expectancy: number;            // avg net P&L per trade
   avgWin: number;
   avgLoss: number;
@@ -255,7 +270,75 @@ export interface TradeStats {
   planFollowRate: number;        // %
 }
 
-/* â”€â”€â”€ Utility: calculate trade â”€â”€â”€ */
+/* ─── Utility: calculate trade (delegates to the decimal ledger) ─── */
+
+export interface FillCalcResult extends Partial<TradeRecord> {
+  status?: LedgerTradeStatus;
+  /** Mensaje si las ejecuciones son inválidas (no se calcula nada). */
+  calcError?: string;
+}
+
+/**
+ * Calcula el trade desde sus ejecuciones reales (entradas y salidas), FIFO, con Decimal.
+ * - Salidas parciales: solo se realiza P&L de la cantidad cerrada; result = "Open", status = "PARTIALLY_CLOSED".
+ * - Fees: comisión por lado × cantidad de cada ejecución (estimada, una sola vez).
+ * - R realizado = neto / riesgo inicial bruto (stop inicial × cantidad entrada × valor punto).
+ */
+export function calculateTradeFromFills(
+  side: TradeSide,
+  entries: { price: number; contracts: number }[],
+  exits: { price: number; contracts: number }[],
+  initialStop: number | undefined,
+  commissionPerSide: number,
+  pointValue: number,
+): FillCalcResult {
+  try {
+    const pv = new Decimal(pointValue);
+    const fee = new Decimal(commissionPerSide || 0);
+    const openSide = side === "Buy" ? "BUY" : "SELL";
+    const closeSide = side === "Buy" ? "SELL" : "BUY";
+    const execs: Execution[] = [
+      ...entries.map((e, i) => ({
+        id: `in${i}`, side: openSide as "BUY" | "SELL",
+        quantity: parseDecimalStrict(e.contracts, `Entrada ${i + 1} cantidad`),
+        price: parseDecimalStrict(e.price, `Entrada ${i + 1} precio`),
+        fees: estimatedCommission(fee, new Decimal(e.contracts)),
+      })),
+      ...exits.map((e, i) => ({
+        id: `out${i}`, side: closeSide as "BUY" | "SELL",
+        quantity: parseDecimalStrict(e.contracts, `Salida ${i + 1} cantidad`),
+        price: parseDecimalStrict(e.price, `Salida ${i + 1} precio`),
+        fees: estimatedCommission(fee, new Decimal(e.contracts)),
+      })),
+    ];
+    const snap = computeSnapshot(execs, pv);
+    const avgEntry = snap.averageEntryPrice ?? new Decimal(0);
+    const risk = initialRiskGross(avgEntry, initialStop ? new Decimal(initialStop) : null, snap.entryQuantity, pv);
+    const r = snap.status === "CLOSED" ? realizedRNet(snap.realizedNetPnl, risk) : null;
+    const result: TradeResult =
+      snap.status !== "CLOSED" ? "Open"
+      : snap.economicResult === "WIN" ? "Win"
+      : snap.economicResult === "LOSS" ? "Loss" : "Breakeven";
+    const exited = snap.exitQuantity;
+    return {
+      status: snap.status,
+      grossPnl: snap.realizedGrossPnl.toDecimalPlaces(2).toNumber(),
+      netPnl: snap.realizedNetPnl.toDecimalPlaces(2).toNumber(),
+      totalCommission: snap.realizedFees.toDecimalPlaces(2).toNumber(),
+      pnlPerContract: exited.gt(0) ? snap.realizedNetPnl.div(exited).toDecimalPlaces(2).toNumber() : undefined,
+      rMultiple: r ? r.toDecimalPlaces(4).toNumber() : undefined,
+      isBreakeven: snap.economicResult === "NET_BREAKEVEN",
+      result,
+    };
+  } catch (err) {
+    return { calcError: err instanceof Error ? err.message : "Ejecuciones no válidas" };
+  }
+}
+
+/**
+ * Compatibilidad: trade con una entrada y una salida promedio.
+ * `contractsExited` (por defecto = contracts) permite salidas parciales.
+ */
 export function calculateTrade(
   side: TradeSide,
   avgEntry: number,
@@ -263,98 +346,87 @@ export function calculateTrade(
   stopLoss: number,
   contracts: number,
   commissionPerSide: number,
-  pipValue: number = 1          // $ per point per contract
-): Partial<TradeRecord> {
-  if (!avgExit) return { result: "Open" };
-
-  const diff = side === "Buy" ? avgExit - avgEntry : avgEntry - avgExit;
-  const grossPnl = diff * contracts * pipValue;
-  const totalCommission = contracts * 2 * commissionPerSide;
-  const netPnl = grossPnl - totalCommission;
-
-  const slDistance = Math.abs(avgEntry - stopLoss);
-  const rMultiple = slDistance > 0 ? (diff * pipValue) / (slDistance * pipValue) : 0;
-
-  const isBreakeven = Math.abs(netPnl) < totalCommission + 0.01;
-  const result: TradeResult =
-    netPnl > 0.005 ? "Win" :
-    netPnl < -0.005 ? "Loss" :
-    "Breakeven";
-
-  return {
-    grossPnl: parseFloat(grossPnl.toFixed(2)),
-    netPnl: parseFloat(netPnl.toFixed(2)),
-    totalCommission: parseFloat(totalCommission.toFixed(2)),
-    pnlPerContract: parseFloat((netPnl / contracts).toFixed(2)),
-    rMultiple: parseFloat(rMultiple.toFixed(2)),
-    isBreakeven,
-    result,
-  };
+  pipValue: number = 1,          // $ per point per contract
+  contractsExited: number = contracts,
+): FillCalcResult {
+  if (avgExit === undefined || avgExit === null || contractsExited === 0) {
+    return { result: "Open", status: "OPEN" };
+  }
+  return calculateTradeFromFills(
+    side,
+    [{ price: avgEntry, contracts }],
+    [{ price: avgExit, contracts: contractsExited }],
+    stopLoss || undefined,
+    commissionPerSide,
+    pipValue,
+  );
 }
 
-/* â”€â”€â”€ Compute statistics from trade list â”€â”€â”€ */
+/* ─── Compute statistics from trade list ─── */
 export function computeStats(trades: TradeRecord[]): TradeStats {
-  const closed = trades.filter(t => t.result !== "Open").sort((a, b) => new Date(a.dateOpen).getTime() - new Date(b.dateOpen).getTime());
-  const wins   = closed.filter(t => t.result === "Win");
-  const losses = closed.filter(t => t.result === "Loss");
-  const be     = closed.filter(t => t.result === "Breakeven");
+  const chrono = (t: TradeRecord) => `${t.dateClose || t.dateOpen}T${t.timeClose || t.timeOpen || "00:00"}`;
+  const closed = trades
+    .filter(t => t.result !== "Open" && typeof t.netPnl === "number" && Number.isFinite(t.netPnl))
+    .sort((a, b) => chrono(a).localeCompare(chrono(b)));
+  const nets = closed.map(t => new Decimal(t.netPnl as number));
+  const sum = (xs: Decimal[]) => xs.reduce((s, x) => s.plus(x), new Decimal(0));
 
-  const totalGross = closed.reduce((s, t) => s + (t.grossPnl ?? 0), 0);
-  const totalComm  = closed.reduce((s, t) => s + (t.totalCommission ?? 0), 0);
-  const totalNet   = closed.reduce((s, t) => s + (t.netPnl ?? 0), 0);
+  const wr = ledgerWinRate(nets);
+  const pf = ledgerProfitFactor(nets);
+  const exp = ledgerExpectancy(nets);
+  const winsN = nets.filter(n => n.gt(0));
+  const lossesN = nets.filter(n => n.lt(0));
 
-  const grossWins   = wins.reduce((s, t) => s + (t.grossPnl ?? 0), 0);
-  const grossLosses = Math.abs(losses.reduce((s, t) => s + (t.grossPnl ?? 0), 0));
+  const totalGross = sum(closed.map(t => new Decimal(t.grossPnl ?? 0)));
+  const totalComm = sum(closed.map(t => new Decimal(t.totalCommission ?? 0)));
+  const totalNet = sum(nets);
+  const maxDD = maxRealizedDrawdown(new Decimal(0), nets).abs();
 
-  const avgWin  = wins.length  ? wins.reduce((s,t)=>s+(t.netPnl??0), 0) / wins.length : 0;
-  const avgLoss = losses.length ? Math.abs(losses.reduce((s,t)=>s+(t.netPnl??0), 0) / losses.length) : 0;
-
-  let maxDD = 0;
-  let peak = 0;
-  let running = 0;
-  for (const t of closed) {
-    running += t.netPnl ?? 0;
-    if (running > peak) peak = running;
-    const dd = peak - running;
-    if (dd > maxDD) maxDD = dd;
-  }
-
-  // Max consecutive wins/losses
+  // Rachas sobre resultado económico neto
   let maxCW = 0, maxCL = 0, cw = 0, cl = 0;
-  for (const t of closed) {
-    if (t.result === "Win") { cw++; cl=0; if(cw>maxCW) maxCW=cw; }
-    else if (t.result === "Loss") { cl++; cw=0; if(cl>maxCL) maxCL=cl; }
-    else { cw=0; cl=0; }
+  for (const n of nets) {
+    if (n.gt(0)) { cw++; cl = 0; maxCW = Math.max(maxCW, cw); }
+    else if (n.lt(0)) { cl++; cw = 0; maxCL = Math.max(maxCL, cl); }
+    else { cw = 0; cl = 0; }
   }
 
-  const avgR = closed.length ? closed.reduce((s,t)=>s+(t.rMultiple??0),0)/closed.length : 0;
-  const planRate = closed.length
-    ? (closed.filter(t=>t.planFollowed).length / closed.length) * 100
-    : 0;
-  const avgHold = closed.filter(t=>t.holdTimeMinutes)
-    .reduce((s,t,_,a)=>s+(t.holdTimeMinutes??0)/a.length, 0);
+  const withR = closed.filter(t => typeof t.rMultiple === "number" && Number.isFinite(t.rMultiple));
+  const withHold = closed.filter(t => typeof t.holdTimeMinutes === "number" && Number.isFinite(t.holdTimeMinutes) && (t.holdTimeMinutes as number) >= 0);
+  const planRate = closed.length ? (closed.filter(t => t.planFollowed).length / closed.length) * 100 : 0;
+  const round = (d: Decimal, dp = 2) => d.toDecimalPlaces(dp).toNumber();
 
   return {
     totalTrades: trades.length,
-    wins: wins.length,
-    losses: losses.length,
-    breakevenCount: be.length,
-    openTrades: trades.filter(t=>t.result==="Open").length,
-    winRate: closed.length ? parseFloat(((wins.length/closed.length)*100).toFixed(1)) : 0,
-    profitFactor: grossLosses > 0 ? parseFloat((grossWins/grossLosses).toFixed(2)) : (grossWins > 0 ? 999.99 : 0),
-    expectancy: closed.length ? parseFloat((totalNet/closed.length).toFixed(2)) : 0,
-    avgWin: parseFloat(avgWin.toFixed(2)),
-    avgLoss: parseFloat(avgLoss.toFixed(2)),
-    avgRMultiple: parseFloat(avgR.toFixed(2)),
-    totalGross: parseFloat(totalGross.toFixed(2)),
-    totalCommissions: parseFloat(totalComm.toFixed(2)),
-    totalNet: parseFloat(totalNet.toFixed(2)),
-    maxDrawdown: parseFloat(maxDD.toFixed(2)),
+    closedTrades: closed.length,
+    wins: wr.wins,
+    losses: wr.losses,
+    breakevenCount: wr.breakeven,
+    openTrades: trades.filter(t => t.result === "Open").length,
+    winRate: wr.rate.state === "VALUE" ? round(wr.rate.value.mul(100), 1) : 0,
+    profitFactor: pf.state === "VALUE" ? round(pf.value, 4) : null,
+    profitFactorState: pf.state,
+    expectancy: exp.state === "VALUE" ? round(exp.value) : 0,
+    avgWin: winsN.length ? round(sum(winsN).div(winsN.length)) : 0,
+    avgLoss: lossesN.length ? round(sum(lossesN).div(lossesN.length).abs()) : 0,
+    avgRMultiple: withR.length ? round(sum(withR.map(t => new Decimal(t.rMultiple as number))).div(withR.length)) : 0,
+    totalGross: round(totalGross),
+    totalCommissions: round(totalComm),
+    totalNet: round(totalNet),
+    maxDrawdown: round(maxDD),
     maxConsecWins: maxCW,
     maxConsecLosses: maxCL,
-    avgHoldTime: parseFloat(avgHold.toFixed(0)),
+    avgHoldTime: withHold.length ? Math.round(withHold.reduce((s, t) => s + (t.holdTimeMinutes as number), 0) / withHold.length) : 0,
     planFollowRate: parseFloat(planRate.toFixed(1)),
+    sampleState: sampleState(closed.length),
+    calculationVersion: CALCULATION_VERSION,
   };
+}
+
+/** Texto para mostrar el Profit Factor sin valores centinela. */
+export function formatProfitFactor(s: Pick<TradeStats, "profitFactor" | "profitFactorState">): string {
+  if (s.profitFactorState === "VALUE" && s.profitFactor !== null) return s.profitFactor.toFixed(2);
+  if (s.profitFactorState === "NO_LOSSES_OBSERVED") return "Sin pérdidas";
+  return "—";
 }
 
 /* â”€â”€â”€ Asset class config â”€â”€â”€ */
