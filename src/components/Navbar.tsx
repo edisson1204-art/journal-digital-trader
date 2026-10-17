@@ -8,10 +8,10 @@ import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useI18n } from "@/lib/i18n";
 
 const NAV_LINKS = [
-  { key: "nav.product",   href: "#features" },
+  { key: "nav.product",   href: "#platform" },
   { key: "nav.features",  href: "#features" },
   { key: "nav.pricing",   href: "#pricing"  },
-  { key: "nav.resources", href: "#"         },
+  { key: "nav.resources", href: "/risk-disclosure" },
 ];
 
 export function Navbar() {

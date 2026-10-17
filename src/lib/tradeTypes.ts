@@ -274,6 +274,10 @@ export interface TradeStats {
 
 export interface FillCalcResult extends Partial<TradeRecord> {
   status?: LedgerTradeStatus;
+  openContracts?: number;
+  accruedCommission?: number;
+  openCommission?: number;
+  netPnlAfterAccruedFees?: number;
   /** Mensaje si las ejecuciones son inválidas (no se calcula nada). */
   calcError?: string;
 }
@@ -281,7 +285,7 @@ export interface FillCalcResult extends Partial<TradeRecord> {
 /**
  * Calcula el trade desde sus ejecuciones reales (entradas y salidas), FIFO, con Decimal.
  * - Salidas parciales: solo se realiza P&L de la cantidad cerrada; result = "Open", status = "PARTIALLY_CLOSED".
- * - Fees: comisión por lado × cantidad de cada ejecución (estimada, una sola vez).
+ * - Fees: comisión por lado × cantidad de cada ejecución (estimada, una sola vez), asignada FIFO a la cantidad cerrada (§9.2).
  * - R realizado = neto / riesgo inicial bruto (stop inicial × cantidad entrada × valor punto).
  */
 export function calculateTradeFromFills(
@@ -320,12 +324,21 @@ export function calculateTradeFromFills(
       : snap.economicResult === "WIN" ? "Win"
       : snap.economicResult === "LOSS" ? "Loss" : "Breakeven";
     const exited = snap.exitQuantity;
+    const hasClosed = exited.gt(0);
     return {
       status: snap.status,
-      grossPnl: snap.realizedGrossPnl.toDecimalPlaces(2).toNumber(),
-      netPnl: snap.realizedNetPnl.toDecimalPlaces(2).toNumber(),
+      avgEntryPrice: snap.averageEntryPrice ? snap.averageEntryPrice.toDecimalPlaces(5).toNumber() : undefined,
+      avgExitPrice: snap.averageExitPrice ? snap.averageExitPrice.toDecimalPlaces(5).toNumber() : undefined,
+      totalContracts: snap.entryQuantity.toNumber(),
+      contractsExited: exited.toNumber(),
+      openContracts: snap.openQuantity.toNumber(),
+      grossPnl: hasClosed ? snap.realizedGrossPnl.toDecimalPlaces(2).toNumber() : undefined,
+      netPnl: hasClosed ? snap.realizedNetPnl.toDecimalPlaces(2).toNumber() : undefined,
       totalCommission: snap.realizedFees.toDecimalPlaces(2).toNumber(),
-      pnlPerContract: exited.gt(0) ? snap.realizedNetPnl.div(exited).toDecimalPlaces(2).toNumber() : undefined,
+      accruedCommission: snap.accruedFees.toDecimalPlaces(2).toNumber(),
+      openCommission: snap.openFees.toDecimalPlaces(2).toNumber(),
+      netPnlAfterAccruedFees: hasClosed ? snap.netPnlAfterAccruedFees.toDecimalPlaces(2).toNumber() : undefined,
+      pnlPerContract: hasClosed ? snap.realizedNetPnl.div(exited).toDecimalPlaces(2).toNumber() : undefined,
       rMultiple: r ? r.toDecimalPlaces(4).toNumber() : undefined,
       isBreakeven: snap.economicResult === "NET_BREAKEVEN",
       result,

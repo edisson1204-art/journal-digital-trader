@@ -44,8 +44,16 @@ export interface TradeSnapshot {
   averageEntryPrice: Decimal | null;
   averageExitPrice: Decimal | null;
   realizedGrossPnl: Decimal;
+  /** Costes asignados a la cantidad efectivamente cerrada (entrada proporcional FIFO + salida). */
   realizedFees: Decimal;
+  /** Costes totales devengados en todas las ejecuciones registradas (abiertas + cerradas). */
+  accruedFees: Decimal;
+  /** Costes de entrada remanentes en la posición abierta (accruedFees - realizedFees). */
+  openFees: Decimal;
+  /** P&L neto realizado sobre los contratos cerrados (realizedGrossPnl - realizedFees). */
   realizedNetPnl: Decimal;
+  /** P&L bruto realizado menos la totalidad de costes devengados (realizedGrossPnl - accruedFees). */
+  netPnlAfterAccruedFees: Decimal;
   /** null salvo que exista un precio de mercado confiable (no se inventa). */
   unrealizedGrossPnl: Decimal | null;
   /** Solo definido cuando status === "CLOSED". */
@@ -107,19 +115,21 @@ export function computeSnapshot(executions: Execution[], pointValue: Decimal): T
   const openingSide = executions[0].side;
   const direction: Direction = openingSide === "BUY" ? "LONG" : "SHORT";
 
-  // Lotes abiertos FIFO
-  const lots: { qty: Decimal; price: Decimal }[] = [];
+  // Lotes abiertos FIFO con fee de entrada remanente para asignación proporcional exacta (§9.2)
+  const lots: { qty: Decimal; price: Decimal; feeRemaining: Decimal }[] = [];
   let entryQty = new Decimal(0);
   let entryNotional = new Decimal(0);
   let exitQty = new Decimal(0);
   let exitNotional = new Decimal(0);
   let gross = new Decimal(0);
-  let fees = new Decimal(0);
+  let accruedFees = new Decimal(0);
+  let realizedFees = new Decimal(0);
 
   for (const e of executions) {
-    fees = fees.plus(sumFees(e));
+    const execFee = sumFees(e);
+    accruedFees = accruedFees.plus(execFee);
     if (e.side === openingSide) {
-      lots.push({ qty: e.quantity, price: e.price });
+      lots.push({ qty: e.quantity, price: e.price, feeRemaining: execFee });
       entryQty = entryQty.plus(e.quantity);
       entryNotional = entryNotional.plus(e.quantity.mul(e.price));
       continue;
@@ -137,17 +147,25 @@ export function computeSnapshot(executions: Execution[], pointValue: Decimal): T
       const take = Decimal.min(lot.qty, remaining);
       const diff = direction === "LONG" ? e.price.minus(lot.price) : lot.price.minus(e.price);
       gross = gross.plus(take.mul(diff).mul(pointValue));
+      const allocatedEntryFee = take.eq(lot.qty)
+        ? lot.feeRemaining
+        : lot.feeRemaining.mul(take).div(lot.qty);
+      realizedFees = realizedFees.plus(allocatedEntryFee);
+      lot.feeRemaining = lot.feeRemaining.minus(allocatedEntryFee);
       lot.qty = lot.qty.minus(take);
       remaining = remaining.minus(take);
       if (lot.qty.eq(0)) lots.shift();
     }
+    realizedFees = realizedFees.plus(execFee);
     exitQty = exitQty.plus(e.quantity);
     exitNotional = exitNotional.plus(e.quantity.mul(e.price));
   }
 
   const openQuantity = entryQty.minus(exitQty);
   const status: TradeStatus = exitQty.eq(0) ? "OPEN" : openQuantity.gt(0) ? "PARTIALLY_CLOSED" : "CLOSED";
-  const net = gross.minus(fees);
+  const openFees = accruedFees.minus(realizedFees);
+  const net = gross.minus(realizedFees);
+  const netAfterAccrued = gross.minus(accruedFees);
   const economicResult: EconomicResult | null =
     status !== "CLOSED" ? null : net.gt(0) ? "WIN" : net.lt(0) ? "LOSS" : "NET_BREAKEVEN";
 
@@ -160,8 +178,11 @@ export function computeSnapshot(executions: Execution[], pointValue: Decimal): T
     averageEntryPrice: entryQty.gt(0) ? entryNotional.div(entryQty) : null,
     averageExitPrice: exitQty.gt(0) ? exitNotional.div(exitQty) : null,
     realizedGrossPnl: gross,
-    realizedFees: fees,
+    realizedFees,
+    accruedFees,
+    openFees,
     realizedNetPnl: net,
+    netPnlAfterAccruedFees: netAfterAccrued,
     unrealizedGrossPnl: null,
     economicResult,
     calculationVersion: CALCULATION_VERSION,

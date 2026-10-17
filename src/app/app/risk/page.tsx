@@ -55,9 +55,142 @@ function ResultCard({ label, value, color = "text-text-primary", large = false, 
   );
 }
 
+import Decimal from "decimal.js";
+import { validateDirection, positionSize as calcPositionSize } from "@/lib/ledger/risk";
+import type { Direction } from "@/lib/ledger/ledger";
+
+export function calculateRiskView(params: {
+  accountSize: string;
+  riskPct: string;
+  entry: string;
+  stop: string;
+  target: string;
+  assetClass: AssetClass;
+  pointValue: number;
+  direction?: Direction;
+}) {
+  const {
+    accountSize, riskPct, entry, stop, target,
+    assetClass, pointValue, direction = "LONG",
+  } = params;
+  const hasEntry = entry.trim() !== "" && Number.isFinite(Number(entry));
+  const hasStop = stop.trim() !== "" && Number.isFinite(Number(stop));
+  const hasTarget = target.trim() !== "" && Number.isFinite(Number(target));
+  const accNum = parseFloat(accountSize) || 0;
+  const riskPctNum = parseFloat(riskPct) || 0;
+  const entryNum = hasEntry ? parseFloat(entry) : 0;
+  const stopNum = hasStop ? parseFloat(stop) : 0;
+  const targetNum = hasTarget ? parseFloat(target) : 0;
+  const riskAmount = accNum > 0 && riskPctNum > 0 ? (accNum * riskPctNum) / 100 : 0;
+
+  if (!hasEntry || (!hasStop && !hasTarget)) {
+    return {
+      accNum, riskPctNum, riskAmount, stopDistance: 0, targetDistance: 0, rr: "—",
+      riskPerContract: 0, positionSizeRaw: 0, positionSize: "0", maxGain: 0, realRisk: 0,
+      effectiveRiskPct: 0, isValid: true, errors: [] as string[], warning: null as string | null,
+    };
+  }
+
+  const check = validateDirection(
+    direction,
+    new Decimal(entryNum),
+    hasStop ? new Decimal(stopNum) : null,
+    hasTarget ? new Decimal(targetNum) : null,
+  );
+
+  if (!check.ok) {
+    return {
+      accNum, riskPctNum, riskAmount, stopDistance: 0, targetDistance: 0, rr: "—",
+      riskPerContract: 0, positionSizeRaw: 0, positionSize: "0", maxGain: 0, realRisk: 0,
+      effectiveRiskPct: 0, isValid: false, errors: check.errors, warning: null as string | null,
+    };
+  }
+
+  const entryD = new Decimal(entryNum);
+  const stopD = hasStop ? new Decimal(stopNum) : null;
+  const targetD = hasTarget ? new Decimal(targetNum) : null;
+  const pvD = new Decimal(pointValue > 0 ? pointValue : 1);
+
+  const stopDistanceD = stopD ? entryD.minus(stopD).abs() : new Decimal(0);
+  const targetDistanceD = targetD ? targetD.minus(entryD).abs() : new Decimal(0);
+  const rr = stopDistanceD.gt(0) && targetDistanceD.gt(0)
+    ? targetDistanceD.div(stopDistanceD).toFixed(2)
+    : "—";
+
+  if (!stopD || stopDistanceD.lte(0) || accNum <= 0 || riskPctNum <= 0 || riskPctNum > 100) {
+    return {
+      accNum, riskPctNum, riskAmount,
+      stopDistance: stopDistanceD.toNumber(),
+      targetDistance: targetDistanceD.toNumber(),
+      rr,
+      riskPerContract: stopDistanceD.mul(pvD).toNumber(),
+      positionSizeRaw: 0, positionSize: "0", maxGain: 0, realRisk: 0,
+      effectiveRiskPct: 0, isValid: true, errors: [] as string[], warning: null as string | null,
+    };
+  }
+
+  const isFractional = ["Forex", "Crypto"].includes(assetClass);
+  if (!isFractional) {
+    const sized = calcPositionSize({
+      direction,
+      accountBalance: new Decimal(accNum),
+      riskFraction: new Decimal(riskPctNum).div(100),
+      entry: entryD,
+      stop: stopD,
+      target: targetD,
+      pointValue: pvD,
+      roundTripFeesPerContract: new Decimal(0),
+    });
+    const positionSizeRaw = sized.riskBudget.div(sized.riskPerContractGross).toNumber();
+    return {
+      accNum,
+      riskPctNum,
+      riskAmount: sized.riskBudget.toNumber(),
+      stopDistance: stopDistanceD.toNumber(),
+      targetDistance: targetDistanceD.toNumber(),
+      rr: sized.plannedRR ? sized.plannedRR.toFixed(2) : "—",
+      riskPerContract: sized.riskPerContractGross.toNumber(),
+      positionSizeRaw,
+      positionSize: sized.contracts.toString(),
+      maxGain: sized.plannedRewardGross ? sized.plannedRewardGross.toNumber() : 0,
+      realRisk: sized.effectiveRiskGross.toNumber(),
+      effectiveRiskPct: sized.effectiveRiskFraction.mul(100).toNumber(),
+      isValid: true,
+      errors: [] as string[],
+      warning: sized.warning,
+    };
+  }
+
+  const riskBudgetD = new Decimal(accNum).mul(new Decimal(riskPctNum).div(100));
+  const riskPerUnitD = stopDistanceD.mul(pvD);
+  const rawUnitsD = riskBudgetD.div(riskPerUnitD);
+  const execUnitsD = rawUnitsD.toDecimalPlaces(4, Decimal.ROUND_DOWN);
+  const realRiskD = execUnitsD.mul(riskPerUnitD);
+  const maxGainD = targetD ? execUnitsD.mul(targetDistanceD).mul(pvD) : new Decimal(0);
+
+  return {
+    accNum,
+    riskPctNum,
+    riskAmount: riskBudgetD.toNumber(),
+    stopDistance: stopDistanceD.toNumber(),
+    targetDistance: targetDistanceD.toNumber(),
+    rr,
+    riskPerContract: riskPerUnitD.toNumber(),
+    positionSizeRaw: rawUnitsD.toNumber(),
+    positionSize: execUnitsD.toFixed(4),
+    maxGain: maxGainD.toNumber(),
+    realRisk: realRiskD.toNumber(),
+    effectiveRiskPct: accNum > 0 ? realRiskD.div(accNum).mul(100).toNumber() : 0,
+    isValid: true,
+    errors: [] as string[],
+    warning: execUnitsD.lte(0) ? "El presupuesto de riesgo no cubre la unidad mínima." : null,
+  };
+}
+
 export default function RiskToolsPage() {
   const { trades } = useTradeStore();
 
+  const [direction, setDirection]     = useState<Direction>("LONG");
   const [accountSize, setAccountSize] = useState("");
   const [riskPct, setRiskPct]         = useState("");
   const [entry, setEntry]             = useState("");
@@ -72,25 +205,11 @@ export default function RiskToolsPage() {
   const pointValue = customPip ? parseFloat(customPip) : (presetPip ?? config.pipValue);
   const pipLabel   = INSTRUMENT_PIP_VALUES[instrument]?.label ?? `${instrument} — ${pointValue}$/punto`;
 
-  // Computed values
-  const accNum        = parseFloat(accountSize) || 0;
-  const riskPctNum    = parseFloat(riskPct) || 0;
-  const entryNum      = parseFloat(entry) || 0;
-  const stopNum       = parseFloat(stop) || 0;
-  const targetNum     = parseFloat(target) || 0;
-
-  const riskAmount      = (accNum * riskPctNum) / 100;
-  const stopDistance    = Math.abs(entryNum - stopNum);
-  const targetDistance  = Math.abs(targetNum - entryNum);
-  const rr              = stopDistance > 0 ? (targetDistance / stopDistance).toFixed(2) : "—";
-
-  const riskPerContract = stopDistance * pointValue;
-  const positionSizeRaw = riskPerContract > 0 ? riskAmount / riskPerContract : 0;
-  const isFractional    = ["Forex", "Crypto"].includes(assetClass);
-  const positionSize    = isFractional ? positionSizeRaw.toFixed(4) : Math.floor(positionSizeRaw).toString();
-
-  const maxGain  = positionSizeRaw > 0 ? positionSizeRaw * targetDistance * pointValue : 0;
-  const realRisk = positionSizeRaw > 0 ? parseFloat(positionSize) * stopDistance * pointValue : 0;
+  const {
+    accNum, riskPctNum, riskAmount, stopDistance, rr,
+    positionSizeRaw, positionSize, maxGain, realRisk,
+    effectiveRiskPct, isValid, errors, warning,
+  } = calculateRiskView({ accountSize, riskPct, entry, stop, target, assetClass, pointValue, direction });
 
   /* ── Daily Risk Rules calculadas desde datos reales ── */
   const riskRules = useMemo(() => {
@@ -118,7 +237,7 @@ export default function RiskToolsPage() {
     return [
       {
         label:    "Pérdida Diaria Actual",
-        value:    `${todayPnl >= 0 ? "+" : ""}$${Math.abs(todayPnl).toFixed(0)}`,
+        value:    `${todayPnl >= 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(0)}`,
         limit:    `$${Math.abs(maxDailyLoss).toFixed(0)}`,
         pct:      maxDailyLoss < 0 ? Math.min(100, (Math.abs(Math.min(todayPnl, 0)) / Math.abs(maxDailyLoss)) * 100) : 0,
         color:    todayPnl < maxDailyLoss * 0.7 ? "text-red-loss" : todayPnl < 0 ? "text-yellow-warn" : "text-green-primary",
@@ -127,7 +246,7 @@ export default function RiskToolsPage() {
       },
       {
         label:    "Pérdida Semanal Actual",
-        value:    `${weekPnl >= 0 ? "+" : ""}$${Math.abs(weekPnl).toFixed(0)}`,
+        value:    `${weekPnl >= 0 ? "+" : "-"}$${Math.abs(weekPnl).toFixed(0)}`,
         limit:    `$${Math.abs(maxWeeklyLoss).toFixed(0)}`,
         pct:      maxWeeklyLoss < 0 ? Math.min(100, (Math.abs(Math.min(weekPnl, 0)) / Math.abs(maxWeeklyLoss)) * 100) : 0,
         color:    weekPnl < maxWeeklyLoss * 0.7 ? "text-red-loss" : weekPnl < 0 ? "text-yellow-warn" : "text-green-primary",
@@ -194,6 +313,29 @@ export default function RiskToolsPage() {
             <p className="text-[11px] text-text-muted">Tamaño exacto de posición basado en riesgo y valor de punto real</p>
           </div>
 
+          {/* Direction selector (MAT-02) */}
+          <div className="mb-4">
+            <label className="text-[11px] font-medium text-text-secondary block mb-1.5">Dirección de la Operación</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["LONG", "SHORT"] as Direction[]).map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDirection(d)}
+                  className={`py-2 rounded-btn text-[12px] font-bold transition-all border ${
+                    direction === d
+                      ? d === "LONG"
+                        ? "bg-green-primary/15 text-green-primary border-green-primary/40"
+                        : "bg-red-loss/15 text-red-loss border-red-loss/40"
+                      : "bg-bg-section text-text-muted border-border-card hover:text-text-secondary"
+                  }`}
+                >
+                  {d === "LONG" ? "▲ LARGO (LONG)" : "▼ CORTO (SHORT)"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Asset class + instrument */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="flex flex-col gap-1.5">
@@ -256,20 +398,36 @@ export default function RiskToolsPage() {
             <InputField label="Take Profit"        id="target" value={target}     onChange={setTarget}      hint="Precio objetivo de ganancia" />
           </div>
 
+          {!isValid && errors.length > 0 && (
+            <div className="rounded-lg border border-red-loss/40 bg-red-loss/10 p-3 flex items-start gap-2 mb-4" role="alert">
+              <AlertTriangle className="h-4 w-4 text-red-loss flex-shrink-0 mt-0.5" />
+              <div className="text-[11px] text-red-loss font-medium">
+                {errors.map((err, i) => <p key={i}>{err}</p>)}
+              </div>
+            </div>
+          )}
+
+          {warning && (
+            <div className="rounded-lg border border-yellow-warn/40 bg-yellow-warn/10 p-3 flex items-start gap-2 mb-4">
+              <AlertTriangle className="h-4 w-4 text-yellow-warn flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] text-yellow-warn font-medium">{warning}</p>
+            </div>
+          )}
+
           {/* Results */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <ResultCard label="$ Permitido a Perder"  value={riskAmount > 0 ? `$${riskAmount.toFixed(2)}` : "—"} color="text-yellow-warn" large />
             <ResultCard
-              label={`Contratos Sugeridos`}
-              value={positionSizeRaw > 0 ? positionSize : "—"}
+              label={`Contratos Ejecutables`}
+              value={isValid && positionSizeRaw > 0 ? positionSize : "—"}
               color="text-green-primary"
               large
-              sub={assetClass === "Futures_Micro" ? "micro-contratos" : config.unit}
+              sub={isValid && positionSizeRaw > 0 ? `${assetClass === "Futures_Micro" ? "micro-contratos" : config.unit} (teórico: ${positionSizeRaw.toFixed(2)})` : undefined}
             />
-            <ResultCard label="Riesgo Real Asumido"   value={realRisk > 0 ? `-$${realRisk.toFixed(2)}` : "—"} color="text-red-loss" />
-            <ResultCard label="Ganancia Proyectada"   value={maxGain > 0 ? `+$${maxGain.toFixed(2)}` : "—"} color="text-green-primary" />
-            <ResultCard label="Ratio Riesgo/Beneficio" value={rr !== "—" ? `1:${rr}` : "—"} color="text-blue-accent" />
-            <ResultCard label="Distancia al Stop"      value={stopDistance > 0 ? `${stopDistance.toFixed(2)} pts` : "—"} />
+            <ResultCard label="Riesgo Real Asumido"   value={isValid && realRisk > 0 ? `-$${realRisk.toFixed(2)} (${effectiveRiskPct.toFixed(2)}%)` : "—"} color="text-red-loss" />
+            <ResultCard label="Ganancia Bruta Proyectada" value={isValid && maxGain > 0 ? `+$${maxGain.toFixed(2)}` : "—"} color="text-green-primary" />
+            <ResultCard label="Ratio Riesgo/Beneficio" value={isValid && rr !== "—" ? `1:${rr}` : "—"} color="text-blue-accent" />
+            <ResultCard label="Distancia al Stop"      value={isValid && stopDistance > 0 ? `${stopDistance.toFixed(2)} pts` : "—"} />
           </div>
 
           {riskPctNum > 2 && (
@@ -280,7 +438,7 @@ export default function RiskToolsPage() {
               </p>
             </div>
           )}
-          {rr !== "—" && parseFloat(rr) < 1.5 && parseFloat(rr) > 0 && (
+          {isValid && rr !== "—" && parseFloat(rr) < 1.5 && parseFloat(rr) > 0 && (
             <div className="rounded-lg border border-yellow-warn/30 bg-yellow-warn/10 p-3 flex items-start gap-2 mt-2">
               <AlertTriangle className="h-4 w-4 text-yellow-warn flex-shrink-0 mt-0.5" />
               <p className="text-[11px] text-yellow-warn font-medium">

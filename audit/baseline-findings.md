@@ -53,3 +53,14 @@
 - Aislamiento entre dos usuarios A/B (RLS real): requiere entorno de staging y dos cuentas de prueba. No se hizo con claves administrativas, según tus reglas.
 - Comportamiento en producción de las variables de entorno.
 - Accesibilidad (contraste, teclado) y responsive: pendiente.
+
+
+---
+
+## Adenda — Auditoría de Fiabilidad (14–15 Octubre 2026)
+
+Se incorporaron y reprodujeron con pruebas automatizadas (`src/lib/ledger/audit_oct14.test.ts`) todos los casos de la auditoría del 14–15 de octubre de 2026:
+- **Reproducción previa (10 fallos antes de corregir):** `audit/test-results/oct14-repro-before.log`
+- **Verificación posterior (51/51 pruebas en verde):** `audit/test-results/oct14-repro-after.log`
+- **Oráculo independiente Python `Decimal`:** `audit/test-results/python-oracle.log`
+- **Matriz detallada por ID (`MAT-01..02`, `LED-01..02`, `LED-05..06`, `BE-01`, `STA-02..05`, `REP-01..04`, `§11.1`):** véase `audit/REPORTE_EJECUTIVO_FINAL.md`.

@@ -38,12 +38,12 @@ export function expectancy(netPnls: Decimal[]): MetricValue {
   return { state: "VALUE", value: netPnls.reduce((s, p) => s.plus(p), new Decimal(0)).div(netPnls.length) };
 }
 
-/** WR = wins / (wins + losses). Los breakeven netos se reportan aparte. */
+/** WR = wins / n de trades cerrados elegibles (§9.2). Los breakeven netos se incluyen en el denominador y se reportan aparte. */
 export function winRate(netPnls: Decimal[]): { wins: number; losses: number; breakeven: number; rate: MetricValue } {
   const wins = netPnls.filter(p => p.gt(0)).length;
   const losses = netPnls.filter(p => p.lt(0)).length;
   const breakeven = netPnls.length - wins - losses;
-  const denom = wins + losses;
+  const denom = netPnls.length;
   return { wins, losses, breakeven, rate: denom === 0 ? { state: "NO_DATA" } : { state: "VALUE", value: new Decimal(wins).div(denom) } };
 }
 

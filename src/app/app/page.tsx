@@ -86,11 +86,13 @@ export default function AppDashboard() {
 
   const recentTrades = useMemo(() => trades.slice(0, 5), [trades]);
 
+  const hasClosed = stats.closedTrades > 0;
+
   const topMetrics = [
-    { label: t("dashboard.netPnl"),         value:`${stats.totalNet >= 0?"+":""}$${stats.totalNet.toLocaleString()}`, change:"Global",  icon: TrendingUp,   color: stats.totalNet >= 0 ? "text-green-primary" : "text-red-loss", bg: stats.totalNet >= 0 ? "bg-green-primary/10" : "bg-red-loss/10",  positive: stats.totalNet >= 0 },
-    { label: t("dashboard.winRate"),        value:`${stats.winRate}%`,       change:"Global",   icon: Target,        color:"text-blue-accent",   bg:"bg-blue-accent/10",    positive: stats.winRate >= 50  },
-    { label: t("dashboard.profitFactor"),   value:`${formatProfitFactor(stats)}`,   change:"Global",   icon: BarChart2,     color: (stats.profitFactor ?? 0) >= 1.5 ? "text-green-primary" : "text-yellow-warn", bg: (stats.profitFactor ?? 0) >= 1.5 ? "bg-green-primary/10" : "bg-yellow-warn/10",  positive: (stats.profitFactor ?? 0) >= 1  },
-    { label: "Max Drawdown",    value:`-$${stats.maxDrawdown.toLocaleString()}`, change:"Global",   icon: TrendingDown,  color:"text-red-loss",      bg:"bg-red-loss/10",       positive:false },
+    { label: t("dashboard.netPnl"),         value:`${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: hasClosed ? "Global" : "Sin cierres",  icon: TrendingUp,   color: stats.totalNet >= 0 ? "text-green-primary" : "text-red-loss", bg: stats.totalNet >= 0 ? "bg-green-primary/10" : "bg-red-loss/10",  positive: stats.totalNet >= 0 },
+    { label: t("dashboard.winRate"),        value: hasClosed ? `${stats.winRate}%` : "—",       change: hasClosed ? "Global" : "Sin muestra",   icon: Target,        color:"text-blue-accent",   bg:"bg-blue-accent/10",    positive: hasClosed && stats.winRate >= 50  },
+    { label: t("dashboard.profitFactor"),   value:`${formatProfitFactor(stats)}`,   change: hasClosed ? "Global" : "Sin muestra",   icon: BarChart2,     color: (stats.profitFactor ?? 0) >= 1.5 ? "text-green-primary" : "text-yellow-warn", bg: (stats.profitFactor ?? 0) >= 1.5 ? "bg-green-primary/10" : "bg-yellow-warn/10",  positive: (stats.profitFactor ?? 0) >= 1  },
+    { label: "Max Drawdown",    value: hasClosed ? `-$${stats.maxDrawdown.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00", change:"Global",   icon: TrendingDown,  color:"text-red-loss",      bg:"bg-red-loss/10",       positive:false },
   ];
 
   if (!isHydrated) return null; // Prevenir flicker en SSR
@@ -145,9 +147,9 @@ export default function AppDashboard() {
               <p className="text-4xl font-black text-text-primary tabular-nums tracking-tight">{stats.totalTrades}</p>
               <div className="mt-5 flex flex-col gap-3">
                 {[
-                  { label:"Wins",      val:stats.wins, pct:stats.totalTrades ? Math.round(stats.wins/stats.totalTrades*100) : 0, color:"bg-green-primary" },
-                  { label:"Losses",    val:stats.losses, pct:stats.totalTrades ? Math.round(stats.losses/stats.totalTrades*100) : 0, color:"bg-red-loss"      },
-                  { label:"Breakeven", val:stats.breakevenCount,  pct:stats.totalTrades ? Math.round(stats.breakevenCount/stats.totalTrades*100) : 0,  color:"bg-yellow-warn"   },
+                  { label:"Wins",      val:stats.wins, pct:stats.closedTrades ? Math.round(stats.wins/stats.closedTrades*100) : 0, color:"bg-green-primary" },
+                  { label:"Losses",    val:stats.losses, pct:stats.closedTrades ? Math.round(stats.losses/stats.closedTrades*100) : 0, color:"bg-red-loss"      },
+                  { label:"Breakeven", val:stats.breakevenCount,  pct:stats.closedTrades ? Math.round(stats.breakevenCount/stats.closedTrades*100) : 0,  color:"bg-yellow-warn"   },
                 ].map(s => (
                   <div key={s.label}>
                     <div className="flex justify-between mb-1.5">
@@ -165,10 +167,10 @@ export default function AppDashboard() {
             {/* Quick stats */}
             <div className="rounded-card border border-border-card bg-bg-card p-6 grid grid-cols-2 gap-4 flex-1">
               {[
-                { label:t("dashboard.avgRR"),     value:`1:${stats.avgRMultiple}`,   color:"text-green-primary" },
-                { label:"Expectancy",  value:`${stats.expectancy>=0?"+":""}$${stats.expectancy}`, color: stats.expectancy>=0 ? "text-green-primary":"text-red-loss" },
-                { label:"Avg Loss",    value:`$${stats.avgLoss}`,         color:"text-red-loss"      },
-                { label:"Avg Win",     value:`+$${stats.avgWin}`,         color:"text-blue-accent"   },
+                { label:t("dashboard.avgRR"),     value: hasClosed ? `1:${stats.avgRMultiple}` : "—",   color:"text-green-primary" },
+                { label:"Expectancy",  value: hasClosed ? `${stats.expectancy >= 0 ? "+" : "-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—", color: stats.expectancy >= 0 ? "text-green-primary":"text-red-loss" },
+                { label:"Avg Loss",    value: stats.losses > 0 ? `-$${Math.abs(stats.avgLoss).toFixed(2)}` : "—",         color:"text-red-loss"      },
+                { label:"Avg Win",     value: stats.wins > 0 ? `+$${Math.abs(stats.avgWin).toFixed(2)}` : "—",         color:"text-blue-accent"   },
               ].map(s => (
                 <div key={s.label} className="flex flex-col justify-center">
                   <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-1">{s.label}</p>
@@ -196,7 +198,8 @@ export default function AppDashboard() {
               </thead>
               <tbody>
                 {recentTrades.map(t => {
-                  const isWin = (t.netPnl || 0) > 0;
+                  const pnlVal = t.netPnl;
+                  const isWin = (pnlVal || 0) > 0;
                   return (
                   <tr key={t.id} className="border-b border-border-card/30 hover:bg-white/3 transition-colors">
                     <td className="px-4 py-2.5 font-semibold text-text-primary">{t.instrument}</td>
@@ -204,8 +207,8 @@ export default function AppDashboard() {
                     <td className={`px-4 py-2.5 font-medium ${t.side === "Buy" ? "text-green-primary" : "text-red-loss"}`}>{t.side}</td>
                     <td className="px-4 py-2.5 tabular-nums text-text-secondary">{t.avgEntryPrice}</td>
                     <td className="px-4 py-2.5 tabular-nums text-text-secondary">{t.avgExitPrice || "Abierto"}</td>
-                    <td className={`px-4 py-2.5 tabular-nums font-bold ${isWin ? "text-green-primary" : "text-red-loss"}`}>
-                      {isWin ? "+" : ""}${Math.abs(t.netPnl || 0).toFixed(2)}
+                    <td className={`px-4 py-2.5 tabular-nums font-bold ${pnlVal === undefined || pnlVal === null ? "text-text-muted" : isWin ? "text-green-primary" : "text-red-loss"}`}>
+                      {pnlVal === undefined || pnlVal === null ? "—" : `${pnlVal >= 0 ? "+" : "-"}$${Math.abs(pnlVal).toFixed(2)}`}
                     </td>
                     <td className="px-4 py-2.5 text-text-muted">{t.dateOpen}</td>
                   </tr>

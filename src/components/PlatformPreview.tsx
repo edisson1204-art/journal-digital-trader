@@ -121,58 +121,159 @@ export function PlatformPreview() {
         </div>
 
         {/* Panel */}
-        <div className="border border-t-0 border-border-card rounded-b-card bg-bg-card p-6 sm:p-8">
-          {/* Metrics row */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
-            {metrics.map((m) => (
-              <div key={m.label} className="rounded-card border border-border-card/60 bg-bg-section p-4">
-                <p className="text-[11px] text-text-muted mb-1">{m.label}</p>
-                <p className={`text-[18px] font-bold tabular-nums leading-none ${m.red ? "text-red-loss" : m.green ? "text-green-primary" : "text-text-primary"}`}>
-                  {m.value}
-                </p>
-                {m.sub && <p className="text-[11px] text-green-primary mt-1">{m.sub}</p>}
-              </div>
-            ))}
-          </div>
-
-          {/* Chart + Strategy breakdown */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
-            {/* Equity curve */}
-            <div className="rounded-card border border-border-card/60 bg-bg-section p-5">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-semibold text-text-primary">{t("platform.equity")}</p>
-                <div className="flex gap-1.5">
-                  {["1W","1M","3M","6M","1Y"].map((p) => (
-                    <button key={p} className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${p === "6M" ? "bg-green-primary/15 text-green-primary" : "text-text-muted hover:text-text-secondary"}`}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <EquityChart />
-            </div>
-
-            {/* Performance by strategy */}
-            <div className="rounded-card border border-border-card/60 bg-bg-section p-5">
-              <p className="text-sm font-semibold text-text-primary mb-4">{t("platform.perf_by_strategy")}</p>
-              <div className="flex flex-col gap-4">
-                {strategies.map((s) => (
-                  <div key={s.key}>
-                    <div className="flex justify-between mb-1.5">
-                      <span className="text-[12px] text-text-secondary">{t(s.key)}</span>
-                      <span className="text-[12px] font-semibold tabular-nums text-text-primary">{s.pct}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-border-card">
-                      <div
-                        className={`h-full rounded-full ${s.color} transition-all duration-700`}
-                        style={{ width: `${s.pct}%` }}
-                      />
-                    </div>
+        <div className="border border-t-0 border-border-card rounded-b-card bg-bg-card p-6 sm:p-8" role="tabpanel">
+          {activeTab === 0 && (
+            <>
+              {/* Metrics row */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+                {metrics.map((m) => (
+                  <div key={m.label} className="rounded-card border border-border-card/60 bg-bg-section p-4">
+                    <p className="text-[11px] text-text-muted mb-1">{m.label}</p>
+                    <p className={`text-[18px] font-bold tabular-nums leading-none ${m.red ? "text-red-loss" : m.green ? "text-green-primary" : "text-text-primary"}`}>
+                      {m.value}
+                    </p>
+                    {m.sub && <p className="text-[11px] text-green-primary mt-1">{m.sub}</p>}
                   </div>
                 ))}
               </div>
+
+              {/* Chart + Strategy breakdown */}
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
+                <div className="rounded-card border border-border-card/60 bg-bg-section p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm font-semibold text-text-primary">{t("platform.equity")}</p>
+                    <div className="flex gap-1.5">
+                      {["1W","1M","3M","6M","1Y"].map((p) => (
+                        <span key={p} className={`px-2 py-0.5 rounded text-[10px] font-medium ${p === "6M" ? "bg-green-primary/15 text-green-primary" : "text-text-muted"}`}>
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <EquityChart />
+                </div>
+
+                <div className="rounded-card border border-border-card/60 bg-bg-section p-5">
+                  <p className="text-sm font-semibold text-text-primary mb-4">{t("platform.perf_by_strategy")}</p>
+                  <div className="flex flex-col gap-4">
+                    {strategies.map((s) => (
+                      <div key={s.key}>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-[12px] text-text-secondary">{t(s.key)}</span>
+                          <span className="text-[12px] font-semibold tabular-nums text-text-primary">{s.pct}%</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-border-card">
+                          <div
+                            className={`h-full rounded-full ${s.color} transition-all duration-700`}
+                            style={{ width: `${s.pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === 1 && (
+            <div className="rounded-card border border-border-card/60 bg-bg-section overflow-x-auto">
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="border-b border-border-card/50 text-left text-[10px] uppercase text-text-muted">
+                    <th className="p-3">Fecha</th>
+                    <th className="p-3">Instrumento</th>
+                    <th className="p-3">Lado</th>
+                    <th className="p-3">Contratos</th>
+                    <th className="p-3">Entrada</th>
+                    <th className="p-3">Salida</th>
+                    <th className="p-3">Comisión</th>
+                    <th className="p-3">Net P&L</th>
+                    <th className="p-3">R</th>
+                    <th className="p-3">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-card/30 tabular-nums">
+                  {[
+                    { d: "2026-10-01", i: "NQ", s: "Buy", c: 2, en: "20,000.00", ex: "20,020.00", fee: "-$0.36", pnl: "+$799.64", r: "+2.00R", st: "Win", pos: true },
+                    { d: "2026-10-02", i: "NQ", s: "Buy", c: 2, en: "20,000.00", ex: "19,990.00", fee: "-$0.36", pnl: "-$400.36", r: "-1.00R", st: "Loss", pos: false },
+                    { d: "2026-10-03", i: "ES", s: "Sell", c: 1, en: "5,800.00", ex: "5,785.00", fee: "-$2.50", pnl: "+$747.50", r: "+1.50R", st: "Win", pos: true },
+                    { d: "2026-10-04", i: "MNQ", s: "Buy", c: 2, en: "20,010.00", ex: "20,020.00 (1/2)", fee: "-$0.18", pnl: "+$19.82", r: "+0.50R", st: "Partial", pos: true },
+                  ].map((row, idx) => (
+                    <tr key={idx}>
+                      <td className="p-3 text-text-muted">{row.d}</td>
+                      <td className="p-3 font-bold text-text-primary">{row.i}</td>
+                      <td className={`p-3 font-semibold ${row.s === "Buy" ? "text-green-primary" : "text-red-loss"}`}>{row.s}</td>
+                      <td className="p-3 text-text-secondary">{row.c}</td>
+                      <td className="p-3 text-text-secondary">{row.en}</td>
+                      <td className="p-3 text-text-secondary">{row.ex}</td>
+                      <td className="p-3 text-yellow-warn">{row.fee}</td>
+                      <td className={`p-3 font-bold ${row.pos ? "text-green-primary" : "text-red-loss"}`}>{row.pnl}</td>
+                      <td className="p-3 text-blue-accent font-semibold">{row.r}</td>
+                      <td className="p-3"><span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-text-secondary">{row.st}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
+          )}
+
+          {activeTab === 2 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-card border border-border-card/60 bg-bg-section p-5">
+                <p className="text-xs font-semibold text-text-muted uppercase mb-2">Distribución de Múltiplos R</p>
+                <p className="text-2xl font-bold text-green-primary tabular-nums">+1.42R Mediana</p>
+                <p className="text-xs text-text-secondary mt-2">Rango intercuartílico (Q1 a Q3): -0.85R a +2.10R sobre operaciones cerradas.</p>
+              </div>
+              <div className="rounded-card border border-border-card/60 bg-bg-section p-5">
+                <p className="text-xs font-semibold text-text-muted uppercase mb-2">Curva de Drawdown</p>
+                <p className="text-2xl font-bold text-red-loss tabular-nums">-$400.36 Máx</p>
+                <p className="text-xs text-text-secondary mt-2">Cálculo exacto pico-a-valle desde el inicio de la serie temporal.</p>
+              </div>
+              <div className="rounded-card border border-border-card/60 bg-bg-section p-5">
+                <p className="text-xs font-semibold text-text-muted uppercase mb-2">Intervalo Wilson (95%)</p>
+                <p className="text-2xl font-bold text-blue-accent tabular-nums">54.1% – 79.8%</p>
+                <p className="text-xs text-text-secondary mt-2">Intervalo binomial para tasa de acierto cuando existe muestra histórica cerrada.</p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 3 && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="rounded-card border border-border-card/60 bg-bg-section p-4">
+                <p className="text-[11px] text-text-muted">Instrumento / Balance</p>
+                <p className="text-lg font-bold text-text-primary mt-1">NQ · $50,000</p>
+                <p className="text-[11px] text-text-muted mt-1">Riesgo máx 1% ($500.00)</p>
+              </div>
+              <div className="rounded-card border border-border-card/60 bg-bg-section p-4">
+                <p className="text-[11px] text-text-muted">Geometría LONG Validada</p>
+                <p className="text-lg font-bold text-text-primary mt-1">20,000 → TP 20,020</p>
+                <p className="text-[11px] text-red-loss mt-1">Stop Loss: 19,990 (10 pts)</p>
+              </div>
+              <div className="rounded-card border border-border-card/60 bg-bg-section p-4">
+                <p className="text-[11px] text-text-muted">Tamaño Ejecutable</p>
+                <p className="text-lg font-bold text-green-primary mt-1">2 Contratos</p>
+                <p className="text-[11px] text-text-muted mt-1">Riesgo real: $400.00 (0.80%)</p>
+              </div>
+              <div className="rounded-card border border-border-card/60 bg-bg-section p-4">
+                <p className="text-[11px] text-text-muted">Ganancia Bruta Proyectada</p>
+                <p className="text-lg font-bold text-green-primary mt-1">+$800.00 (1:2.0R)</p>
+                <p className="text-[11px] text-text-muted mt-1">Calculado sobre 2 contratos enteros</p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 4 && (
+            <div className="rounded-card border border-border-card/60 bg-bg-section p-5 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-violet-accent uppercase tracking-wider">Mentor IA (BYOK · Clave Propia del Usuario)</span>
+                <span className="text-[11px] text-text-muted">Sesión autenticada requerida</span>
+              </div>
+              <p className="text-sm text-text-secondary">
+                Analiza tus métricas reales del Journal (Win Rate, Profit Factor, adherencia al plan y errores frecuentes) usando tu propia clave API de OpenAI sin almacenar secretos en texto plano permanente.
+              </p>
+            </div>
+          )}
 
           {/* Demo data disclaimer */}
           <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border-card/50 pt-5">

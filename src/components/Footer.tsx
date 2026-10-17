@@ -4,13 +4,6 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { Logo } from "./Logo";
 
-const socialLinks = [
-  { label: "X (Twitter)", href: "#", icon: "𝕏" },
-  { label: "YouTube", href: "#", icon: "▶" },
-  { label: "Instagram", href: "#", icon: "◻" },
-  { label: "LinkedIn", href: "#", icon: "in" },
-];
-
 export function Footer() {
   const { t } = useI18n();
 
@@ -19,7 +12,7 @@ export function Footer() {
     { key: "footer.privacy", href: "/privacy" },
     { key: "footer.risk", href: "/risk-disclosure" },
     { key: "footer.refund", href: "/refund-policy" },
-    { key: "footer.contact", href: "#" },
+    { key: "footer.contact", href: "mailto:soporte@digitaltraderinvest.com" },
   ];
 
   return (
@@ -46,23 +39,8 @@ export function Footer() {
           </ul>
         </nav>
 
-        {/* Social + copyright */}
+        {/* Copyright */}
         <div className="flex flex-col items-start sm:items-end gap-3">
-          {/* Social icons */}
-          <div className="flex items-center gap-4" aria-label="Social media">
-            {socialLinks.map(({ label, href, icon }) => (
-              <a
-                key={label}
-                href={href}
-                aria-label={label}
-                className="w-8 h-8 rounded-lg border border-border-card flex items-center justify-center text-text-muted hover:text-text-primary hover:border-border-subtle transition-colors text-sm font-bold"
-              >
-                {icon}
-              </a>
-            ))}
-          </div>
-
-          {/* Copyright */}
           <p className="text-[11px] text-text-muted">{t("footer.copyright")}</p>
         </div>
       </div>

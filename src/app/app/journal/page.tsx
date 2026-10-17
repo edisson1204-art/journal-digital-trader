@@ -30,7 +30,7 @@ function Pnl({ v }: { v?: number }) {
   if (v === undefined || v === null) return <span className="text-text-muted">—</span>;
   return (
     <span className={`font-bold tabular-nums ${v > 0 ? "text-green-primary" : v < 0 ? "text-red-loss" : "text-yellow-warn"}`}>
-      {v >= 0 ? "+" : ""}${Math.abs(v).toFixed(2)}
+      {v >= 0 ? "+" : "-"}${Math.abs(v).toFixed(2)}
     </span>
   );
 }
@@ -218,13 +218,13 @@ export default function JournalPage() {
         {/* ─── KPI strip (always visible) ─── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
           <StatCard label="Total Trades"    value={String(stats.totalTrades)}        icon={BarChart2} />
-          <StatCard label="Net P&L"         value={`${stats.totalNet>=0?"+":""}$${Math.abs(stats.totalNet).toFixed(2)}`}   color={stats.totalNet>=0?"text-green-primary":"text-red-loss"} icon={stats.totalNet>=0?TrendingUp:TrendingDown} />
-          <StatCard label="Win Rate"        value={`${stats.winRate}%`}              color="text-blue-accent"   sub={`${stats.wins}W / ${stats.losses}L / ${stats.breakevenCount}BE`} />
+          <StatCard label="Net P&L"         value={`${stats.totalNet>=0?"+":"-"}$${Math.abs(stats.totalNet).toFixed(2)}`}   color={stats.totalNet>=0?"text-green-primary":"text-red-loss"} icon={stats.totalNet>=0?TrendingUp:TrendingDown} />
+          <StatCard label="Win Rate"        value={stats.closedTrades > 0 ? `${stats.winRate}%` : "—"}              color="text-blue-accent"   sub={`${stats.wins}W / ${stats.losses}L / ${stats.breakevenCount}BE`} />
           <StatCard label="Profit Factor"   value={formatProfitFactor(stats)}       color={(stats.profitFactor ?? 0) >=1.5?"text-green-primary":"text-yellow-warn"} />
-          <StatCard label="Expectancy"      value={`${stats.expectancy>=0?"+":""}$${Math.abs(stats.expectancy).toFixed(2)}`} sub="avg net per trade" color={stats.expectancy>=0?"text-green-primary":"text-red-loss"} />
+          <StatCard label="Expectancy"      value={stats.closedTrades > 0 ? `${stats.expectancy>=0?"+":"-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—"} sub="avg net per trade" color={stats.expectancy>=0?"text-green-primary":"text-red-loss"} />
           <StatCard label="Total Commission" value={`-$${stats.totalCommissions.toFixed(2)}`} color="text-yellow-warn" icon={AlertTriangle} />
-          <StatCard label="Max Drawdown"    value={`-$${stats.maxDrawdown.toFixed(2)}`} color="text-red-loss" />
-          <StatCard label="Plan Follow %"   value={`${stats.planFollowRate}%`}       color={stats.planFollowRate>=80?"text-green-primary":"text-yellow-warn"} sub={`Avg hold: ${stats.avgHoldTime}m`} icon={Clock} />
+          <StatCard label="Max Drawdown"    value={stats.closedTrades > 0 ? `-$${stats.maxDrawdown.toFixed(2)}` : "$0.00"} color="text-red-loss" />
+          <StatCard label="Plan Follow %"   value={stats.closedTrades > 0 ? `${stats.planFollowRate}%` : "—"}       color={stats.planFollowRate>=80?"text-green-primary":"text-yellow-warn"} sub={stats.closedTrades > 0 ? `Avg hold: ${stats.avgHoldTime}m` : "Avg hold: —"} icon={Clock} />
         </div>
 
         {/* ════ TABLE VIEW ════ */}
@@ -382,10 +382,10 @@ export default function JournalPage() {
             <div className="rounded-card border border-border-card bg-bg-card p-5">
               <p className="text-sm font-semibold text-text-primary mb-4">Win / Loss / Breakeven</p>
               {[
-                { label:"Wins",       count:stats.wins,            pct:stats.winRate,                           color:"bg-green-primary", tc:"text-green-primary" },
-                { label:"Losses",     count:stats.losses,          pct:100-stats.winRate-(stats.breakevenCount/(stats.totalTrades||1)*100), color:"bg-red-loss",    tc:"text-red-loss"   },
-                { label:"Breakeven",  count:stats.breakevenCount,  pct:stats.totalTrades?stats.breakevenCount/stats.totalTrades*100:0, color:"bg-yellow-warn", tc:"text-yellow-warn"},
-                { label:"Open",       count:stats.openTrades,      pct:stats.totalTrades?stats.openTrades/stats.totalTrades*100:0,     color:"bg-blue-accent", tc:"text-blue-accent" },
+                { label:"Wins",       count:stats.wins,            pct:stats.closedTrades ? (stats.wins/stats.closedTrades*100) : 0,                           color:"bg-green-primary", tc:"text-green-primary" },
+                { label:"Losses",     count:stats.losses,          pct:stats.closedTrades ? (stats.losses/stats.closedTrades*100) : 0, color:"bg-red-loss",    tc:"text-red-loss"   },
+                { label:"Breakeven",  count:stats.breakevenCount,  pct:stats.closedTrades ? (stats.breakevenCount/stats.closedTrades*100) : 0, color:"bg-yellow-warn", tc:"text-yellow-warn"},
+                { label:"Open",       count:stats.openTrades,      pct:stats.totalTrades ? (stats.openTrades/stats.totalTrades*100) : 0,     color:"bg-blue-accent", tc:"text-blue-accent" },
               ].map(r => (
                 <div key={r.label} className="mb-3">
                   <div className="flex justify-between mb-1">
@@ -404,18 +404,18 @@ export default function JournalPage() {
               <p className="text-sm font-semibold text-text-primary mb-4">Financial Summary</p>
               <div className="flex flex-col gap-2 text-[13px]">
                 {[
-                  { label:"Gross P&L",          v:`${stats.totalGross>=0?"+":""}$${Math.abs(stats.totalGross).toFixed(2)}`,   c:stats.totalGross>=0?"text-green-primary":"text-red-loss" },
+                  { label:"Gross P&L",          v:`${stats.totalGross>=0?"+":"-"}$${Math.abs(stats.totalGross).toFixed(2)}`,   c:stats.totalGross>=0?"text-green-primary":"text-red-loss" },
                   { label:"Total Commissions",   v:`-$${stats.totalCommissions.toFixed(2)}`,                                  c:"text-yellow-warn" },
-                  { label:"Net P&L",             v:`${stats.totalNet>=0?"+":""}$${Math.abs(stats.totalNet).toFixed(2)}`,     c:stats.totalNet>=0?"text-green-primary":"text-red-loss", bold:true },
-                  { label:"Avg Win",             v:`+$${stats.avgWin.toFixed(2)}`,                                            c:"text-green-primary" },
-                  { label:"Avg Loss",            v:`$${stats.avgLoss.toFixed(2)}`,                                            c:"text-red-loss" },
-                  { label:"Expectancy / trade",  v:`${stats.expectancy>=0?"+":""}$${Math.abs(stats.expectancy).toFixed(2)}`, c:stats.expectancy>=0?"text-green-primary":"text-red-loss", bold:true },
+                  { label:"Net P&L",             v:`${stats.totalNet>=0?"+":"-"}$${Math.abs(stats.totalNet).toFixed(2)}`,     c:stats.totalNet>=0?"text-green-primary":"text-red-loss", bold:true },
+                  { label:"Avg Win",             v: stats.wins > 0 ? `+$${stats.avgWin.toFixed(2)}` : "—",                                            c:"text-green-primary" },
+                  { label:"Avg Loss",            v: stats.losses > 0 ? `-$${Math.abs(stats.avgLoss).toFixed(2)}` : "—",                                            c:"text-red-loss" },
+                  { label:"Expectancy / trade",  v: stats.closedTrades > 0 ? `${stats.expectancy>=0?"+":"-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—", c:stats.expectancy>=0?"text-green-primary":"text-red-loss", bold:true },
                   { label:"Profit Factor",       v:formatProfitFactor(stats),                                                c:(stats.profitFactor ?? 0) >=1.5?"text-green-primary":"text-yellow-warn" },
-                  { label:"Max Drawdown",        v:`-$${stats.maxDrawdown.toFixed(2)}`,                                       c:"text-red-loss" },
+                  { label:"Max Drawdown",        v: stats.closedTrades > 0 ? `-$${stats.maxDrawdown.toFixed(2)}` : "$0.00",                                       c:"text-red-loss" },
                   { label:"Max Consec. Wins",    v:String(stats.maxConsecWins),                                               c:"text-green-primary" },
                   { label:"Max Consec. Losses",  v:String(stats.maxConsecLosses),                                             c:"text-red-loss" },
-                  { label:"Avg Hold Time",       v:`${stats.avgHoldTime} min`,                                                c:"text-text-primary" },
-                  { label:"Plan Follow Rate",    v:`${stats.planFollowRate}%`,                                                c:stats.planFollowRate>=80?"text-green-primary":"text-yellow-warn" },
+                  { label:"Avg Hold Time",       v: stats.closedTrades > 0 ? `${stats.avgHoldTime} min` : "—",                                                c:"text-text-primary" },
+                  { label:"Plan Follow Rate",    v: stats.closedTrades > 0 ? `${stats.planFollowRate}%` : "—",                                                c:stats.planFollowRate>=80?"text-green-primary":"text-yellow-warn" },
                 ].map(r => (
                   <div key={r.label} className={`flex justify-between py-1.5 border-b border-border-card/30 ${(r as any).bold ? "mt-1 pt-2 border-t border-border-card" : ""}`}>
                     <span className="text-text-muted">{r.label}</span>

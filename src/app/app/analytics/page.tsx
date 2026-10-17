@@ -122,7 +122,7 @@ export default function AnalyticsPage() {
     return filteredByPeriod.map(t => {
       equity += t.netPnl || 0;
       if (equity > peak) peak = equity;
-      const dd = peak > 0 ? equity - peak : 0; // siempre 0 o negativo
+      const dd = equity - peak; // siempre 0 o negativo, incluso cuando peak === 0
       return {
         date: t.dateOpen,
         drawdown: parseFloat(dd.toFixed(2)),
@@ -244,7 +244,7 @@ export default function AnalyticsPage() {
       trades: data.total,
       winRate: Math.round((data.wins / data.total) * 100),
       pnlRaw: data.pnl,
-      pnl: `${data.pnl >= 0 ? "+" : ""}$${Math.abs(data.pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+      pnl: `${data.pnl >= 0 ? "+" : "-"}$${Math.abs(data.pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
       color: data.pnl >= 0 ? "bg-green-primary" : "bg-red-loss",
     })).sort((a, b) => b.pnlRaw - a.pnlRaw);
   }, [filteredByPeriod]);
@@ -252,7 +252,7 @@ export default function AnalyticsPage() {
   /* ── 7. Rendimiento por Instrumento (tabla) ── */
   const instrumentData = useMemo(() => instrumentPieData.map(d => ({
     sym: d.name, trades: d.trades, winRate: d.winRate,
-    pnlRaw: d.pnl, pnl: `${d.pnl >= 0 ? "+" : ""}$${Math.abs(d.pnl).toLocaleString()}`,
+    pnlRaw: d.pnl, pnl: `${d.pnl >= 0 ? "+" : "-"}$${Math.abs(d.pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
   })), [instrumentPieData]);
 
   if (!isHydrated) return null;
@@ -261,6 +261,8 @@ export default function AnalyticsPage() {
     "1W": "última semana", "1M": "último mes", "3M": "últimos 3 meses",
     "6M": "últimos 6 meses", "1Y": "último año", "Todos": "histórico completo",
   };
+
+  const hasClosed = stats.closedTrades > 0;
 
   return (
     <AppShell title="Analytics" subtitle={`Análisis estadístico — ${periodLabel[period]}`}>
@@ -289,12 +291,12 @@ export default function AnalyticsPage() {
         {/* ── KPIs ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: "Net P&L",       value: `${stats.totalNet >= 0 ? "+" : ""}$${stats.totalNet.toLocaleString()}`,       color: stats.totalNet >= 0 ? "text-green-primary" : "text-red-loss" },
-            { label: "Win Rate",      value: `${stats.winRate}%`,                                                           color: stats.winRate >= 50 ? "text-blue-accent" : "text-yellow-warn" },
+            { label: "Net P&L",       value: `${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,       color: stats.totalNet >= 0 ? "text-green-primary" : "text-red-loss" },
+            { label: "Win Rate",      value: hasClosed ? `${stats.winRate}%` : "—",                                                           color: hasClosed && stats.winRate >= 50 ? "text-blue-accent" : "text-yellow-warn" },
             { label: "Profit Factor", value: `${formatProfitFactor(stats)}`,                                                       color: (stats.profitFactor ?? 0) >= 1.5 ? "text-green-primary" : "text-yellow-warn" },
-            { label: "Avg R:R",       value: `1:${stats.avgRMultiple}`,                                                     color: "text-text-primary" },
-            { label: "Max Drawdown",  value: `-$${Math.abs(stats.maxDrawdown).toLocaleString()}`,                           color: "text-red-loss" },
-            { label: "Expectancy",    value: `${stats.expectancy >= 0 ? "+" : ""}$${stats.expectancy.toFixed(2)}`,         color: stats.expectancy >= 0 ? "text-green-primary" : "text-red-loss" },
+            { label: "Avg R:R",       value: hasClosed ? `1:${stats.avgRMultiple}` : "—",                                                     color: "text-text-primary" },
+            { label: "Max Drawdown",  value: hasClosed ? `-$${Math.abs(stats.maxDrawdown).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00",                           color: "text-red-loss" },
+            { label: "Expectancy",    value: hasClosed ? `${stats.expectancy >= 0 ? "+" : "-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—",         color: stats.expectancy >= 0 ? "text-green-primary" : "text-red-loss" },
           ].map(m => (
             <div key={m.label} className="rounded-card border border-border-card bg-bg-card p-3">
               <p className="text-[10px] text-text-muted mb-1">{m.label}</p>
