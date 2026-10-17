@@ -69,7 +69,7 @@ function pctile(arr: number[], p: number): number {
   return s[Math.min(Math.floor(p * s.length), s.length - 1)];
 }
 
-function runMonteCarlo(
+export function runMonteCarlo(
   startBalance: number, winRate: number,
   avgWin: number, avgLoss: number,
   variability: number, numTrades: number,
@@ -106,15 +106,15 @@ function runMonteCarlo(
     const winsEst = Math.round(wr * sampleN);
     const wilson = wilsonInterval(winsEst, sampleN);
     if (wilson) {
-      ciWRL = wilson.lower * 100;
-      ciWRH = wilson.upper * 100;
+      ciWRL = Math.max(0, wilson.lower * 100);
+      ciWRH = Math.min(100, wilson.upper * 100);
     } else {
       ciWRL = Math.max(0, wr * 100 - 1.96 * seWR);
       ciWRH = Math.min(100, wr * 100 + 1.96 * seWR);
     }
-    seExp = stdPT / Math.sqrt(sampleN);
-    ciExpLow = exp - 1.96 * seExp;
-    ciExpHigh = exp + 1.96 * seExp;
+    seExp = sampleN >= 2 && stdPT > 0 ? stdPT / Math.sqrt(sampleN) : null;
+    ciExpLow = seExp !== null ? exp - 1.96 * seExp : null;
+    ciExpHigh = seExp !== null ? exp + 1.96 * seExp : null;
     adequacy =
       sampleN < 20  ? "poor" :
       sampleN < 30  ? "minimal" :
@@ -223,104 +223,94 @@ function runMonteCarlo(
 }
 
 /* ══════════════════════════════════════════════════════════
-   REPORT GENERATOR (Conditioned on Real Sample Size — STA-05)
+   REPORT GENERATOR (Neutral Descriptive / Inferential / Conditional — R2-05)
 ══════════════════════════════════════════════════════════ */
-function generateReport(
+export function generateReport(
   s: SimStats, winRate: number, numTrades: number, commission: number,
   avgWin: number, avgLoss: number, variability: number, lang: string,
 ) {
   const pros: string[] = [], cons: string[] = [], recs: string[] = [];
-  const hasValidatedSample = s.hasHistoricalSample && (s.sampleN ?? 0) >= 30;
-  const sharpeVal = s.sharpeRatio ?? 0;
 
   if (lang === "en") {
     if (s.expectancyPerTrade > 0) {
       pros.push(
-        hasValidatedSample
-          ? `Positive mathematical expectancy of +$${s.expectancyPerTrade.toFixed(2)}/trade across ${s.sampleN} historical trades.`
-          : `Theoretical expectancy of +$${s.expectancyPerTrade.toFixed(2)}/trade under the entered parameters (unvalidated without historical sample ≥30).`
+        s.hasHistoricalSample
+          ? `Observed descriptive expectancy: +$${s.expectancyPerTrade.toFixed(2)}/trade across n=${s.sampleN} closed trades.`
+          : `Conditional parameter expectancy: +$${s.expectancyPerTrade.toFixed(2)}/trade under the entered assumptions (n=0 historical trades).`
       );
     } else {
-      cons.push(`Negative/zero expectancy of $${s.expectancyPerTrade.toFixed(2)}/trade under current parameters.`);
+      cons.push(`Expectancy is $${s.expectancyPerTrade.toFixed(2)}/trade under the current parameters.`);
     }
 
-    if (s.rrRatio >= 2) pros.push(`Asymmetric R:R ratio of 1:${s.rrRatio.toFixed(2)}.`);
-    else if (s.rrRatio > 0 && s.rrRatio < 1) cons.push(`R:R of 1:${s.rrRatio.toFixed(2)} requires Win Rate > ${Math.round(100 / (1 + s.rrRatio))}% to break even.`);
+    if (s.rrRatio >= 2) pros.push(`Observed/input average win-to-loss ratio: 1:${s.rrRatio.toFixed(2)}.`);
+    else if (s.rrRatio > 0 && s.rrRatio < 1) cons.push(`Win-to-loss ratio of 1:${s.rrRatio.toFixed(2)} requires Win Rate > ${Math.round(100 / (1 + s.rrRatio))}% before fees to break even.`);
 
-    if (s.pctProfitable >= 75) pros.push(`${s.pctProfitable.toFixed(1)}% of simulated paths end above starting balance.`);
-    else if (s.pctProfitable < 50) cons.push(`Only ${s.pctProfitable.toFixed(1)}% of simulated paths end positive.`);
-
-    if (s.pctRuin > 10) cons.push(`Elevated simulated ruin rate: ${s.pctRuin.toFixed(1)}% — reduce risk per trade.`);
-    if (s.medianMaxDD > 20) cons.push(`Simulated median drawdown of ${s.medianMaxDD.toFixed(1)}% exceeds typical risk limits.`);
+    pros.push(`Conditional projection (${numTrades} trades): ${s.pctProfitable.toFixed(1)}% of simulated paths end above starting balance.`);
+    if (s.pctRuin > 0) {
+      cons.push(`Simulated ruin frequency (balance <= $0 within ${numTrades} trades): ${s.pctRuin.toFixed(1)}%.`);
+    }
+    if (s.medianMaxDD > 0) {
+      cons.push(`Simulated median maximum drawdown: ${s.medianMaxDD.toFixed(1)}% (P95: ${s.p95MaxDD.toFixed(1)}%).`);
+    }
 
     if (!s.hasHistoricalSample) {
-      cons.push(`Manual simulation mode: parameters are hypothetical and do not constitute an empirical edge.`);
-      recs.push(`Record at least 30 closed trades in the Journal to compute Wilson confidence intervals and empirical expectancy.`);
-    } else if ((s.sampleN ?? 0) < 30) {
-      cons.push(`Small sample size (n=${s.sampleN} < 30): high estimation variance.`);
-      recs.push(`Accumulate at least 30 closed trades before drawing statistical conclusions.`);
-    } else if (s.ciExpLow !== null && s.ciExpHigh !== null) {
-      recs.push(`95% Expectancy CI based on n=${s.sampleN}: [$${s.ciExpLow.toFixed(2)}, $${s.ciExpHigh.toFixed(2)}]/trade.`);
+      cons.push(`Manual simulation mode (n=0): outputs are conditional projections of your inputs, not empirical evidence.`);
+      recs.push(`Use closed Journal trades to compute descriptive metrics and Wilson 95% intervals.`);
+    } else {
+      if (s.ciWinRateLow !== null && s.ciWinRateHigh !== null) {
+        recs.push(`Wilson 95% Win Rate interval (n=${s.sampleN}, assuming i.i.d. Bernoulli trials): [${s.ciWinRateLow.toFixed(1)}%, ${s.ciWinRateHigh.toFixed(1)}%]. Real markets exhibit volatility clustering and serial dependence.`);
+      }
+      if (s.ciExpLow !== null && s.ciExpHigh !== null) {
+        recs.push(`95% normal-approximation Expectancy interval (n=${s.sampleN}): [$${s.ciExpLow.toFixed(2)}, $${s.ciExpHigh.toFixed(2)}]/trade.`);
+      } else {
+        recs.push(`Sample size n=${s.sampleN}: expectancy dispersion requires at least 2 trades with non-zero variance.`);
+      }
     }
   } else {
     if (s.expectancyPerTrade > 0) {
       pros.push(
-        hasValidatedSample
-          ? `Esperanza matemática positiva de +$${s.expectancyPerTrade.toFixed(2)}/trade observada en ${s.sampleN} trades históricos.`
-          : `Esperanza matemática teórica de +$${s.expectancyPerTrade.toFixed(2)}/trade según los parámetros ingresados (hipótesis no verificada empíricamente).`
+        s.hasHistoricalSample
+          ? `Métrica descriptiva observada: esperanza matemática de +$${s.expectancyPerTrade.toFixed(2)}/trade en n=${s.sampleN} operaciones cerradas.`
+          : `Proyección condicional bajo supuestos: esperanza matemática de +$${s.expectancyPerTrade.toFixed(2)}/trade según los parámetros ingresados (n=0 operaciones históricas).`
       );
     } else {
-      cons.push(`Esperanza matemática negativa o nula de $${s.expectancyPerTrade.toFixed(2)}/trade bajo estos parámetros.`);
+      cons.push(`Esperanza matemática de $${s.expectancyPerTrade.toFixed(2)}/trade bajo estos parámetros.`);
     }
 
-    if (s.rrRatio >= 2) pros.push(`Relación ganancia/pérdida de 1:${s.rrRatio.toFixed(2)}.`);
-    else if (s.rrRatio > 0 && s.rrRatio < 1) cons.push(`R:R de 1:${s.rrRatio.toFixed(2)} requiere WR > ${Math.round(100 / (1 + s.rrRatio))}% para cubrir pérdidas.`);
+    if (s.rrRatio >= 2) pros.push(`Relación ganancia/pérdida media de 1:${s.rrRatio.toFixed(2)}.`);
+    else if (s.rrRatio > 0 && s.rrRatio < 1) cons.push(`Relación ganancia/pérdida de 1:${s.rrRatio.toFixed(2)} requiere WR > ${Math.round(100 / (1 + s.rrRatio))}% antes de comisiones para cubrir pérdidas.`);
 
-    if (s.pctProfitable >= 75) pros.push(`${s.pctProfitable.toFixed(1)}% de las trayectorias simuladas finalizan sobre el balance inicial.`);
-    else if (s.pctProfitable < 50) cons.push(`Solo el ${s.pctProfitable.toFixed(1)}% de las trayectorias simuladas terminan en positivo.`);
-
-    if (s.pctRuin > 10) cons.push(`Riesgo de ruina simulado elevado: ${s.pctRuin.toFixed(1)}% — reduzca el riesgo por operación.`);
-    if (s.medianMaxDD > 20) cons.push(`Drawdown mediano simulado de ${s.medianMaxDD.toFixed(1)}%.`);
+    pros.push(`Proyección condicional (${numTrades} operaciones): ${s.pctProfitable.toFixed(1)}% de las trayectorias simuladas finalizan sobre el balance inicial.`);
+    if (s.pctRuin > 0) {
+      cons.push(`Frecuencia de ruina simulada (balance <= $0 dentro del horizonte de ${numTrades} operaciones): ${s.pctRuin.toFixed(1)}%.`);
+    }
+    if (s.medianMaxDD > 0) {
+      cons.push(`Drawdown máximo mediano simulado: ${s.medianMaxDD.toFixed(1)}% (P95: ${s.p95MaxDD.toFixed(1)}%).`);
+    }
 
     if (!s.hasHistoricalSample) {
-      cons.push(`Modo manual sin muestra histórica (n=0): los resultados reflejan únicamente los supuestos introducidos.`);
-      recs.push(`Registre al menos 30 operaciones cerradas en el Journal para estimar intervalos de confianza reales.`);
-    } else if ((s.sampleN ?? 0) < 30) {
-      cons.push(`Muestra histórica reducida (n=${s.sampleN} < 30): la incertidumbre muestral es alta.`);
-      recs.push(`Acumule al menos 30–50 operaciones cerradas antes de evaluar la consistencia del sistema.`);
-    } else if (s.ciExpLow !== null && s.ciExpHigh !== null) {
-      recs.push(`IC 95% de esperanza matemática (n=${s.sampleN}): [$${s.ciExpLow.toFixed(2)}, $${s.ciExpHigh.toFixed(2)}]/trade.`);
+      cons.push(`Modo manual sin muestra histórica (n=0): los resultados son proyecciones condicionales de los supuestos introducidos.`);
+      recs.push(`Vincule operaciones cerradas del Journal para calcular métricas descriptivas e intervalos de Wilson del 95%.`);
+    } else {
+      if (s.ciWinRateLow !== null && s.ciWinRateHigh !== null) {
+        recs.push(`Intervalo de Wilson 95% para Win Rate (n=${s.sampleN}, bajo supuesto Bernoulli i.i.d. con z=1.96): [${s.ciWinRateLow.toFixed(1)}%, ${s.ciWinRateHigh.toFixed(1)}%]. En mercados reales existen rachas, colas pesadas y dependencia temporal.`);
+      }
+      if (s.ciExpLow !== null && s.ciExpHigh !== null) {
+        recs.push(`Intervalo de esperanza matemática al 95% (n=${s.sampleN}): [$${s.ciExpLow.toFixed(2)}, $${s.ciExpHigh.toFixed(2)}]/trade.`);
+      } else {
+        recs.push(`Muestra n=${s.sampleN}: para estimar el error estándar de la esperanza se requieren al menos 2 operaciones con varianza positiva.`);
+      }
     }
   }
 
-  // STA-05: Nunca otorgar calificación A+ ni puntaje 100/100 sin muestra histórica suficiente (n >= 30)
-  if (!hasValidatedSample) {
-    return {
-      pros,
-      cons,
-      recs,
-      grade: s.hasHistoricalSample ? "Muestra <30" : "Simulación Teórica",
-      gradeColor: "text-yellow-warn",
-      score: null as number | null,
-    };
-  }
-
-  const score =
-    (s.expectancyPerTrade > 0 ? 25 : 0) +
-    (s.pctProfitable >= 65 ? 20 : s.pctProfitable >= 50 ? 10 : 0) +
-    (s.pctRuin < 5 ? 20 : s.pctRuin < 15 ? 10 : 0) +
-    (sharpeVal > 1 ? 20 : sharpeVal > 0.5 ? 10 : 0) +
-    (s.medianMaxDD < 15 ? 15 : s.medianMaxDD < 25 ? 7 : 0);
-
-  const grade =
-    score >= 85 ? "A" : score >= 70 ? "B+" : score >= 55 ? "B" :
-    score >= 40 ? "C" : "D";
-  const gradeColor =
-    grade === "A"  ? "text-green-primary" :
-    grade === "B+" || grade === "B" ? "text-blue-accent" :
-    grade === "C"  ? "text-yellow-warn" : "text-red-loss";
-
-  return { pros, cons, recs, grade, gradeColor, score };
+  return {
+    pros,
+    cons,
+    recs,
+    grade: s.hasHistoricalSample ? `Proyección Condicional (n=${s.sampleN})` : "Proyección Condicional (Manual, n=0)",
+    gradeColor: "text-blue-accent",
+    score: null as number | null,
+  };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -447,8 +437,6 @@ function Gauge({ value, max, label, color }: { value: number; max: number; label
    PAGE
 ══════════════════════════════════════════════════════════ */
 type Mode = "journal" | "manual";
-
-export { runMonteCarlo, generateReport };
 
 function parseFinite(val: string, fallback: number): number {
   const trimmed = String(val ?? "").trim();

@@ -1,34 +1,60 @@
-# Security review — fase B (parcial)
+# Revisión de Seguridad, RLS, Variables de Entorno y Alcance — Ronda 2 (R2-07)
 
-**Rama:** `repair/integridad-ledger-v1` · **Base:** `580e0bd` · **Entorno de prueba:** pruebas de unidad con Supabase simulado + build local. **No se probó contra la base real ni contra producción.**
+**Rama:** `repair/integridad-ledger-v1` · **Base:** `580e0bd62fd8e0f10d4f0cf5b4b13c64a0ba1ef5`
 
-## Corregido (con prueba que falla antes y pasa después)
+---
 
-| ID | Problema | Causa raíz | Corrección | Prueba (antes → después) |
+## 1. Distinción Estricta de Alcance de Pruebas (R2-07)
+
+Para cumplir con el mandato de Ronda 2, se separa sin ambigüedad qué verifica cada nivel de prueba:
+
+| Nivel de prueba | Qué verifica | Qué NO verifica | Evidencia | Estado admisible |
 |---|---|---|---|---|
-| SEC-01 | El webhook de Systeme creaba cuentas con la service role si `SYSTEME_WEBHOOK_SECRET` no estaba definida | `if (expectedSecret && ...)`: la validación era opcional | Falla cerrado (503) sin secreto; comparación en tiempo constante | `SEC-01`: 200 → 503 |
-| SEC-03 | El webhook imprimía el payload completo y el email en logs | `console.log` del payload | Se eliminan esos logs | `SEC-03`: falla → pasa |
-| SEC-04 | `/api/chat` no exigía sesión (proxy abierto) | No había comprobación de usuario | `supabase.auth.getUser()` en servidor, 401 sin sesión | `SEC-04`: 500 → 401 |
-| SEC-06 | Sin límite de mensajes/tamaño | — | Máx. 40 mensajes y 6 MB | `SEC-06`: 500 → 400 |
-| SEC-07 | El header `Authorization` se aceptaba como clave OpenAI | Fallback `Authorization` | Solo `x-openai-key` | `SEC-07`: 500 → 401 |
-| S05 | Logout no cerraba la sesión | Era un `<Link href="/">` | `logout()`: `signOut`, vaciar stores, borrar `localStorage` privado, recarga completa | Sin prueba automatizada (ver "No verificado") |
-| S06 | Rutas `/app/*` protegidas solo en el cliente | No existía proxy | `src/proxy.ts` valida con `getUser()` y responde `no-store` | Sin prueba automatizada |
-| S08 | Recuperación de contraseña era `href="#"` | No implementada | `/forgot-password` (respuesta neutral) y `/reset-password` (sesión de recuperación, mín. 10 caracteres, cierra sesión al terminar) | Sin prueba automatizada |
-| S04 | La UI decía "encriptada" y "nunca se envía a nuestros servidores" | Ofuscación reversible; la clave sí viaja al servidor en cada consulta | Textos corregidos; la clave se borra al cerrar sesión | — |
-| — | Errores de OpenAI devueltos crudos (pueden incluir fragmentos de la clave) | `error.message` directo | Mensajes genéricos y sin log del mensaje | — |
-| — | Dos clientes de Supabase con sesiones distintas (cookies vs localStorage) | `lib/supabase/client.ts` usaba `supabase-js` plano | Un solo cliente `@supabase/ssr` | Sin prueba automatizada |
+| **1. Pruebas unitarias de rutas API con mocks** (`src/app/api/security.test.ts`) | Que `/api/webhooks/systeme` falle cerrado (`503`) cuando `SYSTEME_WEBHOOK_SECRET` no está definido, rechace secretos inválidos (`401`) con comparación en tiempo constante (`timingSafeEqual`), no imprima PII en logs, y que `/api/chat` exija sesión (`401`), rechace payloads `> 40` mensajes (`400`) y no acepte `Authorization` como clave OpenAI (`401`). | **NO demuestra** políticas RLS en PostgreSQL ni aislamiento real entre sesiones de Supabase. | `audit/test-results/r2-vitest.log` (`SEC-01` a `SEC-07`, 7/7 pruebas aprobadas) | `VERIFICADO LOCALMENTE` |
+| **2. Inspección del catálogo `pg_policy` + Ejecución transaccional en PostgreSQL 17.6 con `ROLE authenticated (NOBYPASSRLS)` y `ROLLBACK`** | Que las 4 políticas activas en `public.trades` (`trades_select_own`, `trades_insert_own`, `trades_update_own`, `trades_delete_own`) evalúan `((SELECT auth.uid() AS uid) = user_id)`, que bajo el rol no privilegiado `authenticated` (`NOBYPASSRLS`) el `user_b` obtiene `0` filas en `SELECT/UPDATE/DELETE` sobre registros de `user_a`, recibe error `42501` al intentar `INSERT` con `user_id = user_a`, y que el trigger `enforce_trades_ledger_invariants` rechaza sobre-cierres (`3` sobre `2`) con código `23514`. Todo ejecutado en `pg_temp` dentro de `BEGIN ... ROLLBACK` sin tocar un solo registro real. | **NO sustituye** una prueba HTTP de extremo a extremo con dos cuentas reales de GoTrue en un proyecto Supabase de staging independiente. | `audit/test-results/r2-postgres-rls-trigger.json` | `VERIFICADO LOCALMENTE` (motor Postgres 17.6 con `ROLLBACK`) |
+| **3. Prueba HTTP PostgREST de extremo a extremo con 2 usuarios sintéticos ordinarios (`anon` key) en proyecto de Staging separado** | Login real con `signInWithPassword` para `userA` y `userB` usando `NEXT_PUBLIC_SUPABASE_ANON_KEY` (sin `service_role`) contra un proyecto de staging aislado. | No se ejecutó contra el proyecto `ukeqvdklgtzsnkhtkrvm` porque es la base de datos de producción activa y no existe una rama/proyecto de staging separado (`list_branches = []`). Crear usuarios o filas en producción violaría la Regla §1 (*"No mezcles pruebas con registros reales. No publiques cambios, no apliques migraciones a producción"*). | Script listo en `audit/verify_staging_rls.mjs` | `BLOQUEADO` (falta proyecto Supabase de staging separado de producción) |
 
-Los resultados de las pruebas están en `audit/test-results/security-before.log` (código original) y `audit/test-results/after-security.log`.
+---
 
-## Ventana de sesión (no se afirma revocación inmediata)
-`signOut()` revoca el refresh token, pero el access token (JWT) ya emitido sigue siendo válido hasta que expire (valor por defecto de Supabase: 1 hora). Una API que valide con `getUser()` consulta a Supabase Auth, por lo que la sesión revocada deja de funcionar en `/api/chat` y en el proxy; la ventana aplica a la validación local del JWT, por ejemplo con RLS en la base de datos.
+## 2. Políticas RLS Comprobadas en `public.trades` (Inspección `pg_policy` de solo lectura)
 
-## No verificado / pendiente
-- **Aislamiento A/B (RLS):** no hay migraciones en el repo; la política real de `public.trades` no se pudo auditar. Hay que exportar el esquema o probarlo en un entorno de staging con dos cuentas de prueba, sin usar la service role.
-- **Flujo de recuperación de contraseña de extremo a extremo:** exige que `https://journal-digital-trader.vercel.app/reset-password` esté en *Redirect URLs* de Supabase Auth y que el correo salga con la plantilla correcta. No lo pude comprobar.
-- **Logout, proxy y cambio de usuario en el mismo navegador:** requieren una prueba E2E con navegador; no se hizo.
-- **Webhook:** si en Vercel `SYSTEME_WEBHOOK_SECRET` no existe, tras desplegar este cambio el webhook responderá 503 hasta que se configure el secreto y el mismo valor en Systeme.io.
-- **`/signup` crea cuentas sin pasar por pago** (`supabase.auth.signUp` directo): decisión de producto pendiente.
-- **Almacenamiento de la clave BYOK:** sigue en `localStorage` ofuscada. Cifrarla de verdad en el navegador no aporta protección contra XSS; la alternativa es guardarla cifrada en servidor.
-- **`npm audit`:** 13 vulnerabilidades (1 crítica en `next` 16.0–16.3.7); falta decidir la actualización.
-- **Limitación de tasa (rate limit)** del endpoint de IA: solo hay límites de tamaño.
+Consulta de solo lectura ejecutada sobre `pg_policy` y `pg_constraint`:
+
+- `trades_select_own` (`SELECT`): `USING (((SELECT auth.uid() AS uid) = user_id))`
+- `trades_insert_own` (`INSERT`): `WITH CHECK (((SELECT auth.uid() AS uid) = user_id))`
+- `trades_update_own` (`UPDATE`): `USING (((SELECT auth.uid() AS uid) = user_id))` / `WITH CHECK (((SELECT auth.uid() AS uid) = user_id))`
+- `trades_delete_own` (`DELETE`): `USING (((SELECT auth.uid() AS uid) = user_id))`
+- Clave primaria y foránea: `trades_pkey PRIMARY KEY (id)`, `trades_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE`
+
+### Migraciones preparadas en el repositorio (NO aplicadas a producción)
+1. `supabase/migrations/20261013_harden_trades_rls.sql` y su reversión `20261013_harden_trades_rls.rollback.sql`.
+2. `supabase/migrations/20261016_r2_trades_constraints.sql` y su reversión `20261016_r2_trades_constraints.rollback.sql`:
+   - Añade el trigger `trg_enforce_trades_ledger_invariants` (`enforce_trades_ledger_invariants()`) que impide en PostgreSQL cualquier `INSERT` o `UPDATE` donde la suma de contratos de `exits[]` supere la suma de contratos de `entries[]`, donde los precios/cantidades no sean positivos, o donde `data->>'id'` no coincida con `id::text`.
+
+---
+
+## 3. Inventario de Variables de Entorno por Nombre (Sin Valores)
+
+| Nombre de Variable | Ámbito | Propósito | Comportamiento si falta |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Público (Cliente/Servidor) | URL del proyecto Supabase (`@supabase/ssr`) | Falla la inicialización del cliente Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Público (Cliente/Servidor) | Clave anónima sujeta a RLS (`ROLE authenticated` / `anon`) | Falla la inicialización del cliente Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secreto exclusivo de Servidor (`src/lib/supabase/admin.ts`) | Invitación de usuarios desde `/api/webhooks/systeme` (`auth.admin.inviteUserByEmail`). **Nunca importada en componentes cliente (`"use client"`).** | El webhook devuelve error `500` al intentar invitar; ninguna ruta cliente depende de ella |
+| `SYSTEME_WEBHOOK_SECRET` | Secreto exclusivo de Servidor (`src/app/api/webhooks/systeme/route.ts`) | Autenticación en tiempo constante (`timingSafeEqual`) del header `x-webhook-secret` / `x-systeme-secret` | **Falla cerrado (`503 Webhook not configured`)** y rechaza toda solicitud sin crear usuarios |
+
+---
+
+## 4. Protocolo de Configuración y Verificación del Webhook de Systeme.io (Pre-Producción)
+
+Dado que `/api/webhooks/systeme` ahora **falla cerrado (`503`)** si `SYSTEME_WEBHOOK_SECRET` no está definido:
+
+1. **Generación del secreto (fuera del repositorio):**
+   - Generar un token aleatorio de 32 bytes hexadecimales (`openssl rand -hex 32`).
+2. **Configuración en Vercel (Staging / Preview antes de Producción):**
+   - Definir `SYSTEME_WEBHOOK_SECRET` en las variables de entorno del proyecto en Vercel.
+3. **Configuración en Systeme.io:**
+   - En la regla de automatización / webhook de Systeme.io, configurar el header HTTP `x-webhook-secret` con el mismo valor.
+4. **Verificación previa al corte:**
+   - Petición sin header `x-webhook-secret` $\rightarrow$ debe devolver `401 Unauthorized`.
+   - Petición con header incorrecto $\rightarrow$ debe devolver `401 Unauthorized`.
+   - Petición con header válido y payload de prueba en staging $\rightarrow$ debe devolver `200 OK` sin imprimir el email en los logs de función.

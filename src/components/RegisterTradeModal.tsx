@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Decimal from "decimal.js";
 import {
   X, Plus, Trash2, ChevronDown, ChevronRight,
   AlertTriangle, Info, Upload, ImageIcon, XCircle
@@ -11,6 +12,9 @@ import {
   BROKER_PRESETS, ASSET_CLASS_CONFIG, STRATEGIES, EMOTIONS, MISTAKE_TYPES,
   TAGS_SUGGESTED, calculateTradeFromFills, getPointValue, localDateKey,
 } from "@/lib/tradeTypes";
+import {
+  parseAndValidateInstrumentPrice, getInstrumentPriceSpec, isTickAligned,
+} from "@/lib/ledger/priceParser";
 
 /* ─── Prevent browser auto-translate from mangling trading terms ─── */
 // We use translate="no" on the modal container and keep key terms in English
@@ -102,46 +106,151 @@ function Section({ title, children, collapsible = false }: {
   );
 }
 
+export interface ModalExitInput extends TradeExit_Partial {
+  rawPrice?: string | number | null;
+  explicitZero?: boolean;
+}
+
+export interface SyntheticBeOffer {
+  contracts: number;
+  price: number;
+  dateTime: string;
+  estimatedCommission: number;
+  resultingNetPnl: number;
+  confirmed: boolean;
+}
+
 export function computeModalFormState(params: {
   entries: TradeEntry_Scale[];
-  exits: TradeExit_Partial[];
+  exits: ModalExitInput[];
   side: TradeSide;
   sl: number;
+  initialSl?: number;
   takeProfit1?: string;
   isBreakeven?: boolean;
+  confirmSyntheticBe?: boolean;
+  requireExplicitBeConfirmation?: boolean;
+  closeDateTime?: string;
   broker: string;
   customComm: number;
   assetClass: AssetClass;
   instrument: string;
 }) {
-  const { entries, exits, side, sl, takeProfit1, isBreakeven = false, broker, customComm, assetClass, instrument } = params;
-  const validEntries = entries.filter(e => e.price > 0 && e.contracts > 0);
-  const contracts = validEntries.reduce((s, e) => s + e.contracts, 0);
-  const avgEntry = contracts > 0
-    ? validEntries.reduce((s, e) => s + e.price * e.contracts, 0) / contracts
-    : 0;
+  const {
+    entries, exits, side, sl, initialSl, takeProfit1,
+    isBreakeven = false,
+    confirmSyntheticBe = true,
+    requireExplicitBeConfirmation = false,
+    closeDateTime = "Al cierre",
+    broker, customComm, assetClass, instrument,
+  } = params;
 
-  // LED-05: Filtrar filas de salida vacías o en borrador (price <= 0) para no contaminar el cálculo
-  const validExits = exits.filter(e => e.price > 0 && e.contracts > 0);
-  // Breakeven solo rellena salida al precio de entrada cuando no se ingresaron salidas explícitas; nunca oculta ni sobrescribe salidas reales
-  const effectiveExits: TradeExit_Partial[] =
-    validExits.length > 0
-      ? validExits
-      : isBreakeven && avgEntry > 0 && contracts > 0
-      ? [{ price: avgEntry, contracts, time: "" }]
-      : [];
+  const spec = getInstrumentPriceSpec(instrument);
+  const priceOpts = spec ? { allowZeroPrice: spec.allowZeroPrice, allowNegativePrice: spec.allowNegativePrice } : undefined;
+
+  // Validar entradas con spec de instrumento
+  const validEntries: TradeEntry_Scale[] = [];
+  const entryValidationErrors: string[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const en = entries[i];
+    const rawEn = (en as any).rawPrice !== undefined ? (en as any).rawPrice : (en.price === 0 ? "" : en.price);
+    const parsed = parseAndValidateInstrumentPrice(rawEn, instrument);
+    if (parsed.presence === "EMPTY") continue;
+    if (!parsed.valid || !parsed.value) {
+      entryValidationErrors.push(`Entrada ${i + 1}: ${parsed.message}`);
+      continue;
+    }
+    if (!Number.isFinite(en.contracts) || en.contracts <= 0) {
+      entryValidationErrors.push(`Entrada ${i + 1}: la cantidad debe ser mayor que 0.`);
+      continue;
+    }
+    validEntries.push({ ...en, price: parsed.value.toNumber() });
+  }
+
+  const contractsDec = validEntries.reduce((s, e) => s.plus(e.contracts), new Decimal(0));
+  const contracts = contractsDec.toNumber();
+  const avgEntryDec = contractsDec.gt(0)
+    ? validEntries.reduce((s, e) => s.plus(new Decimal(e.price).mul(e.contracts)), new Decimal(0)).div(contractsDec)
+    : null;
+  const avgEntry = avgEntryDec ? avgEntryDec.toNumber() : 0;
+
+  // R2-03: Clasificar cada fila de salida en EMPTY (borrador sin tocar), PRESENT_VALID o PRESENT_INVALID
+  const validExits: TradeExit_Partial[] = [];
+  const exitValidationErrors: string[] = [];
+  let emptyExitRowCount = 0;
+
+  for (let i = 0; i < exits.length; i++) {
+    const ex = exits[i];
+    let rawVal: unknown;
+    if (ex.rawPrice !== undefined) {
+      rawVal = ex.rawPrice;
+    } else if (ex.price === 0 && !ex.explicitZero) {
+      // Estado inicial por defecto de fila vacía en React ({ price: 0, contracts: 1 })
+      rawVal = "";
+    } else {
+      rawVal = ex.price;
+    }
+
+    const parsed = parseAndValidateInstrumentPrice(rawVal, instrument);
+    if (parsed.presence === "EMPTY") {
+      emptyExitRowCount++;
+      continue;
+    }
+    if (!parsed.valid || !parsed.value) {
+      exitValidationErrors.push(`Salida ${i + 1}: ${parsed.message}`);
+      continue;
+    }
+    if (!Number.isFinite(ex.contracts) || ex.contracts <= 0) {
+      exitValidationErrors.push(`Salida ${i + 1}: la cantidad debe ser mayor que 0.`);
+      continue;
+    }
+    validExits.push({ price: parsed.value.toNumber(), contracts: ex.contracts, time: ex.time });
+  }
+
+  const commPerSide = broker === "custom" ? customComm : BROKER_PRESETS[broker]?.perSide ?? 0;
+  const pointValue = spec ? spec.pointValue.toNumber() : getPointValue(assetClass, instrument);
+
+  // R2-04: Gestión transparente de Breakeven
+  // 1) Si existen salidas reales (completas o parciales), marcar BE NUNCA las sobrescribe ni cierra contratos abiertos.
+  // 2) Si no existen salidas reales y se marca BE, se verifica que el promedio de entrada sea un tick ejecutable válido.
+  let beTickError: string | undefined;
+  let syntheticBeOffer: SyntheticBeOffer | null = null;
+  let effectiveExits: TradeExit_Partial[] = validExits;
+
+  if (validExits.length === 0 && isBreakeven && avgEntryDec && contracts > 0) {
+    if (spec && spec.enforceTickAlignment && !isTickAligned(avgEntryDec, spec.tickSize)) {
+      beTickError = `El precio promedio de la entrada escalonada (${avgEntryDec.toDecimalPlaces(5).toString()}) no coincide con un tick ejecutable de ${spec.symbol} (${spec.tickSize.toString()}). Ingresa las salidas reales manualmente.`;
+    } else {
+      const estComm = new Decimal(contracts).mul(2).mul(commPerSide).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
+      const isConfirmed = requireExplicitBeConfirmation ? confirmSyntheticBe : true;
+      syntheticBeOffer = {
+        contracts,
+        price: avgEntryDec.toNumber(),
+        dateTime: closeDateTime,
+        estimatedCommission: estComm,
+        resultingNetPnl: estComm === 0 ? 0 : -estComm,
+        confirmed: isConfirmed,
+      };
+      if (isConfirmed) {
+        effectiveExits = [{ price: avgEntryDec.toNumber(), contracts, time: closeDateTime }];
+      }
+    }
+  }
 
   const hasExit = effectiveExits.length > 0;
   const totalExitContracts = effectiveExits.reduce((s, e) => s + e.contracts, 0);
 
-  const commPerSide = broker === "custom" ? customComm : BROKER_PRESETS[broker]?.perSide ?? 0;
-  const pointValue = getPointValue(assetClass, instrument);
-  const calc = calculateTradeFromFills(side, validEntries, effectiveExits, sl, commPerSide, pointValue);
+  // R2-04: El denominador de riesgo SIEMPRE usa el Stop Loss inicial (initialSl) aunque el SL actual se haya movido
+  const effectiveInitialSl = initialSl !== undefined && initialSl > 0 ? initialSl : sl;
+  const calc = validEntries.length > 0
+    ? calculateTradeFromFills(side, validEntries, effectiveExits, effectiveInitialSl, commPerSide, pointValue, priceOpts)
+    : { result: "Open" as const, status: "OPEN" as const };
 
-  // LED-06: RR Planificado se calcula exclusivamente desde takeProfit1 y stopLoss original, nunca desde salidas realizadas
-  const slDist = avgEntry > 0 && sl > 0 ? Math.abs(avgEntry - sl) : 0;
-  const tp1Num = takeProfit1 ? parseFloat(takeProfit1) : 0;
-  const tpDist = avgEntry > 0 && tp1Num > 0 && !Number.isNaN(tp1Num) ? Math.abs(tp1Num - avgEntry) : 0;
+  // LED-06 & R2-04: RR Planificado se calcula exclusivamente desde takeProfit1 y stopLoss inicial
+  const slDist = avgEntryDec && effectiveInitialSl > 0 ? avgEntryDec.minus(effectiveInitialSl).abs().toNumber() : 0;
+  const tp1Parsed = takeProfit1 ? parseAndValidateInstrumentPrice(takeProfit1, instrument) : null;
+  const tp1Num = tp1Parsed?.valid && tp1Parsed.value ? tp1Parsed.value.toNumber() : 0;
+  const tpDist = avgEntryDec && tp1Num > 0 ? avgEntryDec.minus(tp1Num).abs().toNumber() : 0;
   const potentialRR = slDist > 0 && tpDist > 0 ? (tpDist / slDist).toFixed(2) : null;
   const potentialRisk = slDist * contracts * pointValue;
   const totalComm = calc.totalCommission ?? contracts * 2 * commPerSide;
@@ -151,15 +260,22 @@ export function computeModalFormState(params: {
     ? `${calc.netPnl >= 0 ? "+" : "-"}$${Math.abs(calc.netPnl).toFixed(2)}`
     : "—";
 
-  // LED-01 y LED-05: Permitir flujo OPEN cuando no hay salidas, pero rechazar filas parciales incompletas o sobrecierre
-  const hasIncompleteAdditionalExit =
-    exits.length > 1 && exits.some(e => (e.price <= 0 || !e.price) || (e.contracts <= 0 || !e.contracts));
+  // LED-01, LED-05, R2-03, R2-04: Validación estricta antes de avanzar/guardar
+  const hasIncompleteAdditionalExit = exits.length > 1 && emptyExitRowCount > 0;
   const overClosed = totalExitContracts > contracts && contracts > 0;
-  const step3Error = hasIncompleteAdditionalExit
-    ? "Completa el precio de todas las filas de salida añadidas o elimina la fila vacía."
-    : overClosed
-    ? `La cantidad de salida (${totalExitContracts}) supera los contratos de entrada (${contracts}).`
-    : undefined;
+  const unconfirmedBe = syntheticBeOffer !== null && !syntheticBeOffer.confirmed;
+
+  const step3Error =
+    entryValidationErrors[0] ??
+    exitValidationErrors[0] ??
+    beTickError ??
+    (unconfirmedBe
+      ? "Confirma o cancela la creación de la salida sintética Breakeven antes de guardar."
+      : hasIncompleteAdditionalExit
+      ? "Completa el precio de todas las filas de salida añadidas o elimina la fila vacía."
+      : overClosed
+      ? `La cantidad de salida (${totalExitContracts}) supera los contratos de entrada (${contracts}).`
+      : calc.calcError);
 
   const savedResult = calc.result ?? "Open";
   const openContracts = calc.openContracts ?? Math.max(0, contracts - totalExitContracts);
@@ -171,6 +287,10 @@ export function computeModalFormState(params: {
     totalComm,
     formattedNetPnl,
     step3Error,
+    entryValidationErrors,
+    exitValidationErrors,
+    beTickError,
+    syntheticBeOffer,
     canSaveOpenFromStep3: !step3Error,
     savedResult,
     openContracts,
@@ -181,10 +301,10 @@ export function computeModalFormState(params: {
 
 /* ─── Live P&L preview ─── */
 function PnlPreview({
-  entries, exits, side, sl, takeProfit1, isBreakeven, broker, customComm, assetClass, instrument
+  entries, exits, side, sl, initialSl, takeProfit1, isBreakeven, broker, customComm, assetClass, instrument
 }: {
-  entries: TradeEntry_Scale[]; exits: TradeExit_Partial[];
-  side: TradeSide; sl: number; takeProfit1?: string; isBreakeven?: boolean;
+  entries: TradeEntry_Scale[]; exits: ModalExitInput[];
+  side: TradeSide; sl: number; initialSl?: number; takeProfit1?: string; isBreakeven?: boolean;
   broker: string; customComm: number;
   assetClass: AssetClass; contracts: number; instrument: string;
 }) {
@@ -193,7 +313,7 @@ function PnlPreview({
   const {
     calc, potentialRR, potentialRisk, totalComm, formattedNetPnl, hasExit, openContracts,
   } = computeModalFormState({
-    entries, exits, side, sl, takeProfit1, isBreakeven, broker, customComm, assetClass, instrument,
+    entries, exits, side, sl, initialSl, takeProfit1, isBreakeven, broker, customComm, assetClass, instrument,
   });
 
   return (
@@ -212,7 +332,7 @@ function PnlPreview({
           </p>
         </div>
         <div>
-          <p className="text-[9px] text-text-muted mb-0.5">Riesgo Máximo (+ comisión)</p>
+          <p className="text-[9px] text-text-muted mb-0.5">Riesgo Inicial Bruto (+ comisión)</p>
           <p className="text-[17px] font-extrabold text-red-loss">
             {potentialRisk ? `-$${(potentialRisk + totalComm).toFixed(2)}` : "—"}
           </p>
@@ -233,6 +353,11 @@ function PnlPreview({
               Bruto: {calc.grossPnl >= 0 ? "+" : "-"}${Math.abs(calc.grossPnl).toFixed(2)}
             </p>
           )}
+          {calc.status === "PARTIALLY_CLOSED" && calc.netPnlAfterAccruedFees !== undefined && (
+            <p className="text-[10px] text-text-muted mt-0.5">
+              Neto tras costes devengados: {calc.netPnlAfterAccruedFees >= 0 ? "+" : "-"}${Math.abs(calc.netPnlAfterAccruedFees).toFixed(2)}
+            </p>
+          )}
         </div>
         <div>
           <p className="text-[9px] text-text-muted mb-0.5">
@@ -243,22 +368,30 @@ function PnlPreview({
           </p>
           {calc.status === "PARTIALLY_CLOSED" && calc.accruedCommission !== undefined && (
             <p className="text-[10px] text-text-muted mt-0.5">
-              Devengada total: -${calc.accruedCommission.toFixed(2)} ({openContracts} abierto{openContracts === 1 ? "" : "s"})
+              Devengada total: -${calc.accruedCommission.toFixed(2)} · Abierta: -${(calc.openCommission ?? 0).toFixed(2)} ({openContracts} abierto{openContracts === 1 ? "" : "s"})
             </p>
           )}
         </div>
       </div>
-      {(calc.rMultiple !== undefined || calc.status === "PARTIALLY_CLOSED" || calc.status === "OPEN") && (
-        <div className="mt-3 flex items-center gap-2">
+      {(calc.rMultiple !== undefined || calc.grossRMultiple !== undefined || calc.status === "PARTIALLY_CLOSED" || calc.status === "OPEN") && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           {calc.rMultiple !== undefined && (
-            <>
-              <span className="text-[10px] text-text-muted">R alcanzado:</span>
-              <span className={`text-[13px] font-bold ${calc.rMultiple > 0 ? "text-green-primary" : "text-red-loss"}`}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-text-muted">R Neto Realizado:</span>
+              <span className={`text-[13px] font-bold tabular-nums ${calc.rMultiple > 0 ? "text-green-primary" : "text-red-loss"}`}>
                 {calc.rMultiple > 0 ? "+" : ""}{calc.rMultiple}R
               </span>
-            </>
+            </div>
           )}
-          <span className={`ml-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+          {calc.grossRMultiple !== undefined && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-text-muted">R Bruto Realizado:</span>
+              <span className="text-[12px] font-semibold text-text-secondary tabular-nums">
+                {calc.grossRMultiple > 0 ? "+" : ""}{calc.grossRMultiple}R
+              </span>
+            </div>
+          )}
+          <span className={`ml-auto rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
             calc.result === "Win" ? "bg-green-primary/15 text-green-primary" :
             calc.result === "Loss" ? "bg-red-loss/15 text-red-loss" :
             calc.result === "Breakeven" ? "bg-yellow-warn/15 text-yellow-warn" :
@@ -452,6 +585,8 @@ function ChartImageUpload({
 /* ═══════════════════════════════════════════════════
    MAIN MODAL
 ═══════════════════════════════════════════════════ */
+type ModalEntryInput = TradeEntry_Scale & { rawPrice?: string };
+
 interface RegisterTradeModalProps {
   open: boolean;
   onClose: () => void;
@@ -477,7 +612,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
   const [isFunded, setIsFunded]             = useState(false);
 
   /* ── Step 2 ── */
-  const [entries, setEntries] = useState<TradeEntry_Scale[]>([{ price: 0, contracts: 1, time: "" }]);
+  const [entries, setEntries] = useState<ModalEntryInput[]>([{ price: 0, rawPrice: "", contracts: 1, time: "" }]);
   const [stopLoss, setStopLoss]             = useState("");
   const [initialSL, setInitialSL]           = useState("");
   const [takeProfit1, setTP1]               = useState("");
@@ -494,7 +629,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
   const [mfe, setMfe]                       = useState("");
 
   /* ── Step 3 ── */
-  const [exits, setExits] = useState<TradeExit_Partial[]>([{ price: 0, contracts: 1, time: "" }]);
+  const [exits, setExits] = useState<ModalExitInput[]>([{ price: 0, rawPrice: "", contracts: 1, time: "" }]);
   const [isBreakeven, setIsBreakeven]       = useState(false);
   const [chartImage, setChartImage]         = useState<string | null>(null);
 
@@ -526,7 +661,11 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
       setTimeClose(initialData.timeClose || "");
       setSession(initialData.session);
       setIsFunded(initialData.isFundedAccount);
-      setEntries(initialData.entries.length > 0 ? initialData.entries : [{ price: initialData.avgEntryPrice, contracts: initialData.totalContracts, time: "" }]);
+      setEntries(
+        initialData.entries.length > 0
+          ? initialData.entries.map(e => ({ ...e, rawPrice: String(e.price) }))
+          : [{ price: initialData.avgEntryPrice, rawPrice: String(initialData.avgEntryPrice), contracts: initialData.totalContracts, time: "" }]
+      );
       setStopLoss(String(initialData.stopLoss));
       setInitialSL(String(initialData.initialStopLoss || initialData.stopLoss));
       setTP1(initialData.takeProfit ? String(initialData.takeProfit) : "");
@@ -541,7 +680,11 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
       setConfluence(String(initialData.confluenceCount));
       setMae(initialData.mae ? String(initialData.mae) : "");
       setMfe(initialData.mfe ? String(initialData.mfe) : "");
-      setExits(initialData.exits.length > 0 ? initialData.exits : [{ price: initialData.avgExitPrice || 0, contracts: initialData.contractsExited || 1, time: "" }]);
+      setExits(
+        initialData.exits.length > 0
+          ? initialData.exits.map(e => ({ ...e, rawPrice: String(e.price) }))
+          : [{ price: 0, rawPrice: "", contracts: initialData.contractsExited || 1, time: "" }]
+      );
       setIsBreakeven(initialData.isBreakeven);
       setChartImage(initialData.screenshotUrl || null);
       setEmotionEntry(initialData.emotionEntry);
@@ -557,12 +700,12 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
       setDateOpen(localDateKey());
       setTimeOpen(new Date().toTimeString().slice(0, 5));
       setDateClose(""); setTimeClose(""); setSession("NYSE Open (9:30-11)"); setIsFunded(false);
-      setEntries([{ price: 0, contracts: 1, time: "" }]);
+      setEntries([{ price: 0, rawPrice: "", contracts: 1, time: "" }]);
       setStopLoss(""); setInitialSL(""); setTP1(""); setTP2(""); setTP3("");
       setBroker("ninjatrader_lease"); setCustomComm("0");
       setStrategy("Breakout"); setSetup(""); setSetupGrade("A");
       setPlanFollowed(true); setConfluence("3"); setMae(""); setMfe("");
-      setExits([{ price: 0, contracts: 1, time: "" }]); setIsBreakeven(false);
+      setExits([{ price: 0, rawPrice: "", contracts: 1, time: "" }]); setIsBreakeven(false);
       setChartImage(null);
       setEmotionEntry("Confident"); setEmotionExit("Neutral");
       setMistakeType(""); setTags([]); setTagInput(""); setNotes(""); setLessons("");
@@ -590,16 +733,30 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
     : BROKER_PRESETS[broker]?.perSide ?? 0;
 
   /* Entry helpers */
-  const addEntry    = () => setEntries(p => [...p, { price: 0, contracts: 1, time: "" }]);
+  const addEntry    = () => setEntries(p => [...p, { price: 0, rawPrice: "", contracts: 1, time: "" }]);
   const removeEntry = (i: number) => setEntries(p => p.filter((_, idx) => idx !== i));
   const updateEntry = (i: number, key: keyof TradeEntry_Scale, val: string | number) =>
-    setEntries(p => p.map((e, idx) => idx === i ? { ...e, [key]: key === "time" ? val : Number(val) } : e));
+    setEntries(p => p.map((e, idx) => {
+      if (idx !== i) return e;
+      if (key === "price") {
+        const strVal = String(val);
+        return { ...e, rawPrice: strVal, price: Number(strVal.replace(",", ".")) || 0 };
+      }
+      return { ...e, [key]: key === "time" ? val : Number(val) };
+    }));
 
   /* Exit helpers */
-  const addExit    = () => setExits(p => [...p, { price: 0, contracts: 1, time: "" }]);
+  const addExit    = () => setExits(p => [...p, { price: 0, rawPrice: "", contracts: 1, time: "" }]);
   const removeExit = (i: number) => setExits(p => p.filter((_, idx) => idx !== i));
   const updateExit = (i: number, key: keyof TradeExit_Partial, val: string | number) =>
-    setExits(p => p.map((e, idx) => idx === i ? { ...e, [key]: key === "time" ? val : Number(val) } : e));
+    setExits(p => p.map((e, idx) => {
+      if (idx !== i) return e;
+      if (key === "price") {
+        const strVal = String(val);
+        return { ...e, rawPrice: strVal, price: Number(strVal.replace(",", ".")) || 0 };
+      }
+      return { ...e, [key]: key === "time" ? val : Number(val) };
+    }));
 
   /* Tags */
   const addTag = (v: string) => {
@@ -611,14 +768,32 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
   /* Validation */
   const validateStep = (s: number) => {
     const e: Record<string, string> = {};
+    const finalInstr = instrument === "Custom" ? customInstrument : instrument;
     if (s === 1) {
       if (!dateOpen) e.dateOpen = "Fecha requerida";
       if (instrument === "Custom" && !customInstrument) e.customInstr = "Requerido";
     }
     if (s === 2) {
-      if (!entries[0].price) e.entry0 = "Ingresa al menos un precio de entrada";
+      if (!entries[0].price && !entries[0].rawPrice) e.entry0 = "Ingresa al menos un precio de entrada";
       if (!stopLoss) e.stopLoss = "El Stop Loss es requerido";
       if (!entries[0].contracts) e.contracts0 = "Ingresa cantidad de contratos";
+
+      const modalSt2 = computeModalFormState({
+        entries,
+        exits: [],
+        side,
+        sl: parseFloat(stopLoss) || 0,
+        initialSl: parseFloat(initialSL) || undefined,
+        takeProfit1,
+        isBreakeven: false,
+        broker,
+        customComm: commPerSide,
+        assetClass,
+        instrument: finalInstr,
+      });
+      if (modalSt2.entryValidationErrors.length > 0) {
+        e.entry0 = modalSt2.entryValidationErrors[0];
+      }
 
       // Guardrails: Validación matemática estricta
       if (avgEntry > 0) {
@@ -635,12 +810,12 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
       }
     }
     if (s === 3 || s === 4) {
-      const finalInstr = instrument === "Custom" ? customInstrument : instrument;
       const modalSt = computeModalFormState({
         entries,
         exits,
         side,
-        sl: parseFloat(initialSL) || parseFloat(stopLoss) || 0,
+        sl: parseFloat(stopLoss) || 0,
+        initialSl: parseFloat(initialSL) || undefined,
         takeProfit1,
         isBreakeven,
         broker,
@@ -668,7 +843,8 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
       entries,
       exits: forceOpen ? [] : exits,
       side,
-      sl: initSlN,
+      sl: slN,
+      initialSl: initSlN,
       takeProfit1,
       isBreakeven: forceOpen ? false : isBreakeven,
       broker,
@@ -692,17 +868,21 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
       assetClass, instrument: finalInstr, tickerSymbol: tickerSymbol || undefined,
       side, dateOpen, timeOpen, dateClose: dateClose || undefined, timeClose: timeClose || undefined,
       holdTimeMinutes, session,
-      entries, avgEntryPrice: parseFloat(avgEntry.toFixed(assetCfg.decimalPlaces)), totalContracts,
+      entries: entries.map(({ price, contracts, time }) => ({ price, contracts, time })),
+      avgEntryPrice: parseFloat(avgEntry.toFixed(assetCfg.decimalPlaces)), totalContracts,
       stopLoss: slN, initialStopLoss: initSlN,
       takeProfit: parseFloat(takeProfit1) || undefined,
       takeProfit2: parseFloat(takeProfit2) || undefined,
       takeProfit3: parseFloat(takeProfit3) || undefined,
-      exits: hasExit ? validExits : [], avgExitPrice: avgExitN !== undefined ? parseFloat(avgExitN.toFixed(assetCfg.decimalPlaces)) : undefined,
+      exits: hasExit ? validExits.map(({ price, contracts, time }) => ({ price, contracts, time })) : [],
+      avgExitPrice: avgExitN !== undefined ? parseFloat(avgExitN.toFixed(assetCfg.decimalPlaces)) : undefined,
       contractsExited: hasExit ? validExitContracts : 0,
       brokerId: broker, commissionPerSide: commPerSide,
       totalCommission: calc.totalCommission ?? 0,
       grossPnl: calc.grossPnl, netPnl: calc.netPnl,
-      pnlPerContract: calc.pnlPerContract, rMultiple: calc.rMultiple,
+      pnlPerContract: calc.pnlPerContract,
+      rMultiple: calc.rMultiple,
+      grossRMultiple: calc.grossRMultiple,
       result: savedResult,
       mae: parseFloat(mae) || undefined, mfe: parseFloat(mfe) || undefined,
       strategy, setup, setupGrade, planFollowed, isBreakeven, isFundedAccount: isFunded,
@@ -925,7 +1105,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                       <div key={i} className="grid grid-cols-[1fr_100px_90px_32px] gap-2 items-start">
                         <div>
                           <NumInput
-                            value={e.price ? String(e.price) : ""}
+                            value={e.rawPrice !== undefined ? e.rawPrice : (e.price ? String(e.price) : "")}
                             onChange={v => updateEntry(i, "price", v)}
                             placeholder={`Entrada ${i + 1}`}
                             step={assetCfg.decimalPlaces === 5 ? "0.00001" : "0.01"}
@@ -1084,7 +1264,8 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
 
                 <PnlPreview
                   entries={entries} exits={exits} side={side}
-                  sl={parseFloat(initialSL) || parseFloat(stopLoss) || 0}
+                  sl={parseFloat(stopLoss) || 0}
+                  initialSl={parseFloat(initialSL) || undefined}
                   takeProfit1={takeProfit1} isBreakeven={isBreakeven}
                   broker={broker}
                   customComm={parseFloat(customCommission) || 0}
@@ -1095,7 +1276,21 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
             )}
 
             {/* ════ STEP 3: Salida ════ */}
-            {step === 3 && (
+            {step === 3 && (() => {
+              const step3Preview = computeModalFormState({
+                entries,
+                exits,
+                side,
+                sl: parseFloat(stopLoss) || 0,
+                initialSl: parseFloat(initialSL) || undefined,
+                takeProfit1,
+                isBreakeven,
+                broker,
+                customComm: commPerSide,
+                assetClass,
+                instrument: instrument === "Custom" ? customInstrument : instrument,
+              });
+              return (
               <>
                 {/* Breakeven toggle */}
                 <div
@@ -1106,15 +1301,34 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                     <input type="checkbox" checked={isBreakeven} onChange={e => setIsBreakeven(e.target.checked)}
                       className="h-5 w-5 accent-yellow-warn" onClick={e => e.stopPropagation()} />
                     <div>
-                      <p className="text-[13px] font-semibold text-text-primary">Breakeven / Scratch (Salida al precio de entrada)</p>
+                      <p className="text-[13px] font-semibold text-text-primary">Atajo Breakeven / Scratch (Salida al precio de entrada)</p>
                       <p className="text-[11px] text-text-muted">
-                        Si no ingresas salidas manuales, rellena salida al precio de entrada. El P&amp;L neto siempre descuenta comisiones reales.
+                        Si no ingresas salidas manuales, prepara una salida al precio promedio de entrada validado por tick. Nunca sobrescribe salidas manuales ni fuerza P&amp;L neto a $0 si existen comisiones.
                       </p>
                     </div>
                   </label>
+                  {isBreakeven && step3Preview.syntheticBeOffer && (
+                    <div className="mt-3 rounded-lg border border-yellow-warn/30 bg-bg-main/60 px-3 py-2 text-[11px] text-text-secondary">
+                      <p className="font-bold text-yellow-warn mb-1">Previsualización de salida Breakeven (confirmación explícita):</p>
+                      <p>
+                        Cantidad: <strong className="text-text-primary">{step3Preview.syntheticBeOffer.contracts} {assetCfg.unit}</strong> ·
+                        Precio salida: <strong className="text-text-primary tabular-nums">{step3Preview.syntheticBeOffer.price.toFixed(assetCfg.decimalPlaces)}</strong> ·
+                        Bruto: <strong className="text-text-primary">$0.00</strong> ·
+                        Comisión: <strong className="text-yellow-warn">-${step3Preview.syntheticBeOffer.estimatedCommission.toFixed(2)}</strong> ·
+                        Neto: <strong className={step3Preview.syntheticBeOffer.resultingNetPnl < 0 ? "text-red-loss" : "text-text-primary"}>
+                          {step3Preview.syntheticBeOffer.resultingNetPnl < 0 ? "-" : ""}${Math.abs(step3Preview.syntheticBeOffer.resultingNetPnl).toFixed(2)}
+                        </strong>
+                      </p>
+                    </div>
+                  )}
+                  {isBreakeven && step3Preview.beTickError && (
+                    <div className="mt-3 rounded-lg border border-red-loss/40 bg-red-loss/10 px-3 py-2 text-[11px] text-red-loss">
+                      {step3Preview.beTickError}
+                    </div>
+                  )}
                 </div>
 
-                {(!isBreakeven || exits.some(e => e.price > 0)) && (
+                {(!isBreakeven || exits.some(e => e.price > 0 || (e.rawPrice !== undefined && e.rawPrice !== null && String(e.rawPrice).trim() !== ""))) && (
                   <Section title="Salidas (Scale-Out / Parciales — Deja vacío si el trade sigue ABIERTO)">
                     <div className="flex flex-col gap-2">
                       <div className="grid grid-cols-[1fr_100px_90px_32px] gap-2 px-1">
@@ -1127,7 +1341,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                         <div key={i} className="grid grid-cols-[1fr_100px_90px_32px] gap-2 items-start">
                           <div>
                             <NumInput
-                              value={e.price ? String(e.price) : ""}
+                              value={e.rawPrice !== undefined && e.rawPrice !== null ? String(e.rawPrice) : (e.price ? String(e.price) : "")}
                               onChange={v => updateExit(i, "price", v)}
                               placeholder={`Salida ${i + 1} (vacío = Open)`}
                               step={assetCfg.decimalPlaces === 5 ? "0.00001" : "0.01"}
@@ -1188,7 +1402,8 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
 
                 <PnlPreview
                   entries={entries} exits={exits} side={side}
-                  sl={parseFloat(initialSL) || parseFloat(stopLoss) || 0}
+                  sl={parseFloat(stopLoss) || 0}
+                  initialSl={parseFloat(initialSL) || undefined}
                   takeProfit1={takeProfit1} isBreakeven={isBreakeven}
                   broker={broker}
                   customComm={parseFloat(customCommission) || 0}
@@ -1196,7 +1411,8 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                   instrument={instrument === "Custom" ? customInstrument : instrument}
                 />
               </>
-            )}
+              );
+            })()}
 
             {/* ════ STEP 4: Psicología ════ */}
             {step === 4 && (

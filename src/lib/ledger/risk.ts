@@ -87,10 +87,24 @@ export function positionSize(i: PositionSizeInput): PositionSizeResult {
   };
 }
 
-/** R realizado neto. El denominador es SIEMPRE el riesgo inicial (aunque el stop se haya movido). */
-export function realizedRNet(realizedNetPnl: Decimal, initialRiskGross: Decimal | null): Decimal | null {
-  if (!initialRiskGross || initialRiskGross.lte(0)) return null;
-  return realizedNetPnl.div(initialRiskGross);
+/**
+ * R realizado neto: realizedNetPnl / initialRiskGross.
+ * Convención de denominador (cerrados y parciales): SIEMPRE el riesgo inicial bruto total
+ * de la posición completa (|avgEntry - initialStop| * totalEntryQuantity * pointValue),
+ * incluso si el stop loss actual se movió después a breakeven o trailing stop.
+ */
+export function realizedRNet(realizedNetPnl: Decimal, initialRiskGrossTotal: Decimal | null): Decimal | null {
+  if (!initialRiskGrossTotal || initialRiskGrossTotal.lte(0)) return null;
+  return realizedNetPnl.div(initialRiskGrossTotal);
+}
+
+/**
+ * R realizado bruto: realizedGrossPnl / initialRiskGross.
+ * Usa el mismo denominador (riesgo inicial bruto total de la posición completa).
+ */
+export function realizedRGross(realizedGrossPnl: Decimal, initialRiskGrossTotal: Decimal | null): Decimal | null {
+  if (!initialRiskGrossTotal || initialRiskGrossTotal.lte(0)) return null;
+  return realizedGrossPnl.div(initialRiskGrossTotal);
 }
 
 export function initialRiskGross(entry: Decimal, initialStop: Decimal | null, quantity: Decimal, pointValue: Decimal): Decimal | null {

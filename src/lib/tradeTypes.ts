@@ -8,7 +8,7 @@ import {
   computeSnapshot, parseDecimalStrict, estimatedCommission, CALCULATION_VERSION,
   type Execution, type TradeStatus as LedgerTradeStatus,
 } from "./ledger/ledger";
-import { initialRiskGross, realizedRNet } from "./ledger/risk";
+import { initialRiskGross, realizedRNet, realizedRGross } from "./ledger/risk";
 import {
   profitFactor as ledgerProfitFactor, winRate as ledgerWinRate, expectancy as ledgerExpectancy,
   maxRealizedDrawdown, sampleState, type SampleState, type MetricValue,
@@ -191,13 +191,21 @@ export interface TradeRecord {
   brokerId: string;             // Key into BROKER_PRESETS
   customCommissionPerSide?: number;  // If broker = "custom"
   commissionPerSide: number;
-  totalCommission: number;      // Calculated: contracts * 2 * commissionPerSide
+  totalCommission: number;      // Realized commission assigned to closed contracts
+  openCommission?: number;      // Commission on open contracts (unassigned entry fee)
+  accruedCommission?: number;   // Total accrued commission across all executions
 
   // P&L
-  grossPnl?: number;            // Before commission
-  netPnl?: number;              // After commission
+  status?: LedgerTradeStatus;
+  openContracts?: number;
+  grossPnl?: number;            // Realized gross P&L before commission
+  netPnl?: number;              // Realized net P&L after realized commission
+  netPnlAfterAccruedFees?: number; // Realized gross P&L minus all accrued fees (labeled separately)
   pnlPerContract?: number;
-  rMultiple?: number;           // R:R achieved (+2.3R, -1R, etc.)
+  rMultiple?: number;           // Net R achieved (realizedNetPnl / initialRiskTotal, 4dp)
+  grossRMultiple?: number;      // Gross R achieved (realizedGrossPnl / initialRiskTotal, 4dp)
+  exactNetR?: string;           // Exact Decimal string for Net R (e.g. "0.49955")
+  exactGrossR?: string;         // Exact Decimal string for Gross R (e.g. "0.5")
   result: TradeResult;
 
   // Performance analytics
@@ -226,7 +234,7 @@ export interface TradeRecord {
   screenshotUrl?: string;
 }
 
-/* â”€â”€â”€ Daily session summary â”€â”€â”€ */
+/* ─── Daily session summary ─── */
 export interface DailySummary {
   date: string;
   trades: number;
@@ -243,7 +251,7 @@ export interface DailySummary {
   rMultipleSum: number;
 }
 
-/* â”€â”€â”€ Statistics â”€â”€â”€ */
+/* ─── Statistics ─── */
 export interface TradeStats {
   totalTrades: number;
   wins: number;
@@ -252,11 +260,14 @@ export interface TradeStats {
   openTrades: number;
   winRate: number;               // %
   profitFactor: number | null;   // net wins / net losses; null si no es calculable
+  exactProfitFactor?: string | null;
   profitFactorState: MetricValue["state"];
   closedTrades: number;
   sampleState: SampleState;
   calculationVersion: string;
-  expectancy: number;            // avg net P&L per trade
+  expectancy: number;            // avg net P&L per trade (ROUND_HALF_UP 2dp)
+  exactExpectancy?: string | null;
+  roundingPolicy?: "ROUND_HALF_UP_2DP";
   avgWin: number;
   avgLoss: number;
   avgRMultiple: number;
@@ -268,6 +279,15 @@ export interface TradeStats {
   maxConsecLosses: number;
   avgHoldTime: number;           // minutes
   planFollowRate: number;        // %
+  // Categorías separadas y reconciliables para posiciones abiertas y parciales (R2-01)
+  openPositionsCount?: number;
+  partialPositionsCount?: number;
+  openContractsTotal?: number;
+  partialRealizedGross?: number;
+  partialRealizedCommission?: number;
+  partialRealizedNet?: number;
+  openExecutionCommission?: number;
+  totalAccruedCommissions?: number;
 }
 
 /* ─── Utility: calculate trade (delegates to the decimal ledger) ─── */
@@ -278,6 +298,9 @@ export interface FillCalcResult extends Partial<TradeRecord> {
   accruedCommission?: number;
   openCommission?: number;
   netPnlAfterAccruedFees?: number;
+  grossRMultiple?: number;
+  exactNetR?: string;
+  exactGrossR?: string;
   /** Mensaje si las ejecuciones son inválidas (no se calcula nada). */
   calcError?: string;
 }
@@ -286,7 +309,8 @@ export interface FillCalcResult extends Partial<TradeRecord> {
  * Calcula el trade desde sus ejecuciones reales (entradas y salidas), FIFO, con Decimal.
  * - Salidas parciales: solo se realiza P&L de la cantidad cerrada; result = "Open", status = "PARTIALLY_CLOSED".
  * - Fees: comisión por lado × cantidad de cada ejecución (estimada, una sola vez), asignada FIFO a la cantidad cerrada (§9.2).
- * - R realizado = neto / riesgo inicial bruto (stop inicial × cantidad entrada × valor punto).
+ * - R realizado neto = realizedNetPnl / riesgo inicial bruto total (stop inicial × cantidad entrada total × valor punto).
+ * - R realizado bruto = realizedGrossPnl / riesgo inicial bruto total (R2-04).
  */
 export function calculateTradeFromFills(
   side: TradeSide,
@@ -295,6 +319,7 @@ export function calculateTradeFromFills(
   initialStop: number | undefined,
   commissionPerSide: number,
   pointValue: number,
+  priceOpts?: { allowZeroPrice?: boolean; allowNegativePrice?: boolean },
 ): FillCalcResult {
   try {
     const pv = new Decimal(pointValue);
@@ -315,31 +340,35 @@ export function calculateTradeFromFills(
         fees: estimatedCommission(fee, new Decimal(e.contracts)),
       })),
     ];
-    const snap = computeSnapshot(execs, pv);
+    const snap = computeSnapshot(execs, pv, priceOpts);
     const avgEntry = snap.averageEntryPrice ?? new Decimal(0);
-    const risk = initialRiskGross(avgEntry, initialStop ? new Decimal(initialStop) : null, snap.entryQuantity, pv);
-    const r = snap.status === "CLOSED" ? realizedRNet(snap.realizedNetPnl, risk) : null;
+    const risk = initialRiskGross(avgEntry, initialStop !== undefined && initialStop !== 0 ? new Decimal(initialStop) : null, snap.entryQuantity, pv);
+    const exited = snap.exitQuantity;
+    const hasClosed = exited.gt(0);
+    const rNet = hasClosed ? realizedRNet(snap.realizedNetPnl, risk) : null;
+    const rGross = hasClosed ? realizedRGross(snap.realizedGrossPnl, risk) : null;
     const result: TradeResult =
       snap.status !== "CLOSED" ? "Open"
       : snap.economicResult === "WIN" ? "Win"
       : snap.economicResult === "LOSS" ? "Loss" : "Breakeven";
-    const exited = snap.exitQuantity;
-    const hasClosed = exited.gt(0);
     return {
       status: snap.status,
-      avgEntryPrice: snap.averageEntryPrice ? snap.averageEntryPrice.toDecimalPlaces(5).toNumber() : undefined,
-      avgExitPrice: snap.averageExitPrice ? snap.averageExitPrice.toDecimalPlaces(5).toNumber() : undefined,
+      avgEntryPrice: snap.averageEntryPrice ? snap.averageEntryPrice.toDecimalPlaces(5, Decimal.ROUND_HALF_UP).toNumber() : undefined,
+      avgExitPrice: snap.averageExitPrice ? snap.averageExitPrice.toDecimalPlaces(5, Decimal.ROUND_HALF_UP).toNumber() : undefined,
       totalContracts: snap.entryQuantity.toNumber(),
       contractsExited: exited.toNumber(),
       openContracts: snap.openQuantity.toNumber(),
-      grossPnl: hasClosed ? snap.realizedGrossPnl.toDecimalPlaces(2).toNumber() : undefined,
-      netPnl: hasClosed ? snap.realizedNetPnl.toDecimalPlaces(2).toNumber() : undefined,
-      totalCommission: snap.realizedFees.toDecimalPlaces(2).toNumber(),
-      accruedCommission: snap.accruedFees.toDecimalPlaces(2).toNumber(),
-      openCommission: snap.openFees.toDecimalPlaces(2).toNumber(),
-      netPnlAfterAccruedFees: hasClosed ? snap.netPnlAfterAccruedFees.toDecimalPlaces(2).toNumber() : undefined,
-      pnlPerContract: hasClosed ? snap.realizedNetPnl.div(exited).toDecimalPlaces(2).toNumber() : undefined,
-      rMultiple: r ? r.toDecimalPlaces(4).toNumber() : undefined,
+      grossPnl: hasClosed ? snap.realizedGrossPnl.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber() : undefined,
+      netPnl: hasClosed ? snap.realizedNetPnl.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber() : undefined,
+      totalCommission: snap.realizedFees.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      accruedCommission: snap.accruedFees.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      openCommission: snap.openFees.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      netPnlAfterAccruedFees: hasClosed ? snap.netPnlAfterAccruedFees.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber() : undefined,
+      pnlPerContract: hasClosed ? snap.realizedNetPnl.div(exited).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber() : undefined,
+      rMultiple: rNet ? rNet.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber() : undefined,
+      grossRMultiple: rGross ? rGross.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber() : undefined,
+      exactNetR: rNet ? rNet.toString() : undefined,
+      exactGrossR: rGross ? rGross.toString() : undefined,
       isBreakeven: snap.economicResult === "NET_BREAKEVEN",
       result,
     };
@@ -378,9 +407,24 @@ export function calculateTrade(
 /* ─── Compute statistics from trade list ─── */
 export function computeStats(trades: TradeRecord[]): TradeStats {
   const chrono = (t: TradeRecord) => `${t.dateClose || t.dateOpen}T${t.timeClose || t.timeOpen || "00:00"}`;
+  const isStrictlyClosed = (t: TradeRecord) =>
+    t.result !== "Open" &&
+    t.status !== "OPEN" &&
+    t.status !== "PARTIALLY_CLOSED" &&
+    (t.openContracts === undefined || t.openContracts === 0) &&
+    typeof t.netPnl === "number" &&
+    Number.isFinite(t.netPnl);
+
   const closed = trades
-    .filter(t => t.result !== "Open" && typeof t.netPnl === "number" && Number.isFinite(t.netPnl))
+    .filter(isStrictlyClosed)
     .sort((a, b) => chrono(a).localeCompare(chrono(b)));
+
+  const nonClosed = trades.filter(t => !isStrictlyClosed(t));
+  const partialPositions = nonClosed.filter(t =>
+    t.status === "PARTIALLY_CLOSED" || ((t.contractsExited ?? 0) > 0 && (t.contractsExited ?? 0) < t.totalContracts)
+  );
+  const openOnlyPositions = nonClosed.filter(t => !partialPositions.includes(t));
+
   const nets = closed.map(t => new Decimal(t.netPnl as number));
   const sum = (xs: Decimal[]) => xs.reduce((s, x) => s.plus(x), new Decimal(0));
 
@@ -395,6 +439,21 @@ export function computeStats(trades: TradeRecord[]): TradeStats {
   const totalNet = sum(nets);
   const maxDD = maxRealizedDrawdown(new Decimal(0), nets).abs();
 
+  // Categorías separadas y reconciliables para posiciones abiertas y parciales (R2-01)
+  const openContractsTotal = nonClosed.reduce((acc, t) => {
+    const openC = t.openContracts !== undefined ? t.openContracts : Math.max(0, (t.totalContracts || 0) - (t.contractsExited || 0));
+    return acc + openC;
+  }, 0);
+  const partialRealizedGrossDec = sum(partialPositions.map(t => new Decimal(t.grossPnl ?? 0)));
+  const partialRealizedCommDec = sum(partialPositions.map(t => new Decimal(t.totalCommission ?? 0)));
+  const partialRealizedNetDec = sum(partialPositions.map(t => new Decimal(t.netPnl ?? 0)));
+  const openExecCommDec = sum(nonClosed.map(t => {
+    if (t.openCommission !== undefined) return new Decimal(t.openCommission);
+    const openC = t.openContracts !== undefined ? t.openContracts : Math.max(0, (t.totalContracts || 0) - (t.contractsExited || 0));
+    return new Decimal(t.commissionPerSide ?? 0).mul(openC);
+  }));
+  const totalAccruedCommDec = totalComm.plus(partialRealizedCommDec).plus(openExecCommDec);
+
   // Rachas sobre resultado económico neto
   let maxCW = 0, maxCL = 0, cw = 0, cl = 0;
   for (const n of nets) {
@@ -406,7 +465,7 @@ export function computeStats(trades: TradeRecord[]): TradeStats {
   const withR = closed.filter(t => typeof t.rMultiple === "number" && Number.isFinite(t.rMultiple));
   const withHold = closed.filter(t => typeof t.holdTimeMinutes === "number" && Number.isFinite(t.holdTimeMinutes) && (t.holdTimeMinutes as number) >= 0);
   const planRate = closed.length ? (closed.filter(t => t.planFollowed).length / closed.length) * 100 : 0;
-  const round = (d: Decimal, dp = 2) => d.toDecimalPlaces(dp).toNumber();
+  const round = (d: Decimal, dp = 2) => d.toDecimalPlaces(dp, Decimal.ROUND_HALF_UP).toNumber();
 
   return {
     totalTrades: trades.length,
@@ -414,24 +473,35 @@ export function computeStats(trades: TradeRecord[]): TradeStats {
     wins: wr.wins,
     losses: wr.losses,
     breakevenCount: wr.breakeven,
-    openTrades: trades.filter(t => t.result === "Open").length,
+    openTrades: nonClosed.length,
     winRate: wr.rate.state === "VALUE" ? round(wr.rate.value.mul(100), 1) : 0,
     profitFactor: pf.state === "VALUE" ? round(pf.value, 4) : null,
+    exactProfitFactor: pf.state === "VALUE" ? pf.value.toString() : null,
     profitFactorState: pf.state,
-    expectancy: exp.state === "VALUE" ? round(exp.value) : 0,
-    avgWin: winsN.length ? round(sum(winsN).div(winsN.length)) : 0,
-    avgLoss: lossesN.length ? round(sum(lossesN).div(lossesN.length).abs()) : 0,
-    avgRMultiple: withR.length ? round(sum(withR.map(t => new Decimal(t.rMultiple as number))).div(withR.length)) : 0,
-    totalGross: round(totalGross),
-    totalCommissions: round(totalComm),
-    totalNet: round(totalNet),
-    maxDrawdown: round(maxDD),
+    expectancy: exp.state === "VALUE" ? round(exp.value, 2) : 0,
+    exactExpectancy: exp.state === "VALUE" ? exp.value.toString() : null,
+    roundingPolicy: "ROUND_HALF_UP_2DP",
+    avgWin: winsN.length ? round(sum(winsN).div(winsN.length), 2) : 0,
+    avgLoss: lossesN.length ? round(sum(lossesN).div(lossesN.length).abs(), 2) : 0,
+    avgRMultiple: withR.length ? round(sum(withR.map(t => new Decimal(t.rMultiple as number))).div(withR.length), 2) : 0,
+    totalGross: round(totalGross, 2),
+    totalCommissions: round(totalComm, 2),
+    totalNet: round(totalNet, 2),
+    maxDrawdown: round(maxDD, 2),
     maxConsecWins: maxCW,
     maxConsecLosses: maxCL,
     avgHoldTime: withHold.length ? Math.round(withHold.reduce((s, t) => s + (t.holdTimeMinutes as number), 0) / withHold.length) : 0,
     planFollowRate: parseFloat(planRate.toFixed(1)),
     sampleState: sampleState(closed.length),
     calculationVersion: CALCULATION_VERSION,
+    openPositionsCount: openOnlyPositions.length,
+    partialPositionsCount: partialPositions.length,
+    openContractsTotal,
+    partialRealizedGross: round(partialRealizedGrossDec, 2),
+    partialRealizedCommission: round(partialRealizedCommDec, 2),
+    partialRealizedNet: round(partialRealizedNetDec, 2),
+    openExecutionCommission: round(openExecCommDec, 2),
+    totalAccruedCommissions: round(totalAccruedCommDec, 2),
   };
 }
 

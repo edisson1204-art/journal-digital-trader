@@ -1,0 +1,12 @@
+{
+  "engine": "PostgreSQL 17.6.1.166 (Supabase pg_temp transactional ROLLBACK — 0 production rows touched)",
+  "verification_result": {
+    "role_tested": "authenticated (NOBYPASSRLS)",
+    "user_a_own_rows_visible": 1,
+    "user_b_cross_select_count": 0,
+    "user_b_cross_update_count": 0,
+    "user_b_cross_delete_count": 0,
+    "user_b_impersonate_insert_error": "42501: new row violates row-level security policy for table \"trades_r2_verify\"",
+    "overclose_3_of_2_db_trigger_error": "23514: Sobre-cierre rechazado en DB: salidas (3) superan entradas (2)"
+  }
+}

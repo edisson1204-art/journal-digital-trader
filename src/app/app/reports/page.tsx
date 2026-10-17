@@ -37,8 +37,18 @@ export function filterReportTrades(
   });
 }
 
+export interface NarrativeTraceItem {
+  ruleId: string;
+  period: string;
+  sampleN: number;
+  metricsUsed: Record<string, number | string | null>;
+  text: string;
+}
+
 export function calculateQuantStats(trades: TradeRecord[]) {
-  const closed = trades.filter(t => t.result !== "Open");
+  const closed = trades.filter(
+    t => t.result !== "Open" && t.totalContracts > 0 && t.contractsExited >= t.totalContracts
+  );
   if (!closed.length) return null;
 
   const longs = closed.filter(t => t.side === "Buy");
@@ -47,27 +57,37 @@ export function calculateQuantStats(trades: TradeRecord[]) {
   const shortWinRate = shorts.length ? (shorts.filter(t => t.result === "Win").length / shorts.length) * 100 : 0;
 
   const assetPnl: Record<string, number> = {};
-  closed.forEach(t => { assetPnl[t.instrument] = (assetPnl[t.instrument] || 0) + (t.netPnl || 0); });
+  closed.forEach(t => { assetPnl[t.instrument] = (assetPnl[t.instrument] || 0) + (t.netPnl ?? 0); });
   const sortedAssets = Object.entries(assetPnl).sort((a,b) => b[1] - a[1]);
   const bestAsset = sortedAssets[0] || ["Ninguno", 0];
   const worstAsset = sortedAssets[sortedAssets.length - 1] || ["Ninguno", 0];
 
-  const mae = closed.reduce((acc, t) => acc + (t.mae || 0), 0) / (closed.length || 1);
-  const mfe = closed.reduce((acc, t) => acc + (t.mfe || 0), 0) / (closed.length || 1);
+  // R2-06: No convertir MAE/MFE ausentes en 0 silenciosamente
+  const tradesWithMae = closed.filter(t => t.mae !== undefined && t.mae !== null && Number.isFinite(t.mae));
+  const tradesWithMfe = closed.filter(t => t.mfe !== undefined && t.mfe !== null && Number.isFinite(t.mfe));
+  const mae: number | null = tradesWithMae.length > 0
+    ? Math.round(tradesWithMae.reduce((acc, t) => acc + (t.mae as number), 0) / tradesWithMae.length)
+    : null;
+  const mfe: number | null = tradesWithMfe.length > 0
+    ? Math.round(tradesWithMfe.reduce((acc, t) => acc + (t.mfe as number), 0) / tradesWithMfe.length)
+    : null;
 
-  const efficiencyActive = closed.reduce((acc, t) => acc + (t.netPnl || 0), 0);
-  const efficiencyPassive = closed.reduce((acc, t) => acc + ((t.result === 'Win' ? (t.mfe || 0) : -(t.mae || 0)) || t.netPnl || 0), 0);
+  // R2-06: Eliminado el contrafactual "Set & Forget" (efficiencyPassive) sin serie intratrade real
+  const efficiencyActive = closed.reduce((acc, t) => acc + (t.netPnl ?? 0), 0);
 
   const setupGroups: Record<string, { wins: number, count: number, net: number }> = {};
   closed.forEach(t => {
     const s = t.setup || "General";
     if (!setupGroups[s]) setupGroups[s] = { wins: 0, count: 0, net: 0 };
     setupGroups[s].count++;
-    setupGroups[s].net += t.netPnl || 0;
+    setupGroups[s].net += t.netPnl ?? 0;
     if (t.result === "Win") setupGroups[s].wins++;
   });
   const setups = Object.entries(setupGroups).map(([name, data]) => ({
-    name, winRate: Math.round((data.wins / data.count) * 100), expectancy: Math.round(data.net / data.count)
+    name,
+    count: data.count,
+    winRate: Math.round((data.wins / data.count) * 100),
+    expectancy: Math.round(data.net / data.count),
   })).sort((a,b) => b.expectancy - a.expectancy).slice(0, 3);
 
   const sessionGroups: Record<string, { wins: number, count: number, net: number }> = {};
@@ -75,11 +95,14 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     const s = t.session || "Other";
     if (!sessionGroups[s]) sessionGroups[s] = { wins: 0, count: 0, net: 0 };
     sessionGroups[s].count++;
-    sessionGroups[s].net += t.netPnl || 0;
+    sessionGroups[s].net += t.netPnl ?? 0;
     if (t.result === "Win") sessionGroups[s].wins++;
   });
   const sessions = Object.entries(sessionGroups).map(([name, data]) => ({
-    name, winRate: Math.round((data.wins / data.count) * 100), pnl: Math.round(data.net)
+    name,
+    count: data.count,
+    winRate: Math.round((data.wins / data.count) * 100),
+    pnl: Math.round(data.net),
   })).sort((a,b) => b.pnl - a.pnl).slice(0, 4);
 
   const holdingGroups = [
@@ -87,16 +110,23 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     { name: "Intraday (15m - 4h)", min: 15, max: 240, wins: 0, count: 0, net: 0 },
     { name: "Swing (> 4h)", min: 240, max: 999999, wins: 0, count: 0, net: 0 }
   ];
+  let unrecordedHoldTimeCount = 0;
   closed.forEach(t => {
-    const ht = t.holdTimeMinutes || 0;
-    const g = holdingGroups.find(g => ht >= g.min && ht < g.max);
-    if (g) { g.count++; g.net += t.netPnl || 0; if (t.result === "Win") g.wins++; }
+    // R2-06: No clasificar holdTimeMinutes ausente como Scalping (< 15m)
+    if (t.holdTimeMinutes === undefined || t.holdTimeMinutes === null || !Number.isFinite(t.holdTimeMinutes) || t.holdTimeMinutes < 0) {
+      unrecordedHoldTimeCount++;
+      return;
+    }
+    const ht = t.holdTimeMinutes;
+    const g = holdingGroups.find(grp => ht >= grp.min && ht < grp.max);
+    if (g) { g.count++; g.net += t.netPnl ?? 0; if (t.result === "Win") g.wins++; }
   });
   
   const holdingTimes = holdingGroups
     .filter(g => g.count > 0)
     .map(g => ({
-      type: g.name, 
+      type: g.name,
+      count: g.count,
       winRate: g.count ? Math.round((g.wins / g.count) * 100) : 0, 
       pnl: Math.round(g.net)
     }));
@@ -119,7 +149,7 @@ export function calculateQuantStats(trades: TradeRecord[]) {
   const dailyPnlMap: Record<string, number> = {};
   closed.forEach(t => {
     const day = t.dateOpen;
-    dailyPnlMap[day] = (dailyPnlMap[day] || 0) + (t.netPnl || 0);
+    dailyPnlMap[day] = (dailyPnlMap[day] || 0) + (t.netPnl ?? 0);
   });
   const dailyPnls = Object.values(dailyPnlMap).filter(v => v > 0);
   const avgDailyPnl = dailyPnls.length ? dailyPnls.reduce((a,b) => a+b, 0) / dailyPnls.length : 0;
@@ -134,94 +164,190 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     shortWinRate: Math.round(shortWinRate * 10) / 10,
     bestAsset: bestAsset[0], bestAssetPnl: Math.round(bestAsset[1]),
     worstAsset: worstAsset[0], worstAssetPnl: Math.round(worstAsset[1]),
-    riskOfRuin, mae: Math.round(mae), mfe: Math.round(mfe),
-    efficiencyPassive: Math.round(efficiencyPassive),
+    riskOfRuin,
+    mae,
+    mfe,
+    recordedMaeCount: tradesWithMae.length,
+    recordedMfeCount: tradesWithMfe.length,
+    unrecordedHoldTimeCount,
     efficiencyActive: Math.round(efficiencyActive),
     recoveryDays,
     sessions, holdingTimes, setups
   };
 }
 
-const generatePsychoText = (stats: any, lang: string) => {
-  // REP-02: Sin operaciones cerradas, no emitir diagnóstico ni texto conductual fabricado
+const generatePsychoText = (stats: any, lang: string, period = "selected") => {
+  // REP-02 / R2-06: Sin operaciones cerradas, no emitir diagnóstico ni texto conductual fabricado
   if (!stats || !stats.closedTrades || stats.closedTrades <= 0) return null;
 
-  const isProfitable = stats.totalNet > 0 && stats.winRate >= 50;
+  const isProfitable = stats.totalNet > 0;
   const planRate = stats.planFollowRate ?? 0;
+  const sampleN = stats.closedTrades;
 
   if (lang === "en") {
+    const diagnosis = `Descriptive behavioral summary (period: ${period}, n=${sampleN} closed trades): realized net P&L is ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} with a recorded plan adherence rate of ${planRate}%.`;
+    const egoTitle = isProfitable ? "OBSERVED PLAN ADHERENCE & RISK NOTE" : "RISK & PLAN ADHERENCE OBSERVATION";
+    const egoText = `Recorded plan adherence is ${planRate}% across n=${sampleN} closed trades (Win Rate: ${stats.winRate}%). Keep position sizing aligned with your written risk rules.`;
+    const blindSpots = [
+      `Observed Max Realized Drawdown: -$${Math.abs(stats.maxDrawdown || 0).toFixed(2)} across n=${sampleN} closed trades.`,
+      `Average losing trade: -$${Math.abs(stats.avgLoss || 0).toFixed(2)} (${stats.losses} losing trades) · Plan adherence: ${planRate}%.`,
+    ];
+    const prescription = [
+      `1. Maintain predefined risk per trade according to your written plan (observed adherence: ${planRate}%).`,
+      `2. Review the ${stats.losses} losing trade(s) in this period against your entry/exit checklist.`,
+    ];
     return {
-      diagnosis: isProfitable
-        ? `Based on ${stats.closedTrades} closed trades, net P&L is positive (+$${stats.totalNet.toFixed(2)}) with a ${planRate}% plan adherence rate.`
-        : `Across ${stats.closedTrades} closed trades, net P&L is $${stats.totalNet.toFixed(2)} with a ${planRate}% plan adherence rate. Review risk per trade and setup selection.`,
-      egoTitle: isProfitable ? "RISK CONSISTENCY NOTE" : "CAPITAL PRESERVATION FOCUS",
-      egoText: isProfitable
-        ? "Maintain constant position sizing rules after winning streaks to avoid increasing drawdown exposure."
-        : "Prioritize strict adherence to predefined stop-loss levels and avoid revenge trading after losing sessions.",
-      blindSpots: [
-        `Observed Max Drawdown: -$${Math.abs(stats.maxDrawdown || 0).toFixed(2)} across ${stats.closedTrades} closed trades.`,
-        `Average losing trade: -$${Math.abs(stats.avgLoss || 0).toFixed(2)} · Plan adherence: ${planRate}%.`,
-      ],
-      prescription: [
-        "1. Maintain predefined risk per trade according to your written plan.",
-        "2. Pause execution for the session if daily loss limit is reached.",
-      ]
+      diagnosis,
+      egoTitle,
+      egoText,
+      blindSpots,
+      prescription,
+      traceability: [
+        { ruleId: "PSY-DIAG-01", period, sampleN, metricsUsed: { totalNet: stats.totalNet, planFollowRate: planRate }, text: diagnosis },
+        { ruleId: "PSY-EGO-01", period, sampleN, metricsUsed: { planFollowRate: planRate, winRate: stats.winRate }, text: egoText },
+        { ruleId: "PSY-DD-01", period, sampleN, metricsUsed: { maxDrawdown: stats.maxDrawdown }, text: blindSpots[0] },
+        { ruleId: "PSY-LOSS-01", period, sampleN, metricsUsed: { avgLoss: stats.avgLoss, losses: stats.losses, planFollowRate: planRate }, text: blindSpots[1] },
+      ] as NarrativeTraceItem[],
     };
   }
 
+  const diagnosis = `Resumen descriptivo de disciplina operativa (periodo: ${period}, n=${sampleN} operaciones cerradas): el resultado neto realizado es ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} con una adherencia al plan registrada del ${planRate}%.`;
+  const egoTitle = isProfitable ? "OBSERVACIÓN DE DISCIPLINA Y RIESGO" : "OBSERVACIÓN DE EJECUCIÓN Y CONTROL DE RIESGO";
+  const egoText = `La adherencia al plan registrada en este periodo es del ${planRate}% sobre n=${sampleN} operaciones cerradas (Win Rate: ${stats.winRate}%). Conserva el riesgo por operación dentro de los parámetros definidos en tu plan.`;
+  const blindSpots = [
+    `Drawdown máximo realizado en el periodo (${period}): -$${Math.abs(stats.maxDrawdown || 0).toFixed(2)} sobre n=${sampleN} operaciones cerradas.`,
+    `Pérdida promedio en operaciones cerradas negativas (${stats.losses} ops): -$${Math.abs(stats.avgLoss || 0).toFixed(2)} · Adherencia al plan: ${planRate}%.`,
+  ];
+  const prescription = [
+    `1. Mantener el riesgo por operación alineado con el plan escrito (adherencia registrada: ${planRate}%).`,
+    `2. Revisar las ${stats.losses} operación(es) con pérdida neta frente a las reglas de entrada y salida registradas.`,
+  ];
+
   return {
-    diagnosis: isProfitable
-      ? `Sobre una muestra de ${stats.closedTrades} operaciones cerradas, el resultado neto es positivo (+$${stats.totalNet.toFixed(2)}) con una adherencia al plan registrada del ${planRate}%.`
-      : `Sobre una muestra de ${stats.closedTrades} operaciones cerradas, el resultado neto es ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} con una adherencia al plan registrada del ${planRate}%.`,
-    egoTitle: isProfitable ? "NOTA DE CONSISTENCIA DE RIESGO" : "CONTROL DE RIESGO Y EJECUCIÓN",
-    egoText: isProfitable
-      ? "Mantén constante el porcentaje de riesgo por operación tras rachas positivas para evitar incrementar la exposición al drawdown."
-      : "Prioriza el respeto estricto al Stop Loss inicial y evita abrir operaciones fuera de tu horario o setup validado.",
-    blindSpots: [
-      `Drawdown máximo observado en el periodo: -$${Math.abs(stats.maxDrawdown || 0).toFixed(2)} (${stats.closedTrades} operaciones cerradas).`,
-      `Pérdida promedio por operación perdedora: -$${Math.abs(stats.avgLoss || 0).toFixed(2)} · Adherencia al plan: ${planRate}%.`,
-    ],
-    prescription: [
-      "1. Mantener el tamaño de posición dentro del límite definido en el plan operativo.",
-      "2. Detener la sesión operativa al alcanzar el límite de pérdida diaria preestablecido.",
-    ]
+    diagnosis,
+    egoTitle,
+    egoText,
+    blindSpots,
+    prescription,
+    traceability: [
+      { ruleId: "PSY-DIAG-01", period, sampleN, metricsUsed: { totalNet: stats.totalNet, planFollowRate: planRate }, text: diagnosis },
+      { ruleId: "PSY-EGO-01", period, sampleN, metricsUsed: { planFollowRate: planRate, winRate: stats.winRate }, text: egoText },
+      { ruleId: "PSY-DD-01", period, sampleN, metricsUsed: { maxDrawdown: stats.maxDrawdown }, text: blindSpots[0] },
+      { ruleId: "PSY-LOSS-01", period, sampleN, metricsUsed: { avgLoss: stats.avgLoss, losses: stats.losses, planFollowRate: planRate }, text: blindSpots[1] },
+    ] as NarrativeTraceItem[],
   };
 };
 
-const generateNarrative = (type: string, stats: any, quant: any, lang: string) => {
-  // REP-01, REP-03, REP-04: Sin operaciones cerradas, no generar narrativa
+export function generateNarrativeTraceability(
+  type: string, stats: any, quant: any, lang: string, period = "selected"
+): NarrativeTraceItem[] {
   if (!stats || !stats.closedTrades || stats.closedTrades <= 0 || !quant) return [];
-  const isProfitable = stats.totalNet > 0;
   const pfFormatted = formatProfitFactor(stats);
+  const sampleN = stats.closedTrades;
+  const maeTextEs = quant.mae !== null ? `-$${quant.mae} (n=${quant.recordedMaeCount})` : "No registrado";
+  const mfeTextEs = quant.mfe !== null ? `+$${quant.mfe} (n=${quant.recordedMfeCount})` : "No registrado";
+  const maeTextEn = quant.mae !== null ? `-$${quant.mae} (n=${quant.recordedMaeCount})` : "Not recorded";
+  const mfeTextEn = quant.mfe !== null ? `+$${quant.mfe} (n=${quant.recordedMfeCount})` : "Not recorded";
 
   if (lang === "en") {
     if (type === "technical") {
       return [
-        `Quantitative summary based on ${stats.closedTrades} closed trades in the selected period. Net P&L is ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} with a Profit Factor of ${pfFormatted}.`,
-        `Directional breakdown: Long Win Rate is ${quant.longWinRate}% (${quant.longCount} trades) and Short Win Rate is ${quant.shortWinRate}% (${quant.shortCount} trades). Recorded average MAE is -$${quant.mae} and average MFE is +$${quant.mfe}.`,
-        `Note: Metrics are descriptive of the ${stats.closedTrades} closed trades in this period. Statistical inference requires at least 30 closed trades.`
+        {
+          ruleId: "TECH-SUM-01",
+          period,
+          sampleN,
+          metricsUsed: { totalNet: stats.totalNet, profitFactor: pfFormatted },
+          text: `Quantitative descriptive summary (period: ${period}, n=${sampleN} closed trades): realized Net P&L is ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} with a Profit Factor of ${pfFormatted}.`,
+        },
+        {
+          ruleId: "TECH-DIR-02",
+          period,
+          sampleN,
+          metricsUsed: { longWinRate: quant.longWinRate, longCount: quant.longCount, shortWinRate: quant.shortWinRate, shortCount: quant.shortCount, mae: quant.mae, mfe: quant.mfe },
+          text: `Directional breakdown: Long Win Rate is ${quant.longWinRate}% (n=${quant.longCount}) and Short Win Rate is ${quant.shortWinRate}% (n=${quant.shortCount}). Recorded average MAE: ${maeTextEn} · Recorded average MFE: ${mfeTextEn}.`,
+        },
+        {
+          ruleId: "TECH-METH-03",
+          period,
+          sampleN,
+          metricsUsed: { closedTrades: sampleN },
+          text: `Methodological note: These figures are descriptive of the n=${sampleN} closed trades in period '${period}' and do not constitute a guarantee of future edge.`,
+        },
       ];
     }
     if (type === "monthly") {
       return [
-        `Period summary across ${stats.closedTrades} closed trades (${stats.openTrades || 0} open trades excluded from realized metrics). Realized Net P&L: ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} (Profit Factor: ${pfFormatted}).`,
-        `Win Rate: ${stats.winRate}% (${stats.wins} wins, ${stats.losses} losses, ${stats.breakevenCount} exact breakevens). Realized commissions totaled -$${stats.totalCommissions.toFixed(2)}.`,
-        `Observation: Review trade-by-trade execution against your plan adherence (${stats.planFollowRate}%).`
+        {
+          ruleId: "MON-SUM-01",
+          period,
+          sampleN,
+          metricsUsed: { totalNet: stats.totalNet, profitFactor: pfFormatted, openTrades: stats.openTrades ?? 0 },
+          text: `Period summary (${period}) across n=${sampleN} closed trades (${stats.openTrades || 0} open/partial positions excluded from closed metrics). Realized Net P&L: ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} (Profit Factor: ${pfFormatted}).`,
+        },
+        {
+          ruleId: "MON-WR-02",
+          period,
+          sampleN,
+          metricsUsed: { winRate: stats.winRate, wins: stats.wins, losses: stats.losses, breakevenCount: stats.breakevenCount, totalCommissions: stats.totalCommissions },
+          text: `Win Rate: ${stats.winRate}% (${stats.wins} wins, ${stats.losses} losses, ${stats.breakevenCount} exact breakevens). Realized commissions on closed trades totaled -$${stats.totalCommissions.toFixed(2)}.`,
+        },
+        {
+          ruleId: "MON-PLAN-03",
+          period,
+          sampleN,
+          metricsUsed: { planFollowRate: stats.planFollowRate, expectancy: stats.expectancy },
+          text: `Descriptive expectancy is ${stats.expectancy >= 0 ? "+" : "-"}$${Math.abs(stats.expectancy).toFixed(2)}/trade with a recorded plan adherence of ${stats.planFollowRate}% (n=${sampleN}).`,
+        },
       ];
     }
     if (type === "strategy") {
-      const bestSetup = quant.setups[0]?.name || "N/A";
+      const bestSetup = quant.setups[0]?.name || "General";
       const bestWR = quant.setups[0]?.winRate ?? 0;
+      const bestExp = quant.setups[0]?.expectancy ?? 0;
+      const bestCount = quant.setups[0]?.count ?? sampleN;
       return [
-        `Setup breakdown across ${stats.closedTrades} closed trades. Highest expectancy setup in this sample: '${bestSetup}' (${bestWR}% Win Rate).`,
-        `Compare setup performance only when each setup has a sufficient sample of closed trades.`
+        {
+          ruleId: "STRAT-TOP-01",
+          period,
+          sampleN,
+          metricsUsed: { bestSetup, bestWR, bestExp, bestCount },
+          text: `Setup breakdown across n=${sampleN} closed trades (${period}): highest observed expectancy in this sample is '${bestSetup}' (n=${bestCount}, Win Rate: ${bestWR}%, Expectancy: ${bestExp >= 0 ? "+" : "-"}$${Math.abs(bestExp)}).`,
+        },
+        {
+          ruleId: "STRAT-NOTE-02",
+          period,
+          sampleN,
+          metricsUsed: { closedTrades: sampleN },
+          text: `Methodological note: Setup metrics are purely descriptive of the recorded sample (n=${sampleN}).`,
+        },
       ];
     }
     if (type === "tax") {
+      const openComm = stats.openExecutionCommission ?? 0;
+      const partialComm = stats.partialRealizedCommission ?? 0;
+      const totalAccrued = stats.totalAccruedCommissions ?? stats.totalCommissions;
       return [
-        `Unofficial reconciliation summary for ${stats.closedTrades} closed trades. Recorded broker commissions totaled -$${stats.totalCommissions.toFixed(2)}.`,
-        `Realized Gross P&L: ${stats.totalGross >= 0 ? "+" : "-"}$${Math.abs(stats.totalGross).toFixed(2)} · Realized Net P&L after recorded fees: ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)}.`,
-        `Disclaimer: This document is an unofficial personal reconciliation summary generated from user-entered records. It is not a tax statement and does not replace official broker statements or prop-firm payout records.`
+        {
+          ruleId: "TAX-CLOSED-01",
+          period,
+          sampleN,
+          metricsUsed: { totalGross: stats.totalGross, totalCommissions: stats.totalCommissions, totalNet: stats.totalNet },
+          text: `Unofficial reconciliation summary (${period}) for n=${sampleN} closed trades: Realized Gross P&L is ${stats.totalGross >= 0 ? "+" : "-"}$${Math.abs(stats.totalGross).toFixed(2)}, realized commissions on closed trades are -$${stats.totalCommissions.toFixed(2)}, and Realized Net P&L is ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)}.`,
+        },
+        {
+          ruleId: "TAX-OPEN-02",
+          period,
+          sampleN,
+          metricsUsed: { openPositionsCount: stats.openPositionsCount ?? 0, partialPositionsCount: stats.partialPositionsCount ?? 0, partialRealizedGross: stats.partialRealizedGross ?? 0, partialComm, openComm, totalAccrued },
+          text: `Separate reconciliation of non-closed positions: ${stats.openPositionsCount ?? 0} open and ${stats.partialPositionsCount ?? 0} partially closed position(s). Partial realized gross: $${(stats.partialRealizedGross ?? 0).toFixed(2)}, partial realized fee: -$${partialComm.toFixed(2)}, open entry fee accrued: -$${openComm.toFixed(2)} (total accrued fees across all positions: -$${totalAccrued.toFixed(2)}).`,
+        },
+        {
+          ruleId: "TAX-DISC-03",
+          period,
+          sampleN,
+          metricsUsed: { closedTrades: sampleN },
+          text: `Disclaimer: This document is an unofficial personal reconciliation summary generated from user-entered records. It is not a tax statement and does not replace official broker statements or prop-firm payout records.`,
+        },
       ];
     }
     return [];
@@ -230,34 +356,109 @@ const generateNarrative = (type: string, stats: any, quant: any, lang: string) =
   // Español
   if (type === "technical") {
     return [
-      `Resumen cuantitativo calculado sobre ${stats.closedTrades} operaciones cerradas en el periodo seleccionado. El P&L neto realizado es de ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} con un Profit Factor de ${pfFormatted}.`,
-      `Desglose direccional observado: Win Rate en compras (Long) de ${quant.longWinRate}% (${quant.longCount} ops) y en ventas (Short) de ${quant.shortWinRate}% (${quant.shortCount} ops). MAE promedio registrado: -$${quant.mae} · MFE promedio: +$${quant.mfe}.`,
-      `Nota metodológica: Estos indicadores describen únicamente las ${stats.closedTrades} operaciones cerradas del periodo. Para inferencia estadística fiable se recomienda una muestra mínima de 30 operaciones.`
+      {
+        ruleId: "TECH-SUM-01",
+        period,
+        sampleN,
+        metricsUsed: { totalNet: stats.totalNet, profitFactor: pfFormatted },
+        text: `Resumen cuantitativo descriptivo (periodo: ${period}, n=${sampleN} operaciones cerradas): el P&L neto realizado es de ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} con un Profit Factor de ${pfFormatted}.`,
+      },
+      {
+        ruleId: "TECH-DIR-02",
+        period,
+        sampleN,
+        metricsUsed: { longWinRate: quant.longWinRate, longCount: quant.longCount, shortWinRate: quant.shortWinRate, shortCount: quant.shortCount, mae: quant.mae, mfe: quant.mfe },
+        text: `Desglose direccional observado: Win Rate en compras (Long) de ${quant.longWinRate}% (n=${quant.longCount}) y en ventas (Short) de ${quant.shortWinRate}% (n=${quant.shortCount}). MAE promedio registrado: ${maeTextEs} · MFE promedio registrado: ${mfeTextEs}.`,
+      },
+      {
+        ruleId: "TECH-METH-03",
+        period,
+        sampleN,
+        metricsUsed: { closedTrades: sampleN },
+        text: `Nota metodológica: Estos indicadores son descriptivos de las n=${sampleN} operaciones cerradas del periodo '${period}' y no constituyen garantía de ventaja futura.`,
+      },
     ];
   }
   if (type === "monthly") {
     return [
-      `Resumen del periodo basado en ${stats.closedTrades} operaciones cerradas (${stats.openTrades || 0} abiertas excluidas de métricas realizadas). Beneficio neto realizado: ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} · Profit Factor: ${pfFormatted}.`,
-      `Tasa de acierto (Win Rate): ${stats.winRate}% (${stats.wins} ganadoras, ${stats.losses} perdedoras, ${stats.breakevenCount} breakeven exactos). Comisiones realizadas registradas: -$${stats.totalCommissions.toFixed(2)}.`,
-      `Observación operativa: Adherencia al plan registrada del ${stats.planFollowRate}% en el periodo.`
+      {
+        ruleId: "MON-SUM-01",
+        period,
+        sampleN,
+        metricsUsed: { totalNet: stats.totalNet, profitFactor: pfFormatted, openTrades: stats.openTrades ?? 0 },
+        text: `Resumen del periodo (${period}) basado en n=${sampleN} operaciones cerradas (${stats.openTrades || 0} abiertas/parciales excluidas de métricas cerradas). Beneficio neto realizado: ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)} · Profit Factor: ${pfFormatted}.`,
+      },
+      {
+        ruleId: "MON-WR-02",
+        period,
+        sampleN,
+        metricsUsed: { winRate: stats.winRate, wins: stats.wins, losses: stats.losses, breakevenCount: stats.breakevenCount, totalCommissions: stats.totalCommissions },
+        text: `Tasa de acierto (Win Rate): ${stats.winRate}% (${stats.wins} ganadoras, ${stats.losses} perdedoras, ${stats.breakevenCount} breakeven exactos). Comisiones realizadas en operaciones cerradas: -$${stats.totalCommissions.toFixed(2)}.`,
+      },
+      {
+        ruleId: "MON-PLAN-03",
+        period,
+        sampleN,
+        metricsUsed: { planFollowRate: stats.planFollowRate, expectancy: stats.expectancy },
+        text: `Esperanza matemática descriptiva de ${stats.expectancy >= 0 ? "+" : "-"}$${Math.abs(stats.expectancy).toFixed(2)}/trade con adherencia al plan registrada del ${stats.planFollowRate}% (n=${sampleN}).`,
+      },
     ];
   }
   if (type === "strategy") {
-    const bestSetup = quant.setups[0]?.name || "N/A";
+    const bestSetup = quant.setups[0]?.name || "General";
     const bestWR = quant.setups[0]?.winRate ?? 0;
+    const bestExp = quant.setups[0]?.expectancy ?? 0;
+    const bestCount = quant.setups[0]?.count ?? sampleN;
     return [
-      `Desglose por setup sobre ${stats.closedTrades} operaciones cerradas. El setup con mayor esperanza matemática en esta muestra es '${bestSetup}' (Win Rate: ${bestWR}%).`,
-      `Nota: Evalúa la significancia de cada setup considerando el número de operaciones registradas en cada categoría.`
+      {
+        ruleId: "STRAT-TOP-01",
+        period,
+        sampleN,
+        metricsUsed: { bestSetup, bestWR, bestExp, bestCount },
+        text: `Desglose por setup sobre n=${sampleN} operaciones cerradas (${period}): el setup con mayor esperanza matemática observada en esta muestra es '${bestSetup}' (n=${bestCount}, Win Rate: ${bestWR}%, Expectativa: ${bestExp >= 0 ? "+" : "-"}$${Math.abs(bestExp)}).`,
+      },
+      {
+        ruleId: "STRAT-NOTE-02",
+        period,
+        sampleN,
+        metricsUsed: { closedTrades: sampleN },
+        text: `Nota metodológica: Las métricas por setup describen únicamente el histórico registrado en el periodo (n=${sampleN}).`,
+      },
     ];
   }
   if (type === "tax") {
+    const openComm = stats.openExecutionCommission ?? 0;
+    const partialComm = stats.partialRealizedCommission ?? 0;
+    const totalAccrued = stats.totalAccruedCommissions ?? stats.totalCommissions;
     return [
-      `Resumen de conciliación no oficial correspondiente a ${stats.closedTrades} operaciones cerradas. Las comisiones registradas en el periodo suman -$${stats.totalCommissions.toFixed(2)}.`,
-      `P&L Bruto realizado: ${stats.totalGross >= 0 ? "+" : "-"}$${Math.abs(stats.totalGross).toFixed(2)} · P&L Neto realizado (tras comisiones registradas): ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)}.`,
-      `Aviso importante: Este documento es un resumen personal no oficial generado a partir de los registros del usuario. No constituye declaración fiscal, no calcula base imponible ni equivale a liquidaciones o payouts de cuentas de fondeo. Contrasta siempre con el extracto oficial de tu bróker.`
+      {
+        ruleId: "TAX-CLOSED-01",
+        period,
+        sampleN,
+        metricsUsed: { totalGross: stats.totalGross, totalCommissions: stats.totalCommissions, totalNet: stats.totalNet },
+        text: `Resumen de conciliación no oficial (${period}) correspondiente a n=${sampleN} operaciones cerradas: P&L Bruto realizado de ${stats.totalGross >= 0 ? "+" : "-"}$${Math.abs(stats.totalGross).toFixed(2)}, comisiones realizadas en cerradas de -$${stats.totalCommissions.toFixed(2)} y P&L Neto realizado de ${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toFixed(2)}.`,
+      },
+      {
+        ruleId: "TAX-OPEN-02",
+        period,
+        sampleN,
+        metricsUsed: { openPositionsCount: stats.openPositionsCount ?? 0, partialPositionsCount: stats.partialPositionsCount ?? 0, partialRealizedGross: stats.partialRealizedGross ?? 0, partialComm, openComm, totalAccrued },
+        text: `Conciliación separada de posiciones no cerradas: ${stats.openPositionsCount ?? 0} abierta(s) y ${stats.partialPositionsCount ?? 0} parcialmente cerrada(s). Bruto parcial realizado: $${(stats.partialRealizedGross ?? 0).toFixed(2)}, comisión realizada en tramo parcial: -$${partialComm.toFixed(2)}, comisión de entrada devengada en lotes abiertos: -$${openComm.toFixed(2)} (comisión total devengada en el periodo: -$${totalAccrued.toFixed(2)}).`,
+      },
+      {
+        ruleId: "TAX-DISC-03",
+        period,
+        sampleN,
+        metricsUsed: { closedTrades: sampleN },
+        text: `Aviso importante: Este documento es un resumen personal no oficial generado a partir de los registros del usuario. No constituye declaración fiscal, no calcula base imponible ni equivale a liquidaciones o payouts de cuentas de fondeo. Contrasta siempre con el extracto oficial de tu bróker.`,
+      },
     ];
   }
   return [];
+}
+
+const generateNarrative = (type: string, stats: any, quant: any, lang: string, period = "selected"): string[] => {
+  return generateNarrativeTraceability(type, stats, quant, lang, period).map(item => item.text);
 };
 
 export { generatePsychoText, generateNarrative };
@@ -303,8 +504,8 @@ export default function ReportsPage() {
     const QUANT_STATS = calculateQuantStats(trades);
     const hasClosedTrades = STATS.closedTrades > 0 && QUANT_STATS !== null;
 
-    const psycho = generatePsychoText(STATS, language);
-    const narrative = generateNarrative(selType, STATS, QUANT_STATS, language);
+    const psycho = generatePsychoText(STATS, language, periodLabel);
+    const narrative = generateNarrative(selType, STATS, QUANT_STATS, language, periodLabel);
 
     return (
       <div className="max-w-[900px] mx-auto bg-white min-h-screen text-slate-900 font-sans shadow-2xl relative">
@@ -439,11 +640,15 @@ export default function ReportsPage() {
                         <h3 className="text-[11px] print:text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-4 print:mb-2">Excursión Registrada (MAE / MFE)</h3>
                         <div className="flex justify-between items-center mb-3 print:mb-1">
                           <span className="text-[12px] print:text-[11px] text-slate-600 font-medium">MAE Promedio</span>
-                          <span className="text-[13px] print:text-[12px] font-black text-red-500">-${QUANT_STATS.mae}</span>
+                          <span className="text-[13px] print:text-[12px] font-black text-red-500">
+                            {QUANT_STATS.mae !== null ? `-$${QUANT_STATS.mae}` : "No registrado"}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[12px] print:text-[11px] text-slate-600 font-medium">MFE Promedio</span>
-                          <span className="text-[13px] print:text-[12px] font-black text-emerald-600">+${QUANT_STATS.mfe}</span>
+                          <span className="text-[13px] print:text-[12px] font-black text-emerald-600">
+                            {QUANT_STATS.mfe !== null ? `+$${QUANT_STATS.mfe}` : "No registrado"}
+                          </span>
                         </div>
                       </div>
 

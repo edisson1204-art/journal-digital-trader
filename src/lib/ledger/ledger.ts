@@ -85,12 +85,21 @@ export function parseDecimalStrict(value: unknown, field: string): Decimal {
   return d;
 }
 
-function validateExecution(e: Execution) {
+function validateExecution(
+  e: Execution,
+  opts?: { allowZeroPrice?: boolean; allowNegativePrice?: boolean },
+) {
   if (!e.quantity.isFinite() || e.quantity.lte(0)) {
     throw new LedgerError("INVALID_QUANTITY", `Ejecución ${e.id}: la cantidad debe ser > 0`);
   }
-  if (!e.price.isFinite() || e.price.lte(0)) {
-    throw new LedgerError("INVALID_PRICE", `Ejecución ${e.id}: el precio debe ser > 0`);
+  if (!e.price.isFinite()) {
+    throw new LedgerError("INVALID_PRICE", `Ejecución ${e.id}: el precio debe ser un número finito`);
+  }
+  if (e.price.eq(0) && !opts?.allowZeroPrice) {
+    throw new LedgerError("INVALID_PRICE", `Ejecución ${e.id}: el instrumento no admite precio igual a 0`);
+  }
+  if (e.price.lt(0) && !opts?.allowNegativePrice) {
+    throw new LedgerError("INVALID_PRICE", `Ejecución ${e.id}: el instrumento no admite precio negativo`);
   }
   for (const f of e.fees) {
     if (!f.amount.isFinite() || f.amount.lt(0)) {
@@ -105,12 +114,16 @@ const sumFees = (e: Execution) => e.fees.reduce((s, f) => s.plus(f.amount), new 
  * Reconstruye el snapshot de un trade desde sus ejecuciones.
  * La dirección la define la primera ejecución en orden cronológico (orden del array).
  */
-export function computeSnapshot(executions: Execution[], pointValue: Decimal): TradeSnapshot {
+export function computeSnapshot(
+  executions: Execution[],
+  pointValue: Decimal,
+  priceOpts?: { allowZeroPrice?: boolean; allowNegativePrice?: boolean },
+): TradeSnapshot {
   if (executions.length === 0) throw new LedgerError("NO_EXECUTIONS", "El trade no tiene ejecuciones");
   if (!pointValue.isFinite() || pointValue.lte(0)) {
     throw new LedgerError("UNKNOWN_SPEC", "Valor por punto desconocido o no válido");
   }
-  executions.forEach(validateExecution);
+  executions.forEach(e => validateExecution(e, priceOpts));
 
   const openingSide = executions[0].side;
   const direction: Direction = openingSide === "BUY" ? "LONG" : "SHORT";
