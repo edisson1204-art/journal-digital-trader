@@ -1,0 +1,7 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "repair/integridad-ledger-v1": false
+    }
+  }
+}
