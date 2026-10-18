@@ -801,11 +801,11 @@ export default function ReportsPage() {
                             </tr>
                             <tr>
                               <td className="py-2.5 text-slate-600 font-medium">Comisiones en Posiciones Abiertas / Parciales ({STATS.openTrades} ops)</td>
-                              <td className="py-2.5 font-bold text-right text-slate-600 tabular-nums">-${Math.max(0, STATS.accruedCommissions - STATS.totalCommissions).toFixed(2)}</td>
+                              <td className="py-2.5 font-bold text-right text-slate-600 tabular-nums">-${Math.max(0, (STATS.totalAccruedCommissions ?? STATS.totalCommissions) - STATS.totalCommissions).toFixed(2)}</td>
                             </tr>
                             <tr>
                               <td className="py-2.5 text-slate-800 font-bold">Total Comisiones Devengadas en el Periodo</td>
-                              <td className="py-2.5 font-black text-right text-amber-700 tabular-nums">-${STATS.accruedCommissions.toFixed(2)}</td>
+                              <td className="py-2.5 font-black text-right text-amber-700 tabular-nums">-${(STATS.totalAccruedCommissions ?? STATS.totalCommissions).toFixed(2)}</td>
                             </tr>
                           </tbody>
                         </table>
