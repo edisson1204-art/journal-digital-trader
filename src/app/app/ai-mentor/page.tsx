@@ -39,9 +39,9 @@ export default function AIMentorPage() {
      CONTEXTO ENRIQUECIDO — se envía en cada petición
   ════════════════════════════════════════════════════ */
   const tradeContext = useMemo(() => {
-    const closed = trades
+    const closed = [...trades]
       .filter(t => t.result !== "Open")
-      .sort((a, b) => new Date(b.dateOpen).getTime() - new Date(a.dateOpen).getTime());
+      .sort((a, b) => `${b.dateOpen}T${b.timeOpen || "00:00"}`.localeCompare(`${a.dateOpen}T${a.timeOpen || "00:00"}`));
 
     if (closed.length === 0) return null;
 
@@ -55,7 +55,18 @@ export default function AIMentorPage() {
     let longWins = 0, longTotal = 0, shortWins = 0, shortTotal = 0;
     let revengeCount = 0;
 
-    closed.forEach((t, i) => {
+    // Orden cronológico ascendente (más antiguo -> más reciente) para evaluar secuencia temporal
+    const chronological = [...closed].reverse();
+    chronological.forEach((curr, idx) => {
+      if (idx > 0) {
+        const prev = chronological[idx - 1];
+        if (prev.result === "Loss" && curr.totalContracts > prev.totalContracts * 1.3) {
+          revengeCount++;
+        }
+      }
+    });
+
+    closed.forEach((t) => {
       // Días
       const d = days[new Date(t.dateOpen + "T12:00:00").getDay()];
       pnlByDay[d] = (pnlByDay[d] || 0) + (t.netPnl || 0);
@@ -69,12 +80,6 @@ export default function AIMentorPage() {
       // Long/Short
       if (t.side === "Buy") { longTotal++; if (t.result === "Win") longWins++; }
       else { shortTotal++; if (t.result === "Win") shortWins++; }
-      // Revenge
-      if (i < closed.length - 1 && t.result === "Loss") {
-        const prev = closed[i + 1];
-        const diff = new Date(t.dateOpen).getTime() - new Date(prev.dateOpen).getTime();
-        if (diff < 86400000 && t.totalContracts > prev.totalContracts) revengeCount++;
-      }
     });
 
     const bestDay   = Object.entries(pnlByDay).sort(([,a],[,b]) => b - a)[0];
@@ -211,22 +216,23 @@ export default function AIMentorPage() {
       type: "info",
       icon: <Activity className="h-5 w-5 text-blue-accent" />,
       title: "Datos Insuficientes",
-      body: `Necesitas al menos 5 operaciones cerradas para generar patrones estadísticos (tienes ${closed.length}). Registra más trades en el Journal.`,
-      confidence: 100,
+      body: `Necesitas al menos 5 operaciones cerradas para generar observaciones descriptivas (tienes ${closed.length}). Registra más trades en el Journal.`,
+      sampleBadge: `n=${closed.length}`,
       color: "border-blue-accent/30 bg-blue-accent/5",
     }];
 
     if (!tradeContext?.patterns) return [];
     const { patterns } = tradeContext;
     const insights = [];
+    const nBadge = `Muestra n=${closed.length}`;
 
     if (patterns.bestDay && (patterns.bestDayPnl ?? 0) > 0) {
       insights.push({
         type: "performance",
         icon: <TrendingUp className="h-5 w-5 text-green-primary" />,
-        title: `✅ Pico de rendimiento: ${patterns.bestDay}s`,
-        body: `Tus ${patterns.bestDay}s generan el mayor P&L histórico (+$${(patterns.bestDayPnl ?? 0).toFixed(2)}). Considera aumentar tu tamaño de posición un 10–20% solo ese día.`,
-        confidence: 85,
+        title: `✅ Mayor resultado por día: ${patterns.bestDay}s`,
+        body: `En la muestra registrada, los ${patterns.bestDay}s concentran el mayor P&L neto acumulado (+$${Math.abs(patterns.bestDayPnl ?? 0).toFixed(2)}). Mantén las mismas reglas de riesgo y ejecución en esa sesión.`,
+        sampleBadge: nBadge,
         color: "border-green-primary/30 bg-green-primary/5",
       });
     }
@@ -235,9 +241,9 @@ export default function AIMentorPage() {
       insights.push({
         type: "warning",
         icon: <TrendingDown className="h-5 w-5 text-red-loss" />,
-        title: `⚠️ Fuga de capital: ${patterns.worstDay}s`,
-        body: `Los ${patterns.worstDay}s destruyes consistentemente tu capital ($${(patterns.worstDayPnl ?? 0).toFixed(2)}). Considera no operar ese día o reducir el riesgo al 50%.`,
-        confidence: 92,
+        title: `⚠️ Menor resultado por día: ${patterns.worstDay}s`,
+        body: `En la muestra actual, los ${patterns.worstDay}s registran un resultado neto acumulado de -$${Math.abs(patterns.worstDayPnl ?? 0).toFixed(2)}. Revisa si coincide con mayor frecuencia de entradas fuera de plan.`,
+        sampleBadge: nBadge,
         color: "border-red-loss/30 bg-red-loss/5",
       });
     }
@@ -246,9 +252,9 @@ export default function AIMentorPage() {
       insights.push({
         type: "pattern",
         icon: <Target className="h-5 w-5 text-violet-accent" />,
-        title: `🎯 Especialidad: ${patterns.bestAsset} (${patterns.bestAssetWinRate}% WR)`,
-        body: `Tu edge estadístico más sólido está en ${patterns.bestAsset} con $${(patterns.bestAssetPnl ?? 0).toFixed(2)} netos. Concentrar tu operativa aquí maximiza tu expectativa.`,
-        confidence: 88,
+        title: `🎯 Instrumento destacado: ${patterns.bestAsset} (${patterns.bestAssetWinRate}% WR)`,
+        body: `El mayor resultado neto observado corresponde a ${patterns.bestAsset} con +$${Math.abs(patterns.bestAssetPnl ?? 0).toFixed(2)} netos.`,
+        sampleBadge: nBadge,
         color: "border-violet-accent/30 bg-violet-accent/5",
       });
     }
@@ -257,9 +263,9 @@ export default function AIMentorPage() {
       insights.push({
         type: "risk",
         icon: <AlertTriangle className="h-5 w-5 text-yellow-warn" />,
-        title: `🔴 Revenge Trading: ${patterns.revengeCount} casos detectados`,
-        body: `Aumentaste contratos inmediatamente después de una pérdida ${patterns.revengeCount} veces. Matemáticamente este sesgo eleva tu riesgo de ruina en ~42%.`,
-        confidence: 96,
+        title: `🔴 Incremento de posición tras pérdida: ${patterns.revengeCount} caso(s)`,
+        body: `Se detectaron ${patterns.revengeCount} secuencia(s) donde el número de contratos aumentó en más de un 30% inmediatamente después de una operación perdedora. Mantén el riesgo unitario constante tras pérdidas.`,
+        sampleBadge: nBadge,
         color: "border-yellow-warn/30 bg-yellow-warn/5",
       });
     }
@@ -272,9 +278,9 @@ export default function AIMentorPage() {
         insights.push({
           type: "pattern",
           icon: <BarChart2 className="h-5 w-5 text-blue-accent" />,
-          title: `📐 Asimetría direccional: ${better} ${patterns.longWinRate > patterns.shortWinRate ? patterns.longWinRate : patterns.shortWinRate}% vs ${worse} ${patterns.longWinRate < patterns.shortWinRate ? patterns.longWinRate : patterns.shortWinRate}%`,
-          body: `Tu operativa en ${better} es estadísticamente superior en ${diff} puntos porcentuales. Considera eliminar o reducir drasticamente las operaciones en ${worse}.`,
-          confidence: 91,
+          title: `📐 Diferencia direccional observada: ${better} ${patterns.longWinRate > patterns.shortWinRate ? patterns.longWinRate : patterns.shortWinRate}% vs ${worse} ${patterns.longWinRate < patterns.shortWinRate ? patterns.longWinRate : patterns.shortWinRate}%`,
+          body: `En la muestra registrada, las operaciones ${better} presentan una tasa de acierto ${diff} puntos porcentuales mayor que las operaciones ${worse}.`,
+          sampleBadge: nBadge,
           color: "border-blue-accent/30 bg-blue-accent/5",
         });
       }
@@ -284,9 +290,9 @@ export default function AIMentorPage() {
       insights.push({
         type: "performance",
         icon: <Zap className="h-5 w-5 text-yellow-warn" />,
-        title: `⏰ Mejor sesión: ${patterns.bestSession}`,
-        body: `Tus mejores resultados ocurren durante la sesión "${patterns.bestSession}". Alinear tu operativa a esta ventana temporal puede incrementar tu P&L significativamente.`,
-        confidence: 80,
+        title: `⏰ Sesión con mayor retorno: ${patterns.bestSession}`,
+        body: `El mayor P&L neto registrado por sesión ocurrió durante "${patterns.bestSession}".`,
+        sampleBadge: nBadge,
         color: "border-yellow-warn/30 bg-yellow-warn/5",
       });
     }
@@ -327,7 +333,7 @@ export default function AIMentorPage() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="text-[13px] font-semibold text-text-primary leading-tight">{ins.title}</h3>
                     <span className="flex-shrink-0 rounded-full bg-black/20 px-2 py-0.5 text-[9px] font-bold text-text-primary uppercase tracking-wider">
-                      {ins.confidence}% conf.
+                      {ins.sampleBadge}
                     </span>
                   </div>
                   <p className="text-[12px] text-text-secondary leading-relaxed">{ins.body}</p>

@@ -89,10 +89,18 @@ export default function JournalPage() {
         return matchQ && matchR && matchA;
       })
       .sort((a, b) => {
-        let av: string | number = (a as any)[sortField] ?? "";
-        let bv: string | number = (b as any)[sortField] ?? "";
-        if (sortDir === "asc") return av < bv ? -1 : av > bv ? 1 : 0;
-        return av > bv ? -1 : av < bv ? 1 : 0;
+        const av = (a as any)[sortField];
+        const bv = (b as any)[sortField];
+        const aMissing = av === undefined || av === null || av === "";
+        const bMissing = bv === undefined || bv === null || bv === "";
+        if (aMissing && bMissing) return 0;
+        if (aMissing) return 1;
+        if (bMissing) return -1;
+        if (typeof av === "number" && typeof bv === "number") {
+          return sortDir === "asc" ? av - bv : bv - av;
+        }
+        const cmp = String(av).localeCompare(String(bv));
+        return sortDir === "asc" ? cmp : -cmp;
       });
   }, [trades, search, filterResult, filterAsset, sortField, sortDir]);
 

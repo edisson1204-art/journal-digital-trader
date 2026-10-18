@@ -46,6 +46,7 @@ export interface SimStats {
   worstMaxDDPct:   number;
   medianConsecLoss: number;
   sharpeRatio:     number | null;
+  horizonSharpe?:  number | null;
   fanBands:        number[][];   // [step][5 percentiles: p5,p25,p50,p75,p95]
   histogram:       { low: number; high: number; count: number; pct: number }[];
   expectancyPerTrade: number;
@@ -89,7 +90,8 @@ export function runMonteCarlo(
                 (1 - wr) * Math.pow(-(avgLoss + commission) - exp, 2) +
                 wr * sw * sw + (1 - wr) * sl * sl;
   const stdPT = varPT > 1e-12 ? Math.sqrt(varPT) : 0;
-  const sharpe = stdPT > 0 ? (exp / stdPT) * Math.sqrt(numTrades) : null;
+  const sharpe = stdPT > 0 ? exp / stdPT : null;
+  const horizonSharpe = stdPT > 0 ? (exp / stdPT) * Math.sqrt(numTrades) : null;
 
   // Error analysis ONLY when backed by a real historical sample (sampleN !== null && sampleN > 0)
   const hasHistoricalSample = sampleN !== null && sampleN > 0;
@@ -205,6 +207,7 @@ export function runMonteCarlo(
     worstMaxDDPct:   Math.max(...ddPcts, 0),
     medianConsecLoss: pctile(streaks, 0.50),
     sharpeRatio:     sharpe,
+    horizonSharpe,
     fanBands,
     histogram,
     expectancyPerTrade: exp,
@@ -461,18 +464,23 @@ export function resolveSimParams(params: {
   const { mode, balance, winRate, avgWin, avgLoss, varPct, comm, nTrades, nSims, journalStats, journalN } = params;
   const B  = Math.max(1, parseFinite(balance, 10000));
   const WR = mode === "journal"
-    ? parseFloat(journalStats.winRate.toFixed(1))
+    ? (journalStats.closedTrades > 0 && typeof journalStats.wins === "number"
+        ? (journalStats.wins / journalStats.closedTrades) * 100
+        : journalStats.winRate)
     : Math.min(100, Math.max(0, parseFinite(winRate, 60)));
   const AW = mode === "journal"
-    ? parseFloat(Math.abs(journalStats.avgWin).toFixed(2))
+    ? Math.abs(journalStats.avgWin)
     : Math.max(0, parseFinite(avgWin, 150));
   const AL = mode === "journal"
-    ? parseFloat(Math.abs(journalStats.avgLoss).toFixed(2))
+    ? Math.abs(journalStats.avgLoss)
     : Math.max(0, parseFinite(avgLoss, 75));
   // STA-02: Preserve explicit 0% variability and $0 commission instead of replacing with 40% via ||
   const VA = Math.max(0, parseFinite(varPct, 40));
+  // SIM-R3-01: En modo Journal, journalStats.avgWin y avgLoss YA son netos de comisiones.
+  // Si se restara CM de nuevo en cada trade simulado, la comisión se descontaría dos veces.
+  const journalAvgComm = parseFloat((journalStats.totalCommissions / Math.max(journalStats.closedTrades, 1)).toFixed(3));
   const CM = mode === "journal"
-    ? parseFloat((journalStats.totalCommissions / Math.max(journalStats.closedTrades, 1)).toFixed(3))
+    ? 0
     : Math.max(0, parseFinite(comm, 0));
   const NT = Math.min(Math.max(1, parseInt(nTrades) || 100), 500);
   const NS = Math.min(Math.max(1, parseInt(nSims)   || 1000), 5000);
@@ -493,7 +501,7 @@ export function resolveSimParams(params: {
       ? "Buena (50-99 trades)"
       : "Excelente (100+ trades)";
   const canRun = mode === "manual" ? B > 0 && NT > 0 && NS > 0 : journalN > 0;
-  return { B, WR, AW, AL, VA, CM, NT, NS, SN, initialAdequacyLabel, canRun };
+  return { B, WR, AW, AL, VA, CM, journalAvgComm, NT, NS, SN, initialAdequacyLabel, canRun };
 }
 
 export default function SimulatorPage() {

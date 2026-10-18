@@ -14,7 +14,7 @@ function CustomTooltip({ active, payload, label }: any) {
       <div className="rounded-xl border border-border-card bg-bg-card p-3 shadow-card">
         <p className="text-[10px] text-text-muted mb-1">{label}</p>
         <p className={`text-lg font-bold tabular-nums leading-none ${pnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-          {pnl >= 0 ? "+" : ""}${pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {pnl >= 0 ? "+" : "-"}${Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
     );
@@ -27,14 +27,14 @@ function EquityChart({ trades }: { trades: any[] }) {
   const data = useMemo(() => {
     const closed = [...trades]
       .filter(t => t.result !== "Open")
-      .sort((a, b) => new Date(a.dateOpen).getTime() - new Date(b.dateOpen).getTime());
+      .sort((a, b) => `${a.dateOpen}T${a.timeOpen || "00:00"}`.localeCompare(`${b.dateOpen}T${b.timeOpen || "00:00"}`));
     const result = [{ date: "Inicio", equity: 0 }];
     let current = 0;
     for (const t of closed) {
       current += t.netPnl || 0;
       result.push({
         date: `${t.dateOpen} ${t.timeOpen}`,
-        equity: current,
+        equity: parseFloat(current.toFixed(2)),
       });
     }
     return result.length > 1 ? result : [{ date: "Inicio", equity: 0 }, { date: "Hoy", equity: 0 }];
@@ -167,7 +167,7 @@ export default function AppDashboard() {
             {/* Quick stats */}
             <div className="rounded-card border border-border-card bg-bg-card p-6 grid grid-cols-2 gap-4 flex-1">
               {[
-                { label:t("dashboard.avgRR"),     value: hasClosed ? `1:${stats.avgRMultiple}` : "—",   color:"text-green-primary" },
+                { label:t("dashboard.avgRR"),     value: hasClosed ? `${stats.avgRMultiple >= 0 ? "+" : ""}${stats.avgRMultiple.toFixed(2)}R` : "—",   color: stats.avgRMultiple >= 0 ? "text-green-primary" : "text-red-loss" },
                 { label:"Expectancy",  value: hasClosed ? `${stats.expectancy >= 0 ? "+" : "-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—", color: stats.expectancy >= 0 ? "text-green-primary":"text-red-loss" },
                 { label:"Avg Loss",    value: stats.losses > 0 ? `-$${Math.abs(stats.avgLoss).toFixed(2)}` : "—",         color:"text-red-loss"      },
                 { label:"Avg Win",     value: stats.wins > 0 ? `+$${Math.abs(stats.avgWin).toFixed(2)}` : "—",         color:"text-blue-accent"   },
@@ -200,6 +200,7 @@ export default function AppDashboard() {
                 {recentTrades.map(t => {
                   const pnlVal = t.netPnl;
                   const isWin = (pnlVal || 0) > 0;
+                  const isBE = pnlVal === 0;
                   return (
                   <tr key={t.id} className="border-b border-border-card/30 hover:bg-white/3 transition-colors">
                     <td className="px-4 py-2.5 font-semibold text-text-primary">{t.instrument}</td>
@@ -207,7 +208,7 @@ export default function AppDashboard() {
                     <td className={`px-4 py-2.5 font-medium ${t.side === "Buy" ? "text-green-primary" : "text-red-loss"}`}>{t.side}</td>
                     <td className="px-4 py-2.5 tabular-nums text-text-secondary">{t.avgEntryPrice}</td>
                     <td className="px-4 py-2.5 tabular-nums text-text-secondary">{t.avgExitPrice || "Abierto"}</td>
-                    <td className={`px-4 py-2.5 tabular-nums font-bold ${pnlVal === undefined || pnlVal === null ? "text-text-muted" : isWin ? "text-green-primary" : "text-red-loss"}`}>
+                    <td className={`px-4 py-2.5 tabular-nums font-bold ${pnlVal === undefined || pnlVal === null ? "text-text-muted" : isWin ? "text-green-primary" : isBE ? "text-yellow-warn" : "text-red-loss"}`}>
                       {pnlVal === undefined || pnlVal === null ? "—" : `${pnlVal >= 0 ? "+" : "-"}$${Math.abs(pnlVal).toFixed(2)}`}
                     </td>
                     <td className="px-4 py-2.5 text-text-muted">{t.dateOpen}</td>

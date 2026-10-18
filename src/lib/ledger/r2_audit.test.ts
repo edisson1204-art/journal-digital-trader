@@ -437,7 +437,7 @@ describe("R2-02 — Pruebas de Integración de Flujo, Persistencia, Concurrencia
     const reportTrades = filterReportTrades(state.trades, "month", "2026-10", "2026", "all");
     const reportQuant = calculateQuantStats(reportTrades)!;
     const narrative = generateNarrative("monthly", computeStats(reportTrades), reportQuant, "es", "2026-10");
-    expect(reportQuant.efficiencyActive).toBe(-200);
+    expect(reportQuant.efficiencyActive).toBe(-200.18);
     expect(narrative[0]).toContain("-$200.18");
   });
 

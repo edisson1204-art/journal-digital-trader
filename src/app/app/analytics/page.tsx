@@ -1,6 +1,6 @@
 "use client";
 
-import { formatProfitFactor } from "@/lib/tradeTypes";
+import { computeStats, formatProfitFactor } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { useState, useMemo } from "react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -20,7 +20,7 @@ function EquityTooltip({ active, payload, label }: any) {
       <div className="rounded-xl border border-border-card bg-bg-card p-3 shadow-card">
         <p className="text-[10px] text-text-muted mb-1">{label}</p>
         <p className={`text-[14px] font-bold tabular-nums leading-none ${val >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-          {val >= 0 ? "+" : ""}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {val >= 0 ? "+" : "-"}${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
     );
@@ -35,7 +35,7 @@ function DrawdownTooltip({ active, payload, label }: any) {
       <div className="rounded-xl border border-border-card bg-bg-card p-3 shadow-card">
         <p className="text-[10px] text-text-muted mb-1">{label}</p>
         <p className="text-[14px] font-bold tabular-nums text-red-loss leading-none">
-          {val === 0 ? "$0" : `-$${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          {val === 0 ? "$0.00" : `-$${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         </p>
         <p className="text-[9px] text-text-muted mt-0.5">Caída desde el pico máximo</p>
       </div>
@@ -51,7 +51,7 @@ function BarTooltip({ active, payload, label }: any) {
       <div className="rounded-xl border border-border-card bg-bg-card p-3 shadow-card">
         <p className="text-[10px] text-text-muted mb-1">{label}</p>
         <p className={`text-[14px] font-bold tabular-nums leading-none ${val >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-          {val >= 0 ? "+" : ""}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {val >= 0 ? "+" : "-"}${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
     );
@@ -67,7 +67,7 @@ function PieTooltip({ active, payload }: any) {
         <p className="text-[11px] font-bold text-text-primary mb-1">{d.name}</p>
         <p className="text-[10px] text-text-muted">{d.trades} trades · {d.pct}%</p>
         <p className={`text-[13px] font-bold tabular-nums mt-1 ${d.pnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-          {d.pnl >= 0 ? "+" : ""}${d.pnl.toLocaleString()}
+          {d.pnl >= 0 ? "+" : "-"}${Math.abs(d.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
     );
@@ -80,12 +80,19 @@ function PieTooltip({ active, payload }: any) {
 ════════════════════════════════════════════════ */
 const PIE_COLORS = ["#20E58D", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#06B6D4", "#F97316", "#84CC16"];
 
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /* ════════════════════════════════════════════════
    PÁGINA PRINCIPAL
 ════════════════════════════════════════════════ */
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState("6M");
-  const { trades, stats, isHydrated } = useTradeStore();
+  const { trades, isHydrated } = useTradeStore();
 
   /* ── Filtrado por período ── */
   const filteredByPeriod = useMemo(() => {
@@ -98,10 +105,14 @@ export default function AnalyticsPage() {
     else if (period === "1Y") cutoff.setFullYear(now.getFullYear() - 1);
     else cutoff.setFullYear(2000);
 
+    const cutoffKey = toLocalDateStr(cutoff);
     return trades
-      .filter(t => t.result !== "Open" && new Date(t.dateOpen) >= cutoff)
-      .sort((a, b) => new Date(a.dateOpen).getTime() - new Date(b.dateOpen).getTime());
+      .filter(t => t.result !== "Open" && (t.dateOpen || "").slice(0, 10) >= cutoffKey)
+      .sort((a, b) => `${a.dateOpen}T${a.timeOpen || "00:00"}`.localeCompare(`${b.dateOpen}T${b.timeOpen || "00:00"}`));
   }, [trades, period]);
+
+  /* ── Estadísticas correlacionadas al período activo ── */
+  const periodStats = useMemo(() => computeStats(filteredByPeriod), [filteredByPeriod]);
 
   /* ── 1. Curva de Equity ── */
   const equityData = useMemo(() => {
@@ -154,7 +165,7 @@ export default function AnalyticsPage() {
     };
     const weeks: Record<string, number> = {};
     for (const t of filteredByPeriod) {
-      const d = new Date(t.dateOpen);
+      const d = new Date(`${(t.dateOpen || "").slice(0, 10)}T12:00:00`);
       const key = `${d.getFullYear()}-W${String(getISOWeek(d)).padStart(2, "0")}`;
       weeks[key] = (weeks[key] || 0) + (t.netPnl || 0);
     }
@@ -179,7 +190,7 @@ export default function AnalyticsPage() {
         value: d.trades,
         trades: d.trades,
         pct: Math.round((d.trades / total) * 100),
-        pnl: Math.round(d.pnl),
+        pnl: parseFloat(d.pnl.toFixed(2)),
         winRate: Math.round((d.wins / d.trades) * 100),
       }))
       .sort((a, b) => b.trades - a.trades);
@@ -243,8 +254,8 @@ export default function AnalyticsPage() {
       name,
       trades: data.total,
       winRate: Math.round((data.wins / data.total) * 100),
-      pnlRaw: data.pnl,
-      pnl: `${data.pnl >= 0 ? "+" : "-"}$${Math.abs(data.pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+      pnlRaw: parseFloat(data.pnl.toFixed(2)),
+      pnl: `${data.pnl >= 0 ? "+" : "-"}$${Math.abs(data.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       color: data.pnl >= 0 ? "bg-green-primary" : "bg-red-loss",
     })).sort((a, b) => b.pnlRaw - a.pnlRaw);
   }, [filteredByPeriod]);
@@ -252,7 +263,7 @@ export default function AnalyticsPage() {
   /* ── 7. Rendimiento por Instrumento (tabla) ── */
   const instrumentData = useMemo(() => instrumentPieData.map(d => ({
     sym: d.name, trades: d.trades, winRate: d.winRate,
-    pnlRaw: d.pnl, pnl: `${d.pnl >= 0 ? "+" : "-"}$${Math.abs(d.pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+    pnlRaw: d.pnl, pnl: `${d.pnl >= 0 ? "+" : "-"}$${Math.abs(d.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
   })), [instrumentPieData]);
 
   if (!isHydrated) return null;
@@ -262,7 +273,7 @@ export default function AnalyticsPage() {
     "6M": "últimos 6 meses", "1Y": "último año", "Todos": "histórico completo",
   };
 
-  const hasClosed = stats.closedTrades > 0;
+  const hasClosed = periodStats.closedTrades > 0;
 
   return (
     <AppShell title="Analytics" subtitle={`Análisis estadístico — ${periodLabel[period]}`}>
@@ -288,15 +299,15 @@ export default function AnalyticsPage() {
           </span>
         </div>
 
-        {/* ── KPIs ── */}
+        {/* ── KPIs (Correlacionados al período seleccionado) ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: "Net P&L",       value: `${stats.totalNet >= 0 ? "+" : "-"}$${Math.abs(stats.totalNet).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,       color: stats.totalNet >= 0 ? "text-green-primary" : "text-red-loss" },
-            { label: "Win Rate",      value: hasClosed ? `${stats.winRate}%` : "—",                                                           color: hasClosed && stats.winRate >= 50 ? "text-blue-accent" : "text-yellow-warn" },
-            { label: "Profit Factor", value: `${formatProfitFactor(stats)}`,                                                       color: (stats.profitFactor ?? 0) >= 1.5 ? "text-green-primary" : "text-yellow-warn" },
-            { label: "Avg R:R",       value: hasClosed ? `1:${stats.avgRMultiple}` : "—",                                                     color: "text-text-primary" },
-            { label: "Max Drawdown",  value: hasClosed ? `-$${Math.abs(stats.maxDrawdown).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00",                           color: "text-red-loss" },
-            { label: "Expectancy",    value: hasClosed ? `${stats.expectancy >= 0 ? "+" : "-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—",         color: stats.expectancy >= 0 ? "text-green-primary" : "text-red-loss" },
+            { label: "Net P&L",       value: `${periodStats.totalNet >= 0 ? "+" : "-"}$${Math.abs(periodStats.totalNet).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,       color: periodStats.totalNet >= 0 ? "text-green-primary" : "text-red-loss" },
+            { label: "Win Rate",      value: hasClosed ? `${periodStats.winRate}%` : "—",                                                           color: hasClosed && periodStats.winRate >= 50 ? "text-blue-accent" : "text-yellow-warn" },
+            { label: "Profit Factor", value: `${formatProfitFactor(periodStats)}`,                                                       color: (periodStats.profitFactor ?? 0) >= 1.5 ? "text-green-primary" : "text-yellow-warn" },
+            { label: "Avg R-Multiple", value: hasClosed ? `${periodStats.avgRMultiple >= 0 ? "+" : ""}${periodStats.avgRMultiple.toFixed(2)}R` : "—", color: periodStats.avgRMultiple >= 0 ? "text-green-primary" : "text-red-loss" },
+            { label: "Max Drawdown",  value: hasClosed ? `-$${Math.abs(periodStats.maxDrawdown).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00",                           color: "text-red-loss" },
+            { label: "Expectancy",    value: hasClosed ? `${periodStats.expectancy >= 0 ? "+" : "-"}$${Math.abs(periodStats.expectancy).toFixed(2)}` : "—",         color: periodStats.expectancy >= 0 ? "text-green-primary" : "text-red-loss" },
           ].map(m => (
             <div key={m.label} className="rounded-card border border-border-card bg-bg-card p-3">
               <p className="text-[10px] text-text-muted mb-1">{m.label}</p>
@@ -381,8 +392,8 @@ export default function AnalyticsPage() {
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
                 {[
-                  { label: "Max Drawdown", value: `$${Math.abs(ddStats.max).toLocaleString()}`, color: "text-red-loss" },
-                  { label: "DD Promedio",  value: `$${Math.abs(ddStats.avg).toLocaleString()}`,  color: "text-yellow-warn" },
+                  { label: "Max Drawdown", value: `-$${Math.abs(ddStats.max).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-red-loss" },
+                  { label: "DD Promedio",  value: `-$${Math.abs(ddStats.avg).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,  color: "text-yellow-warn" },
                   { label: "Trades en DD", value: `${ddStats.daysUnderwater}`,                   color: "text-text-muted" },
                 ].map(s => (
                   <div key={s.label} className="text-right">
@@ -465,7 +476,7 @@ export default function AnalyticsPage() {
                       <span className="text-[11px] text-text-secondary font-medium truncate">{d.name}</span>
                       <span className="text-[10px] text-text-muted ml-auto">{d.pct}%</span>
                       <span className={`text-[10px] font-bold tabular-nums ${d.pnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-                        {d.pnl >= 0 ? "+" : ""}${d.pnl.toLocaleString()}
+                        {d.pnl >= 0 ? "+" : "-"}${Math.abs(d.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   ))}

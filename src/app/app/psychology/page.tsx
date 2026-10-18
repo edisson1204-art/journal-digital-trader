@@ -14,7 +14,9 @@ export default function PsychologyPage() {
   const isHydrated = useTradeStore(s => s.isHydrated);
 
   const psych = useMemo(() => {
-    const closed = trades.filter(t => t.result !== "Open");
+    const closed = [...trades]
+      .filter(t => t.result !== "Open")
+      .sort((a, b) => `${a.dateOpen}T${a.timeOpen || "00:00"}`.localeCompare(`${b.dateOpen}T${b.timeOpen || "00:00"}`));
     if (closed.length < 3) return null;
 
     // 1. Distribución de emociones (real)
@@ -30,7 +32,7 @@ export default function PsychologyPage() {
       .map(([label, d]) => ({
         label,
         count: d.count,
-        pnl: d.pnl,
+        pnl: parseFloat(d.pnl.toFixed(2)),
         winRate: Math.round((d.wins / d.count) * 100),
         pct: (d.count / closed.length) * 100,
       }))
@@ -43,7 +45,7 @@ export default function PsychologyPage() {
 
     // 3. P&L emocional: diferencia entre operar con mejor vs peor emoción
     const emotionalPnlDiff = bestEmotion && worstEmotion
-      ? Math.round(bestEmotion.pnl - worstEmotion.pnl)
+      ? parseFloat((bestEmotion.pnl - worstEmotion.pnl).toFixed(2))
       : 0;
 
     // 4. Rendimiento por día de la semana (real)
@@ -61,7 +63,7 @@ export default function PsychologyPage() {
       .map(([dow, d]) => ({
         day: DOW_NAMES[Number(dow)],
         dow: Number(dow),
-        pnl: Math.round(d.pnl),
+        pnl: parseFloat(d.pnl.toFixed(2)),
         trades: d.trades,
         wins: d.wins,
         winRate: Math.round((d.wins / d.trades) * 100),
@@ -86,10 +88,12 @@ export default function PsychologyPage() {
       Math.min(Math.max((100 - (worstDay ? Math.abs(worstDay.pnl) / 20 : 0)), 0), 100) * 0.3
     );
 
+    const fmtPnl = (v: number) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
+
     // 7. Patrones de comportamiento reales detectados
     const behaviors: { behavior: string; detail: string; impact: string; positive: boolean }[] = [];
 
-    // Revenge Trading: ¿opera con más contratos después de una pérdida?
+    // Revenge Trading: ¿opera con más contratos inmediatamente después de una pérdida? (orden cronológico ascendente)
     let revengeTrades = 0;
     for (let i = 1; i < closed.length; i++) {
       const prev = closed[i - 1];
@@ -106,12 +110,12 @@ export default function PsychologyPage() {
       behaviors.push({
         behavior: "Revenge Trading",
         detail: `Detectado ${revengeTrades} veces — subes posición tras pérdidas`,
-        impact: `${revPnl >= 0 ? "+" : ""}$${Math.round(revPnl)}`,
+        impact: fmtPnl(revPnl),
         positive: revPnl > 0,
       });
     }
 
-    // Sobreoperiación: días con más de 5 trades
+    // Sobreoperación: días con más de 5 trades
     const dailyTrades: Record<string, number> = {};
     closed.forEach(t => { dailyTrades[t.dateOpen] = (dailyTrades[t.dateOpen] || 0) + 1; });
     const overTradingDays = Object.values(dailyTrades).filter(n => n > 5).length;
@@ -122,7 +126,7 @@ export default function PsychologyPage() {
       behaviors.push({
         behavior: "Sobreoperación",
         detail: `${overTradingDays} días con más de 5 trades`,
-        impact: `${overTradingPnl >= 0 ? "+" : ""}$${Math.round(overTradingPnl)}`,
+        impact: fmtPnl(overTradingPnl),
         positive: overTradingPnl > 0,
       });
     }
@@ -134,7 +138,7 @@ export default function PsychologyPage() {
       behaviors.push({
         behavior: "Adherencia al Plan",
         detail: `${planFollowRate}% de trades siguiendo el plan`,
-        impact: `Siguiendo: ${followedPnl >= 0 ? "+" : ""}$${Math.round(followedPnl)} | Sin plan: $${Math.round(notFollowedPnl)}`,
+        impact: `Siguiendo: ${fmtPnl(followedPnl)} | Sin plan: ${fmtPnl(notFollowedPnl)}`,
         positive: followedPnl > notFollowedPnl,
       });
     }
@@ -144,7 +148,7 @@ export default function PsychologyPage() {
       behaviors.push({
         behavior: `Mejor Estado Mental: "${bestEmotion.label}"`,
         detail: `${bestEmotion.count} trades con ${bestEmotion.winRate}% win rate`,
-        impact: `${bestEmotion.pnl >= 0 ? "+" : ""}$${Math.round(bestEmotion.pnl)}`,
+        impact: fmtPnl(bestEmotion.pnl),
         positive: bestEmotion.pnl > 0,
       });
     }
@@ -163,7 +167,7 @@ export default function PsychologyPage() {
       .map(([label, d]) => ({
         label,
         count: d.count,
-        pnl: Math.round(d.pnl)
+        pnl: parseFloat(d.pnl.toFixed(2)),
       }))
       .sort((a, b) => b.count - a.count);
 
@@ -222,11 +226,11 @@ export default function PsychologyPage() {
               value: psych.worstDay?.day ?? "—",
               color: "text-red-loss",
               icon: AlertTriangle,
-              sub: psych.worstDay ? `$${Math.round(psych.worstDay.pnl)} neto` : "",
+              sub: psych.worstDay ? `${psych.worstDay.pnl >= 0 ? "+" : "-"}$${Math.abs(psych.worstDay.pnl).toFixed(2)} neto` : "",
             },
             {
               label: "P&L Emocional",
-              value: `${psych.emotionalPnlDiff >= 0 ? "+" : ""}$${psych.emotionalPnlDiff}`,
+              value: `${psych.emotionalPnlDiff >= 0 ? "+" : "-"}$${Math.abs(psych.emotionalPnlDiff).toFixed(2)}`,
               color: psych.emotionalPnlDiff >= 0 ? "text-green-primary" : "text-red-loss",
               icon: psych.emotionalPnlDiff >= 0 ? Target : AlertTriangle,
               sub: "Mejor vs peor estado mental",
@@ -264,7 +268,7 @@ export default function PsychologyPage() {
                     </div>
                     <span className="text-[10px] text-text-muted w-12 text-right">{d.trades}T</span>
                     <span className={`text-[12px] font-bold tabular-nums w-20 text-right ${d.pnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-                      {d.pnl >= 0 ? "+" : ""}${d.pnl.toLocaleString()}
+                      {d.pnl >= 0 ? "+" : "-"}${Math.abs(d.pnl).toFixed(2)}
                     </span>
                   </div>
                 );
@@ -389,7 +393,7 @@ export default function PsychologyPage() {
                         </div>
                       </div>
                       <span className={`text-[13px] font-bold tabular-nums ${m.pnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-                        {m.pnl >= 0 ? "+" : ""}${m.pnl.toLocaleString()}
+                        {m.pnl >= 0 ? "+" : "-"}${Math.abs(m.pnl).toFixed(2)}
                       </span>
                     </div>
                   ))}

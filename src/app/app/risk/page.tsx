@@ -237,8 +237,8 @@ export default function RiskToolsPage() {
     return [
       {
         label:    "Pérdida Diaria Actual",
-        value:    `${todayPnl >= 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(0)}`,
-        limit:    `$${Math.abs(maxDailyLoss).toFixed(0)}`,
+        value:    `${todayPnl >= 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(2)}`,
+        limit:    `$${Math.abs(maxDailyLoss).toFixed(2)}`,
         pct:      maxDailyLoss < 0 ? Math.min(100, (Math.abs(Math.min(todayPnl, 0)) / Math.abs(maxDailyLoss)) * 100) : 0,
         color:    todayPnl < maxDailyLoss * 0.7 ? "text-red-loss" : todayPnl < 0 ? "text-yellow-warn" : "text-green-primary",
         bar:      todayPnl < maxDailyLoss * 0.7 ? "bg-red-loss" : "bg-yellow-warn",
@@ -246,8 +246,8 @@ export default function RiskToolsPage() {
       },
       {
         label:    "Pérdida Semanal Actual",
-        value:    `${weekPnl >= 0 ? "+" : "-"}$${Math.abs(weekPnl).toFixed(0)}`,
-        limit:    `$${Math.abs(maxWeeklyLoss).toFixed(0)}`,
+        value:    `${weekPnl >= 0 ? "+" : "-"}$${Math.abs(weekPnl).toFixed(2)}`,
+        limit:    `$${Math.abs(maxWeeklyLoss).toFixed(2)}`,
         pct:      maxWeeklyLoss < 0 ? Math.min(100, (Math.abs(Math.min(weekPnl, 0)) / Math.abs(maxWeeklyLoss)) * 100) : 0,
         color:    weekPnl < maxWeeklyLoss * 0.7 ? "text-red-loss" : weekPnl < 0 ? "text-yellow-warn" : "text-green-primary",
         bar:      weekPnl < maxWeeklyLoss * 0.7 ? "bg-red-loss" : "bg-blue-accent",
@@ -469,7 +469,7 @@ export default function RiskToolsPage() {
                     <span className="text-[12px] text-text-secondary">{r.label}</span>
                     <div className="flex items-center gap-2 text-[11px]">
                       <span className={`font-bold tabular-nums ${r.color}`}>{r.value}</span>
-                      <span className="text-text-muted">/ límite ${r.limit}</span>
+                      <span className="text-text-muted">/ límite {r.limit}</span>
                     </div>
                   </div>
                   <div className="h-2 rounded-full bg-border-card overflow-hidden">

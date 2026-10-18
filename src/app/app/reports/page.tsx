@@ -1,10 +1,14 @@
 "use client";
 
+import Decimal from "decimal.js";
 import { formatProfitFactor } from "@/lib/tradeTypes";
 import { useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { FileText, Calendar as CalendarIcon, Briefcase, Landmark, Download, BarChart2, X, Brain, Cpu, Target, TrendingUp, AlertTriangle, Clock, Crosshair, Globe } from "lucide-react";
 import { useSettingsStore } from "@/store/settingsStore";
+
+const round2dp = (n: number): number =>
+  new Decimal(Number.isFinite(n) ? n : 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
 
 const REPORT_TYPES = [
   { id: "monthly",    title: "Reporte Mensual P&L",               icon: CalendarIcon, color: "text-green-primary", desc: "Ganancias, días operativos y performance del mes." },
@@ -66,10 +70,10 @@ export function calculateQuantStats(trades: TradeRecord[]) {
   const tradesWithMae = closed.filter(t => t.mae !== undefined && t.mae !== null && Number.isFinite(t.mae));
   const tradesWithMfe = closed.filter(t => t.mfe !== undefined && t.mfe !== null && Number.isFinite(t.mfe));
   const mae: number | null = tradesWithMae.length > 0
-    ? Math.round(tradesWithMae.reduce((acc, t) => acc + (t.mae as number), 0) / tradesWithMae.length)
+    ? round2dp(tradesWithMae.reduce((acc, t) => acc + (t.mae as number), 0) / tradesWithMae.length)
     : null;
   const mfe: number | null = tradesWithMfe.length > 0
-    ? Math.round(tradesWithMfe.reduce((acc, t) => acc + (t.mfe as number), 0) / tradesWithMfe.length)
+    ? round2dp(tradesWithMfe.reduce((acc, t) => acc + (t.mfe as number), 0) / tradesWithMfe.length)
     : null;
 
   // R2-06: Eliminado el contrafactual "Set & Forget" (efficiencyPassive) sin serie intratrade real
@@ -77,7 +81,7 @@ export function calculateQuantStats(trades: TradeRecord[]) {
 
   const setupGroups: Record<string, { wins: number, count: number, net: number }> = {};
   closed.forEach(t => {
-    const s = t.setup || "General";
+    const s = t.setup || t.strategy || "General";
     if (!setupGroups[s]) setupGroups[s] = { wins: 0, count: 0, net: 0 };
     setupGroups[s].count++;
     setupGroups[s].net += t.netPnl ?? 0;
@@ -86,9 +90,10 @@ export function calculateQuantStats(trades: TradeRecord[]) {
   const setups = Object.entries(setupGroups).map(([name, data]) => ({
     name,
     count: data.count,
-    winRate: Math.round((data.wins / data.count) * 100),
-    expectancy: Math.round(data.net / data.count),
-  })).sort((a,b) => b.expectancy - a.expectancy).slice(0, 3);
+    winRate: round2dp((data.wins / data.count) * 100),
+    netPnl: round2dp(data.net),
+    expectancy: round2dp(data.net / data.count),
+  })).sort((a,b) => b.expectancy - a.expectancy).slice(0, 6);
 
   const sessionGroups: Record<string, { wins: number, count: number, net: number }> = {};
   closed.forEach(t => {
@@ -101,8 +106,8 @@ export function calculateQuantStats(trades: TradeRecord[]) {
   const sessions = Object.entries(sessionGroups).map(([name, data]) => ({
     name,
     count: data.count,
-    winRate: Math.round((data.wins / data.count) * 100),
-    pnl: Math.round(data.net),
+    winRate: round2dp((data.wins / data.count) * 100),
+    pnl: round2dp(data.net),
   })).sort((a,b) => b.pnl - a.pnl).slice(0, 4);
 
   const holdingGroups = [
@@ -127,8 +132,8 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     .map(g => ({
       type: g.name,
       count: g.count,
-      winRate: g.count ? Math.round((g.wins / g.count) * 100) : 0, 
-      pnl: Math.round(g.net)
+      winRate: g.count ? round2dp((g.wins / g.count) * 100) : 0, 
+      pnl: round2dp(g.net)
     }));
 
   const stats = computeStats(closed);
@@ -162,15 +167,15 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     shortCount: shorts.length,
     longWinRate: Math.round(longWinRate * 10) / 10,
     shortWinRate: Math.round(shortWinRate * 10) / 10,
-    bestAsset: bestAsset[0], bestAssetPnl: Math.round(bestAsset[1]),
-    worstAsset: worstAsset[0], worstAssetPnl: Math.round(worstAsset[1]),
+    bestAsset: bestAsset[0], bestAssetPnl: round2dp(bestAsset[1]),
+    worstAsset: worstAsset[0], worstAssetPnl: round2dp(worstAsset[1]),
     riskOfRuin,
     mae,
     mfe,
     recordedMaeCount: tradesWithMae.length,
     recordedMfeCount: tradesWithMfe.length,
     unrecordedHoldTimeCount,
-    efficiencyActive: Math.round(efficiencyActive),
+    efficiencyActive: round2dp(efficiencyActive),
     recoveryDays,
     sessions, holdingTimes, setups
   };
@@ -311,7 +316,7 @@ export function generateNarrativeTraceability(
           period,
           sampleN,
           metricsUsed: { bestSetup, bestWR, bestExp, bestCount },
-          text: `Setup breakdown across n=${sampleN} closed trades (${period}): highest observed expectancy in this sample is '${bestSetup}' (n=${bestCount}, Win Rate: ${bestWR}%, Expectancy: ${bestExp >= 0 ? "+" : "-"}$${Math.abs(bestExp)}).`,
+          text: `Setup breakdown across n=${sampleN} closed trades (${period}): highest observed expectancy in this sample is '${bestSetup}' (n=${bestCount}, Win Rate: ${bestWR}%, Expectancy: ${bestExp >= 0 ? "+" : "-"}$${Math.abs(bestExp).toFixed(2)}).`,
         },
         {
           ruleId: "STRAT-NOTE-02",
@@ -415,7 +420,7 @@ export function generateNarrativeTraceability(
         period,
         sampleN,
         metricsUsed: { bestSetup, bestWR, bestExp, bestCount },
-        text: `Desglose por setup sobre n=${sampleN} operaciones cerradas (${period}): el setup con mayor esperanza matemática observada en esta muestra es '${bestSetup}' (n=${bestCount}, Win Rate: ${bestWR}%, Expectativa: ${bestExp >= 0 ? "+" : "-"}$${Math.abs(bestExp)}).`,
+        text: `Desglose por setup sobre n=${sampleN} operaciones cerradas (${period}): el setup con mayor esperanza matemática observada en esta muestra es '${bestSetup}' (n=${bestCount}, Win Rate: ${bestWR}%, Expectativa: ${bestExp >= 0 ? "+" : "-"}$${Math.abs(bestExp).toFixed(2)}).`,
       },
       {
         ruleId: "STRAT-NOTE-02",
@@ -624,11 +629,11 @@ export default function ReportsPage() {
                           <tbody>
                             <tr>
                               <td className="py-2 print:py-1 text-slate-700 font-bold">Mayor retorno: {QUANT_STATS.bestAsset}</td>
-                              <td className="text-right text-emerald-600 font-black">{QUANT_STATS.bestAssetPnl >= 0 ? "+" : "-"}${Math.abs(QUANT_STATS.bestAssetPnl)}</td>
+                              <td className="text-right text-emerald-600 font-black tabular-nums">{QUANT_STATS.bestAssetPnl >= 0 ? "+" : "-"}${Math.abs(QUANT_STATS.bestAssetPnl).toFixed(2)}</td>
                             </tr>
                             <tr>
                               <td className="py-2 print:py-1 text-slate-700 font-bold">Menor retorno: {QUANT_STATS.worstAsset}</td>
-                              <td className="text-right text-red-500 font-black">{QUANT_STATS.worstAssetPnl >= 0 ? "+" : "-"}${Math.abs(QUANT_STATS.worstAssetPnl)}</td>
+                              <td className="text-right text-red-500 font-black tabular-nums">{QUANT_STATS.worstAssetPnl >= 0 ? "+" : "-"}${Math.abs(QUANT_STATS.worstAssetPnl).toFixed(2)}</td>
                             </tr>
                           </tbody>
                         </table>
@@ -640,14 +645,14 @@ export default function ReportsPage() {
                         <h3 className="text-[11px] print:text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-4 print:mb-2">Excursión Registrada (MAE / MFE)</h3>
                         <div className="flex justify-between items-center mb-3 print:mb-1">
                           <span className="text-[12px] print:text-[11px] text-slate-600 font-medium">MAE Promedio</span>
-                          <span className="text-[13px] print:text-[12px] font-black text-red-500">
-                            {QUANT_STATS.mae !== null ? `-$${QUANT_STATS.mae}` : "No registrado"}
+                          <span className="text-[13px] print:text-[12px] font-black text-red-500 tabular-nums">
+                            {QUANT_STATS.mae !== null ? `-$${QUANT_STATS.mae.toFixed(2)}` : "No registrado"}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[12px] print:text-[11px] text-slate-600 font-medium">MFE Promedio</span>
-                          <span className="text-[13px] print:text-[12px] font-black text-emerald-600">
-                            {QUANT_STATS.mfe !== null ? `+$${QUANT_STATS.mfe}` : "No registrado"}
+                          <span className="text-[13px] print:text-[12px] font-black text-emerald-600 tabular-nums">
+                            {QUANT_STATS.mfe !== null ? `+$${QUANT_STATS.mfe.toFixed(2)}` : "No registrado"}
                           </span>
                         </div>
                       </div>
@@ -656,8 +661,8 @@ export default function ReportsPage() {
                         <h3 className="text-[11px] print:text-[10px] font-bold uppercase tracking-wider text-indigo-700 mb-4 print:mb-2">Resultado Realizado</h3>
                         <div className="flex justify-between items-center mb-3 print:mb-1">
                           <span className="text-[12px] print:text-[11px] text-slate-600 font-medium">PnL Neto Realizado</span>
-                          <span className="text-[13px] print:text-[12px] font-black text-slate-800">
-                            {QUANT_STATS.efficiencyActive >= 0 ? "+" : "-"}${Math.abs(QUANT_STATS.efficiencyActive).toLocaleString()}
+                          <span className="text-[13px] print:text-[12px] font-black text-slate-800 tabular-nums">
+                            {QUANT_STATS.efficiencyActive >= 0 ? "+" : "-"}${Math.abs(QUANT_STATS.efficiencyActive).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -748,6 +753,64 @@ export default function ReportsPage() {
                         ))}
                       </tbody>
                     </table>
+
+                    {selType === "strategy" && QUANT_STATS && (
+                      <div className="mt-8 border border-slate-200 bg-white p-6 rounded-xl shadow-sm avoid-break">
+                        <h3 className="text-[11px] print:text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+                          <Crosshair className="h-4 w-4" /> Desglose por Estrategia / Setup ({STATS.closedTrades} ops cerradas)
+                        </h3>
+                        <table className="w-full text-[13px] print:text-[11px]">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-left">
+                              <th className="pb-2.5 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Setup</th>
+                              <th className="pb-2.5 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-center">Muestra (n)</th>
+                              <th className="pb-2.5 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-center">Win Rate</th>
+                              <th className="pb-2.5 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-right">Net P&L</th>
+                              <th className="pb-2.5 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-right">Expectativa / Trade</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {QUANT_STATS.setups.map((setup: any, idx: number) => (
+                              <tr key={idx}>
+                                <td className="py-3 font-bold text-slate-800">{setup.name}</td>
+                                <td className="py-3 text-center font-semibold text-slate-600 tabular-nums">{setup.count}</td>
+                                <td className="py-3 text-center font-bold text-blue-600 tabular-nums">{setup.winRate.toFixed(2)}%</td>
+                                <td className={`py-3 text-right font-bold tabular-nums ${setup.netPnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                  {setup.netPnl >= 0 ? `+$${setup.netPnl.toFixed(2)}` : `-$${Math.abs(setup.netPnl).toFixed(2)}`}
+                                </td>
+                                <td className={`py-3 text-right font-black tabular-nums ${setup.expectancy >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                  {setup.expectancy >= 0 ? `+$${setup.expectancy.toFixed(2)}` : `-$${Math.abs(setup.expectancy).toFixed(2)}`}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selType === "tax" && (
+                      <div className="mt-8 border border-slate-200 bg-slate-50 p-6 rounded-xl avoid-break">
+                        <h3 className="text-[11px] print:text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-4">
+                          Conciliación de Comisiones y Operaciones Abiertas / Parciales
+                        </h3>
+                        <table className="w-full text-[13px] print:text-[11px]">
+                          <tbody className="divide-y divide-slate-200">
+                            <tr>
+                              <td className="py-2.5 text-slate-600 font-medium">Comisiones en Trades Cerrados (Realizadas)</td>
+                              <td className="py-2.5 font-bold text-right text-amber-600 tabular-nums">-${STATS.totalCommissions.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                              <td className="py-2.5 text-slate-600 font-medium">Comisiones en Posiciones Abiertas / Parciales ({STATS.openTrades} ops)</td>
+                              <td className="py-2.5 font-bold text-right text-slate-600 tabular-nums">-${Math.max(0, STATS.accruedCommissions - STATS.totalCommissions).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                              <td className="py-2.5 text-slate-800 font-bold">Total Comisiones Devengadas en el Periodo</td>
+                              <td className="py-2.5 font-black text-right text-amber-700 tabular-nums">-${STATS.accruedCommissions.toFixed(2)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </>
                 )}
               </>
@@ -779,8 +842,8 @@ export default function ReportsPage() {
                         <p className="text-[13px] font-bold text-slate-800">{session.name}</p>
                         <p className="text-[11px] text-slate-500">Win Rate: {session.winRate}%</p>
                       </div>
-                      <div className={`text-[14px] font-black ${session.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {session.pnl >= 0 ? `+$${session.pnl}` : `-$${Math.abs(session.pnl)}`}
+                      <div className={`text-[14px] font-black tabular-nums ${session.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {session.pnl >= 0 ? `+$${session.pnl.toFixed(2)}` : `-$${Math.abs(session.pnl).toFixed(2)}`}
                       </div>
                     </div>
                   ))}
@@ -798,8 +861,8 @@ export default function ReportsPage() {
                         <p className="text-[13px] font-bold text-slate-800">{ht.type}</p>
                         <p className="text-[11px] text-slate-500">Win Rate: {ht.winRate}%</p>
                       </div>
-                      <div className={`text-[14px] font-black ${ht.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {ht.pnl >= 0 ? `+$${ht.pnl}` : `-$${Math.abs(ht.pnl)}`}
+                      <div className={`text-[14px] font-black tabular-nums ${ht.pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {ht.pnl >= 0 ? `+$${ht.pnl.toFixed(2)}` : `-$${Math.abs(ht.pnl).toFixed(2)}`}
                       </div>
                     </div>
                   ))}
@@ -823,9 +886,9 @@ export default function ReportsPage() {
                   {QUANT_STATS.setups.map((setup: any, idx: number) => (
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="py-4 font-bold text-slate-800">{setup.name}</td>
-                      <td className="py-4 text-center font-bold text-blue-600">{setup.winRate}%</td>
-                      <td className={`py-4 text-right font-black ${setup.expectancy >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {setup.expectancy >= 0 ? `+$${setup.expectancy}` : `-$${Math.abs(setup.expectancy)}`}
+                      <td className="py-4 text-center font-bold text-blue-600 tabular-nums">{setup.winRate.toFixed(2)}%</td>
+                      <td className={`py-4 text-right font-black tabular-nums ${setup.expectancy >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {setup.expectancy >= 0 ? `+$${setup.expectancy.toFixed(2)}` : `-$${Math.abs(setup.expectancy).toFixed(2)}`}
                       </td>
                     </tr>
                   ))}

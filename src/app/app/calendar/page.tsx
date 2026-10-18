@@ -46,7 +46,7 @@ function DayDetailPanel({ date, dayTrades, onClose }: {
         </div>
         <div className="flex items-center gap-3">
           <p className={`text-[20px] font-black tabular-nums ${dayPnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-            {dayPnl >= 0 ? "+" : ""}${Math.abs(dayPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {dayPnl >= 0 ? "+" : "-"}${Math.abs(dayPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <button
             onClick={onClose}
@@ -85,7 +85,7 @@ function DayDetailPanel({ date, dayTrades, onClose }: {
               </div>
               <div className="text-right">
                 <p className={`text-[14px] font-bold tabular-nums ${(t.netPnl || 0) >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-                  {(t.netPnl || 0) >= 0 ? "+" : ""}${Math.abs(t.netPnl || 0).toFixed(2)}
+                  {(t.netPnl || 0) >= 0 ? "+" : "-"}${Math.abs(t.netPnl || 0).toFixed(2)}
                 </p>
                 {t.rMultiple !== undefined && t.rMultiple !== null && (
                   <p className={`text-[10px] font-medium ${t.rMultiple >= 0 ? "text-blue-accent" : "text-red-loss"}`}>
@@ -99,18 +99,21 @@ function DayDetailPanel({ date, dayTrades, onClose }: {
       </div>
 
       {/* Day summary footer */}
-      {dayTrades.length > 0 && (
-        <div className="px-5 py-3 border-t border-border-card/40 bg-bg-section/30 flex items-center justify-between text-[11px]">
-          <span className="text-text-muted">
-            Comisiones: <strong className="text-text-secondary">${dayTrades.reduce((s,t) => s + (t.totalCommission || 0), 0).toFixed(2)}</strong>
-          </span>
-          <span className="text-text-muted">
-            Gross P&L: <strong className={dayPnl >= 0 ? "text-green-primary" : "text-red-loss"}>
-              {dayPnl >= 0 ? "+" : ""}${dayTrades.reduce((s,t) => s + (t.grossPnl || 0), 0).toFixed(2)}
-            </strong>
-          </span>
-        </div>
-      )}
+      {dayTrades.length > 0 && (() => {
+        const dayGross = dayTrades.reduce((s, t) => s + (t.grossPnl || 0), 0);
+        return (
+          <div className="px-5 py-3 border-t border-border-card/40 bg-bg-section/30 flex items-center justify-between text-[11px]">
+            <span className="text-text-muted">
+              Comisiones: <strong className="text-text-secondary">-${dayTrades.reduce((s,t) => s + (t.totalCommission || 0), 0).toFixed(2)}</strong>
+            </span>
+            <span className="text-text-muted">
+              Gross P&L: <strong className={dayGross >= 0 ? "text-green-primary" : "text-red-loss"}>
+                {dayGross >= 0 ? "+" : "-"}${Math.abs(dayGross).toFixed(2)}
+              </strong>
+            </span>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -125,14 +128,16 @@ export default function CalendarPage() {
 
   /* ── Mapa de días con trades ── */
   const TRADE_DAYS = useMemo(() => {
-    const map: Record<string, { pnl: number; trades: number; wins: number }> = {};
+    const map: Record<string, { pnl: number; trades: number; wins: number; losses: number; breakevens: number }> = {};
     const closed = trades.filter(t => t.result !== "Open");
     for (const t of closed) {
       const d = t.dateOpen;
-      if (!map[d]) map[d] = { pnl: 0, trades: 0, wins: 0 };
-      map[d].pnl += t.netPnl || 0;
+      if (!map[d]) map[d] = { pnl: 0, trades: 0, wins: 0, losses: 0, breakevens: 0 };
+      map[d].pnl = parseFloat((map[d].pnl + (t.netPnl || 0)).toFixed(2));
       map[d].trades++;
       if (t.result === "Win") map[d].wins++;
+      else if (t.result === "Loss") map[d].losses++;
+      else map[d].breakevens++;
     }
     return map;
   }, [trades]);
@@ -152,7 +157,7 @@ export default function CalendarPage() {
 
   const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
   const monthKeys   = Object.keys(TRADE_DAYS).filter(k => k.startsWith(monthPrefix));
-  const monthPnl    = monthKeys.reduce((s, k) => s + TRADE_DAYS[k].pnl, 0);
+  const monthPnl    = parseFloat(monthKeys.reduce((s, k) => s + TRADE_DAYS[k].pnl, 0).toFixed(2));
   const monthTrades = monthKeys.reduce((s, k) => s + TRADE_DAYS[k].trades, 0);
   const monthWins   = monthKeys.reduce((s, k) => s + TRADE_DAYS[k].wins, 0);
   const tradingDays = monthKeys.length;
@@ -169,7 +174,7 @@ export default function CalendarPage() {
         {/* ── KPIs del mes ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { label: "Net P&L del Mes",   value: `${monthPnl >= 0 ? "+" : ""}$${Math.abs(monthPnl).toLocaleString()}`, color: monthPnl >= 0 ? "text-green-primary" : "text-red-loss" },
+            { label: "Net P&L del Mes",   value: `${monthPnl >= 0 ? "+" : "-"}$${Math.abs(monthPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: monthPnl >= 0 ? "text-green-primary" : "text-red-loss" },
             { label: "Días Operados",     value: String(tradingDays),   color: "text-text-primary" },
             { label: "Total Trades",      value: String(monthTrades),   color: "text-text-primary" },
             { label: "Días con Profit",   value: String(profitDays),    color: "text-green-primary" },
@@ -227,7 +232,7 @@ export default function CalendarPage() {
                       isWeekend ? "bg-bg-section/30 border border-transparent cursor-default" :
                       "bg-bg-section/50 border border-border-card/30 hover:border-border-card cursor-default"
                     } ${isToday ? "ring-2 ring-green-primary/50" : ""}`}
-                    title={data ? `Clic para ver ${data.trades} trade${data.trades > 1 ? "s" : ""} — P&L: ${data.pnl >= 0 ? "+" : ""}$${data.pnl.toFixed(0)}` : undefined}
+                    title={data ? `Clic para ver ${data.trades} trade${data.trades > 1 ? "s" : ""} — P&L: ${data.pnl >= 0 ? "+" : "-"}$${Math.abs(data.pnl).toFixed(2)}` : undefined}
                   >
                     <span className={`text-[11px] font-bold ${data ? "opacity-90" : isWeekend ? "text-text-muted" : "text-text-secondary"}`}>
                       {day}
@@ -235,7 +240,7 @@ export default function CalendarPage() {
                     {data && (
                       <div>
                         <p className="text-[11px] font-extrabold tabular-nums leading-tight">
-                          {data.pnl >= 0 ? "+" : ""}${Math.abs(data.pnl).toLocaleString()}
+                          {data.pnl >= 0 ? "+" : "-"}${Math.abs(data.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                         <p className="text-[9px] opacity-75">{data.trades}T · {data.wins}W</p>
                       </div>
@@ -299,11 +304,13 @@ export default function CalendarPage() {
                             }
                             <div>
                               <p className="text-[12px] font-semibold text-text-primary capitalize">{dow} {parseInt(dd)}</p>
-                              <p className="text-[10px] text-text-muted">{d.trades} trades · {d.wins}W · {d.trades - d.wins}L</p>
+                              <p className="text-[10px] text-text-muted">
+                                {d.trades} trades · {d.wins}W · {d.losses}L{d.breakevens > 0 ? ` · ${d.breakevens}BE` : ""}
+                              </p>
                             </div>
                           </div>
                           <p className={`text-[14px] font-extrabold tabular-nums ${d.pnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-                            {d.pnl >= 0 ? "+" : ""}${Math.abs(d.pnl).toLocaleString()}
+                            {d.pnl >= 0 ? "+" : "-"}${Math.abs(d.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </button>
                       );
