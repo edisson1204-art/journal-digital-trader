@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Award,
   Lock,
-  Layers,
   X,
 } from "lucide-react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -37,12 +36,28 @@ export interface PropAccountConfig {
   maxDailyLoss: number;
   maxTotalLoss: number;
   minTradingDays: number;
-  consistencyRulePct: number; // ej. 40% en LucidFlex, 50% en TopStep, 0% en LucidPro
-  maxMicros?: number;         // ej. 40 Micros (4 Minis) en Lucy Trading $50K
+  consistencyRulePct: number; // ej. 40% en MFFU Starter / LucidFlex, 50% en TopStep, 0% en MFFU Expert / LucidPro
+  maxMicros?: number;         // ej. 50 Micros (5 Minis) en MFFU Expert $50K, 40 en Lucy $50K
   status: "Active" | "Passed" | "Breached";
 }
 
 const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
+  {
+    id: "default-mffu-50k",
+    name: "My Funded Futures (MFFU) $50K",
+    firm: "My Funded Futures (MFFU)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "my_funded_futures",
+    initialBalance: 50000,
+    profitTarget: 3000,
+    maxDailyLoss: 1200,
+    maxTotalLoss: 2000,
+    minTradingDays: 2,
+    consistencyRulePct: 40,
+    maxMicros: 50,
+    status: "Active",
+  },
   {
     id: "default-lucy-50k",
     name: "Lucy Trading / LucidPro $50K",
@@ -108,6 +123,81 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
 ];
 
 const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
+  {
+    name: "MFFU (My Funded Futures) Starter/Core $50K",
+    firm: "My Funded Futures (MFFU)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "my_funded_futures",
+    initialBalance: 50000,
+    profitTarget: 3000,
+    maxDailyLoss: 1200,
+    maxTotalLoss: 2000,
+    minTradingDays: 2,
+    consistencyRulePct: 40,
+    maxMicros: 30,
+    status: "Active",
+  },
+  {
+    name: "MFFU (My Funded Futures) Expert/Pro $50K",
+    firm: "My Funded Futures (MFFU)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "my_funded_futures",
+    initialBalance: 50000,
+    profitTarget: 3000,
+    maxDailyLoss: 0,
+    maxTotalLoss: 2000,
+    minTradingDays: 2,
+    consistencyRulePct: 0,
+    maxMicros: 50,
+    status: "Active",
+  },
+  {
+    name: "MFFU (My Funded Futures) Starter $100K",
+    firm: "My Funded Futures (MFFU)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "my_funded_futures",
+    initialBalance: 100000,
+    profitTarget: 6000,
+    maxDailyLoss: 2400,
+    maxTotalLoss: 3000,
+    minTradingDays: 2,
+    consistencyRulePct: 40,
+    maxMicros: 60,
+    status: "Active",
+  },
+  {
+    name: "MFFU (My Funded Futures) Expert/Pro $100K",
+    firm: "My Funded Futures (MFFU)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "my_funded_futures",
+    initialBalance: 100000,
+    profitTarget: 6000,
+    maxDailyLoss: 0,
+    maxTotalLoss: 3000,
+    minTradingDays: 2,
+    consistencyRulePct: 0,
+    maxMicros: 100,
+    status: "Active",
+  },
+  {
+    name: "MFFU (My Funded Futures) Expert $150K",
+    firm: "My Funded Futures (MFFU)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "my_funded_futures",
+    initialBalance: 150000,
+    profitTarget: 9000,
+    maxDailyLoss: 0,
+    maxTotalLoss: 4500,
+    minTradingDays: 2,
+    consistencyRulePct: 0,
+    maxMicros: 150,
+    status: "Active",
+  },
   {
     name: "Lucy Trading / LucidPro $50K",
     firm: "Lucy Trading (Lucid)",
@@ -214,21 +304,6 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
-    name: "My Funded Futures (MFFU) $50K",
-    firm: "My Funded Futures",
-    accountType: "Evaluación / Challenge",
-    filterMode: "funded",
-    brokerFilter: "my_funded_futures",
-    initialBalance: 50000,
-    profitTarget: 3000,
-    maxDailyLoss: 1200,
-    maxTotalLoss: 2000,
-    minTradingDays: 2,
-    consistencyRulePct: 40,
-    maxMicros: 50,
-    status: "Active",
-  },
-  {
     name: "Take Profit Trader $50K",
     firm: "Take Profit Trader",
     accountType: "Evaluación / Challenge",
@@ -260,7 +335,7 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
   },
 ];
 
-const STORAGE_KEY = "tdi_prop_accounts_v2";
+const STORAGE_KEY = "tdi_prop_accounts_v3";
 
 function ProgressBar({ value, max, color = "bg-green-primary" }: {
   value: number; max: number; color?: string;
@@ -292,7 +367,6 @@ function RuleRow({
 }) {
   if (limit <= 0) return null;
   const rawPct = (Math.max(0, current) / limit) * 100;
-  const pct = Math.min(rawPct, 100);
 
   let color = "bg-green-primary";
   let textColor = "text-green-primary";
@@ -401,7 +475,7 @@ export default function AccountsPage() {
       const currentProfit = stats.totalNet;
       const currentBalance = parseFloat((acc.initialBalance + currentProfit).toFixed(2));
 
-      // EOD High-Water Mark y Piso de Liquidación EOD (con candado en Balance Inicial como Lucy Trading / TopStep)
+      // EOD High-Water Mark y Piso de Liquidación EOD (con candado en Balance Inicial como MFFU / Lucy / TopStep)
       let runningBalance = acc.initialBalance;
       let eodHighWaterMark = acc.initialBalance;
       for (const d of sortedDays) {
@@ -474,18 +548,18 @@ export default function AccountsPage() {
   const openNewAccountModal = () => {
     setEditingAccount({
       id: `acc-${Date.now()}`,
-      name: "Lucy Trading / LucidPro $50K",
-      firm: "Lucy Trading (Lucid)",
+      name: "My Funded Futures (MFFU) $50K",
+      firm: "My Funded Futures (MFFU)",
       accountType: "Evaluación / Challenge",
       filterMode: "funded",
-      brokerFilter: "lucid_trading",
+      brokerFilter: "my_funded_futures",
       initialBalance: 50000,
       profitTarget: 3000,
       maxDailyLoss: 1200,
       maxTotalLoss: 2000,
-      minTradingDays: 3,
+      minTradingDays: 2,
       consistencyRulePct: 40,
-      maxMicros: 40,
+      maxMicros: 50,
       status: "Active",
     });
     setIsModalOpen(true);
@@ -549,20 +623,20 @@ export default function AccountsPage() {
   return (
     <AppShell
       title="Cuentas de Trading & Prop Firms"
-      subtitle="Monitoreo en tiempo real conectado 1:1 con las operaciones de tu Journal (Lucy Trading / Lucid, TopStep, Apex, MFFU, FTMO)"
+      subtitle="Monitoreo en tiempo real conectado 1:1 con tu Journal (My Funded Futures MFFU, Lucy Trading / Lucid, TopStep, Apex, TPT, FTMO)"
     >
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
 
         {/* ── Barra superior: Selector de cuentas + Botón Crear/Configurar ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2.5">
             {computedAccounts.map(item => {
               const isSel = item.config.id === active.config.id;
               return (
                 <button
                   key={item.config.id}
                   onClick={() => setSelectedId(item.config.id)}
-                  className={`flex flex-col items-start rounded-card border px-4 py-3 transition-all text-left min-w-[215px] ${
+                  className={`flex flex-col items-start rounded-card border px-4 py-3 transition-all text-left min-w-[205px] ${
                     isSel
                       ? "bg-green-primary/10 border-green-primary/40 shadow-green-glow"
                       : "border-border-card bg-bg-card hover:bg-bg-section/60"
@@ -734,7 +808,7 @@ export default function AccountsPage() {
               ) : (
                 <div className="rounded-lg border border-border-card/60 bg-bg-section/40 px-4 py-2.5 flex items-center justify-between text-[12px]">
                   <span className="text-text-secondary font-medium">Límite de Pérdida Diaria (Daily Loss Limit)</span>
-                  <span className="text-green-primary font-bold">Sin límite diario en este plan (ej. LucidFlex / Apex)</span>
+                  <span className="text-green-primary font-bold">Sin límite diario en este plan (ej. MFFU Expert/Pro / LucidFlex / Apex)</span>
                 </div>
               )}
 
@@ -866,7 +940,7 @@ export default function AccountsPage() {
                   },
                   {
                     ok: consistencyOk,
-                    label: acc.consistencyRulePct > 0 ? `Regla de Consistencia ≤ ${acc.consistencyRulePct}%` : "Sin regla de consistencia (LucidPro / Libre)",
+                    label: acc.consistencyRulePct > 0 ? `Regla de Consistencia ≤ ${acc.consistencyRulePct}%` : "Sin regla de consistencia (MFFU Expert / LucidPro)",
                   },
                 ].map((c, i) => (
                   <div key={i} className="flex items-center gap-2.5 text-[12px]">
@@ -901,7 +975,7 @@ export default function AccountsPage() {
               {/* Plantillas rápidas de Prop Firm */}
               <div className="mb-4">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-text-muted block mb-2">
-                  Cargar Plantilla Oficial (1 clic — incluye Lucy Trading / LucidPro & LucidFlex)
+                  Cargar Plantilla Oficial (1 clic — incluye My Funded Futures MFFU y Lucy Trading / Lucid)
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {PROP_PRESETS.map(p => (
@@ -910,7 +984,7 @@ export default function AccountsPage() {
                       type="button"
                       onClick={() => setEditingAccount({ ...p, id: editingAccount.id })}
                       className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                        p.firm.includes("Lucy")
+                        p.firm.includes("My Funded") || p.firm.includes("Lucy")
                           ? "border-green-primary/40 bg-green-primary/10 text-green-primary hover:bg-green-primary/20"
                           : "border-border-card bg-bg-section text-text-secondary hover:border-green-primary/40 hover:text-green-primary"
                       }`}
@@ -945,7 +1019,7 @@ export default function AccountsPage() {
                   <select
                     value={
                       editingAccount.filterMode === "broker"
-                        ? `broker:${editingAccount.brokerFilter || "lucid_trading"}`
+                        ? `broker:${editingAccount.brokerFilter || "my_funded_futures"}`
                         : editingAccount.filterMode
                     }
                     onChange={e => {
@@ -966,10 +1040,10 @@ export default function AccountsPage() {
                     className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
                   >
                     <option value="funded">Todas las Cuentas Fondeadas / Prop Firm</option>
+                    <option value="broker:my_funded_futures">Solo Bróker: My Funded Futures (MFFU)</option>
                     <option value="broker:lucid_trading">Solo Bróker: Lucy Trading / Lucid Trading</option>
                     <option value="broker:topstep">Solo Bróker: TopStep</option>
                     <option value="broker:apex">Solo Bróker: Apex Trader Funding</option>
-                    <option value="broker:my_funded_futures">Solo Bróker: My Funded Futures (MFFU)</option>
                     <option value="broker:take_profit_trader">Solo Bróker: Take Profit Trader</option>
                     <option value="personal">Cuenta Personal</option>
                     <option value="all">Todas las Operaciones (Global)</option>
@@ -1030,10 +1104,10 @@ export default function AccountsPage() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Límite de Contratos Micros (ej. 40 Micros = 4 Minis en Lucy $50K, 60 en $100K)</label>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Límite de Contratos Micros (ej. 30/50 Micros en MFFU $50K, 40 en Lucy $50K)</label>
                   <input
                     type="number"
-                    value={editingAccount.maxMicros ?? 40}
+                    value={editingAccount.maxMicros ?? 50}
                     onChange={e => setEditingAccount({ ...editingAccount, maxMicros: Number(e.target.value) || 0 })}
                     className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
                   />
