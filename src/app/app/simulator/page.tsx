@@ -1,7 +1,7 @@
 "use client";
 
 import Decimal from "decimal.js";
-import { formatProfitFactor, computeStats } from "@/lib/tradeTypes";
+import { formatProfitFactor, computeStats, isStrictlyClosed } from "@/lib/tradeTypes";
 import { wilsonInterval, seededRandom } from "@/lib/ledger/metrics";
 import { AppShell } from "@/components/AppShell";
 import { useState, useMemo } from "react";
@@ -48,6 +48,7 @@ export interface SimStats {
   sharpeRatio:     number | null;
   horizonSharpe?:  number | null;
   fanBands:        number[][];   // [step][5 percentiles: p5,p25,p50,p75,p95]
+  samplePaths?:    number[][];   // [pathIdx][step] representative individual trajectories
   histogram:       { low: number; high: number; count: number; pct: number }[];
   expectancyPerTrade: number;
   rrRatio:         number;
@@ -219,6 +220,10 @@ export function runMonteCarlo(
     medianConsecLoss: pctile(streaks, 0.50),
     sharpeRatio:     sharpe,
     horizonSharpe,
+    samplePaths: Array.from({ length: Math.min(24, numSims) }, (_, idx) => {
+      const simIdx = Math.min(numSims - 1, Math.floor((idx * numSims) / Math.min(24, numSims)));
+      return fanMatrix.map(stepVals => stepVals[simIdx] ?? 0);
+    }),
     fanBands,
     histogram,
     expectancyPerTrade: exp,
@@ -330,7 +335,437 @@ export function generateReport(
 /* ══════════════════════════════════════════════════════════
    SVG COMPONENTS
 ══════════════════════════════════════════════════════════ */
-function FanChart({ bands, startBalance, numTrades }: {
+function FanChart({ bands, samplePaths = [], startBalance, numTrades }: {
+  bands: number[][]; samplePaths?: number[][]; startBalance: number; numTrades: number;
+}) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [showPaths, setShowPaths] = useState<boolean>(true);
+  const [zoomMode, setZoomMode] = useState<"full" | "cone">("full");
+
+  const W = 1060, H = 310;
+  const PAD_L = 74, PAD_R = 128, PAD_T = 18, PAD_B = 34;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_T - PAD_B;
+
+  if (!bands.length) return null;
+
+  const N = bands.length;
+  // En modo "cone", enfocamos el último 65% de las operaciones o el rango real sin forzar piso artificial
+  const startStep = zoomMode === "cone" && N > 12 ? Math.floor(N * 0.35) : 0;
+  const visibleBands = bands.slice(startStep);
+  const visN = visibleBands.length;
+
+  const pathVals = showPaths
+    ? samplePaths.flatMap(p => p.slice(startStep)).filter(Number.isFinite)
+    : [];
+  const allV = [...visibleBands.flat().filter(Number.isFinite), ...pathVals];
+
+  const rawMin = Math.min(...allV, zoomMode === "full" ? startBalance * 0.96 : Infinity);
+  const rawMax = Math.max(...allV, zoomMode === "full" ? startBalance * 1.04 : -Infinity);
+  const span = Math.max(rawMax - rawMin, Math.max(startBalance * 0.05, 50));
+  const minV = Math.max(0, rawMin - span * 0.06);
+  const maxV = rawMax + span * 0.06;
+  const range = maxV - minV || 1;
+
+  const px = (localIdx: number) =>
+    PAD_L + (visN <= 1 ? 0 : (localIdx / (visN - 1)) * plotW);
+  const py = (v: number) =>
+    PAD_T + plotH - ((v - minV) / range) * plotH;
+
+  const path = (pi: number) =>
+    visibleBands.map((b, i) => `${i === 0 ? "M" : "L"}${px(i).toFixed(1)},${py(b[pi]).toFixed(1)}`).join(" ");
+
+  const revPath = (pi: number) =>
+    [...visibleBands].reverse().map((b, i) =>
+      `L${px(visN - 1 - i).toFixed(1)},${py(b[pi]).toFixed(1)}`
+    ).join(" ");
+
+  const area = (loPI: number, hiPI: number) =>
+    path(loPI) + " " + revPath(hiPI) + " Z";
+
+  const gridLevels = [0, 0.25, 0.5, 0.75, 1].map(t => ({
+    y: PAD_T + plotH * t,
+    val: maxV - range * t,
+  }));
+
+  // Etiquetas derechas en T_final con separación anti-colisión
+  const finalBand = visibleBands[visN - 1] ?? [startBalance, startBalance, startBalance, startBalance, startBalance];
+  const rawCallouts = [
+    { pi: 4, label: "P95", val: finalBand[4], color: "#3B82F6", bg: "rgba(59,130,246,0.16)", border: "rgba(59,130,246,0.45)", rawY: py(finalBand[4]) },
+    { pi: 3, label: "P75", val: finalBand[3], color: "#F59E0B", bg: "rgba(245,158,11,0.14)", border: "rgba(245,158,11,0.40)", rawY: py(finalBand[3]) },
+    { pi: 2, label: "P50", val: finalBand[2], color: "#20E58D", bg: "rgba(32,229,141,0.20)", border: "rgba(32,229,141,0.55)", rawY: py(finalBand[2]) },
+    { pi: 1, label: "P25", val: finalBand[1], color: "#F59E0B", bg: "rgba(245,158,11,0.14)", border: "rgba(245,158,11,0.40)", rawY: py(finalBand[1]) },
+    { pi: 0, label: "P5",  val: finalBand[0], color: "#EF4444", bg: "rgba(239,68,68,0.16)",  border: "rgba(239,68,68,0.45)",  rawY: py(finalBand[0]) },
+  ];
+  const minGap = 22;
+  const callouts = rawCallouts.map(c => ({ ...c, y: c.rawY }));
+  for (let i = 1; i < callouts.length; i++) {
+    if (callouts[i].y - callouts[i - 1].y < minGap) {
+      callouts[i].y = callouts[i - 1].y + minGap;
+    }
+  }
+  if (callouts[callouts.length - 1].y > PAD_T + plotH + 8) {
+    const overflow = callouts[callouts.length - 1].y - (PAD_T + plotH + 8);
+    callouts.forEach(c => { c.y -= overflow; });
+  }
+
+  const activeLocalIdx = hoverIdx !== null ? Math.min(visN - 1, Math.max(0, hoverIdx)) : null;
+  const activeStep = activeLocalIdx !== null ? startStep + activeLocalIdx : null;
+  const activeBand = activeLocalIdx !== null ? visibleBands[activeLocalIdx] : null;
+  const activeTradeNum = activeStep !== null ? Math.round((activeStep / Math.max(1, N - 1)) * numTrades) : null;
+
+  return (
+    <div className="relative select-none">
+      {/* Controles visuales de la curva */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setZoomMode("full")}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all border ${
+              zoomMode === "full"
+                ? "bg-green-primary/15 text-green-primary border-green-primary/35"
+                : "bg-bg-section text-text-muted border-border-card hover:text-text-secondary"
+            }`}
+          >
+            Vista Completa (T0–T{numTrades})
+          </button>
+          <button
+            type="button"
+            onClick={() => setZoomMode("cone")}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all border ${
+              zoomMode === "cone"
+                ? "bg-blue-accent/15 text-blue-accent border-blue-accent/35"
+                : "bg-bg-section text-text-muted border-border-card hover:text-text-secondary"
+            }`}
+          >
+            Zoom Abanico (Dispersión Final)
+          </button>
+          {samplePaths.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowPaths(v => !v)}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all border ${
+                showPaths
+                  ? "bg-violet-500/15 text-violet-300 border-violet-500/35"
+                  : "bg-bg-section text-text-muted border-border-card hover:text-text-secondary"
+              }`}
+            >
+              {showPaths ? "Ocultar Trayectorias (24)" : "Mostrar Trayectorias (24)"}
+            </button>
+          )}
+        </div>
+        <p className="text-[10px] text-text-muted">
+          Pasa el cursor sobre la curva para inspeccionar percentiles por operación
+        </p>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto max-h-[360px] overflow-visible"
+        onMouseLeave={() => setHoverIdx(null)}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const relX = ((e.clientX - rect.left) / rect.width) * W;
+          if (relX < PAD_L - 8 || relX > PAD_L + plotW + 8) {
+            setHoverIdx(null);
+            return;
+          }
+          const ratio = Math.min(1, Math.max(0, (relX - PAD_L) / plotW));
+          setHoverIdx(Math.round(ratio * (visN - 1)));
+        }}
+      >
+        <defs>
+          <linearGradient id="mcOuterBand" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.06" />
+            <stop offset="50%" stopColor="#20E58D" stopOpacity="0.11" />
+            <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.18" />
+          </linearGradient>
+          <linearGradient id="mcInnerBand" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#20E58D" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#20E58D" stopOpacity="0.28" />
+          </linearGradient>
+          <filter id="mcMedianGlow" x="-10%" y="-20%" width="120%" height="140%">
+            <feDropShadow dx="0" dy="0" stdDeviation="3.5" floodColor="#20E58D" floodOpacity="0.45" />
+          </filter>
+        </defs>
+
+        {/* Fondo del área de trazado */}
+        <rect
+          x={PAD_L}
+          y={PAD_T}
+          width={plotW}
+          height={plotH}
+          rx="8"
+          fill="#07131F"
+          stroke="#132A3E"
+          strokeWidth="1"
+        />
+
+        {/* Líneas de cuadrícula horizontales y eje Y nítido */}
+        {gridLevels.map((g, i) => (
+          <g key={i}>
+            <line
+              x1={PAD_L}
+              y1={g.y}
+              x2={PAD_L + plotW}
+              y2={g.y}
+              stroke="#142C40"
+              strokeWidth="1"
+              strokeDasharray="4 4"
+            />
+            <text
+              x={PAD_L - 10}
+              y={g.y + 3.5}
+              fontSize="10.5"
+              fontWeight="600"
+              fill="#6C96B3"
+              textAnchor="end"
+              className="tabular-nums"
+            >
+              ${Math.round(g.val).toLocaleString()}
+            </text>
+          </g>
+        ))}
+
+        {/* Cuadrícula vertical y etiquetas del eje X */}
+        {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+          const localIdx = Math.round(t * (visN - 1));
+          const stepIdx = startStep + localIdx;
+          const xPos = px(localIdx);
+          const tradeNum = Math.round((stepIdx / Math.max(1, N - 1)) * numTrades);
+          return (
+            <g key={i}>
+              <line
+                x1={xPos}
+                y1={PAD_T}
+                x2={xPos}
+                y2={PAD_T + plotH}
+                stroke="#112536"
+                strokeWidth="1"
+              />
+              <text
+                x={xPos}
+                y={H - 8}
+                fontSize="10.5"
+                fontWeight="600"
+                fill="#6C96B3"
+                textAnchor="middle"
+                className="tabular-nums"
+              >
+                T{tradeNum}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Línea de Balance Inicial (si cae dentro del rango visible) */}
+        {startBalance >= minV && startBalance <= maxV && (
+          <g>
+            <line
+              x1={PAD_L}
+              y1={py(startBalance)}
+              x2={PAD_L + plotW}
+              y2={py(startBalance)}
+              stroke="#F59E0B"
+              strokeWidth="1.2"
+              strokeDasharray="6 4"
+              opacity="0.8"
+            />
+            <rect
+              x={PAD_L + 8}
+              y={py(startBalance) - 17}
+              width="98"
+              height="15"
+              rx="4"
+              fill="#0A1929"
+              stroke="#F59E0B"
+              strokeWidth="0.7"
+              opacity="0.92"
+            />
+            <text
+              x={PAD_L + 57}
+              y={py(startBalance) - 6.5}
+              fontSize="9.5"
+              fontWeight="700"
+              fill="#F59E0B"
+              textAnchor="middle"
+            >
+              Inicial ${Math.round(startBalance).toLocaleString()}
+            </text>
+          </g>
+        )}
+
+        {/* Trayectorias individuales simuladas ("Spaghetti Paths") */}
+        {showPaths && samplePaths.map((sp, sIdx) => {
+          const slice = sp.slice(startStep);
+          if (!slice.length) return null;
+          const d = slice
+            .map((v, i) => `${i === 0 ? "M" : "L"}${px(i).toFixed(1)},${py(v).toFixed(1)}`)
+            .join(" ");
+          return (
+            <path
+              key={`sp-${sIdx}`}
+              d={d}
+              fill="none"
+              stroke={slice[slice.length - 1] >= startBalance ? "#38BDF8" : "#F87171"}
+              strokeWidth="0.85"
+              opacity="0.16"
+            />
+          );
+        })}
+
+        {/* Bandas sombreadas P5-P95 y P25-P75 */}
+        <path d={area(0, 4)} fill="url(#mcOuterBand)" />
+        <path d={area(1, 3)} fill="url(#mcInnerBand)" />
+
+        {/* Curvas de percentiles P5, P25, P75, P95 y P50 (Mediana con glow) */}
+        {[
+          { pi: 0, color: "#EF4444", w: 1.5, dash: "5 3", glow: false },
+          { pi: 1, color: "#F59E0B", w: 1.5, dash: "",    glow: false },
+          { pi: 3, color: "#F59E0B", w: 1.5, dash: "",    glow: false },
+          { pi: 4, color: "#3B82F6", w: 1.6, dash: "5 3", glow: false },
+          { pi: 2, color: "#20E58D", w: 2.8, dash: "",    glow: true  },
+        ].map(({ pi, color, w, dash, glow }) => (
+          <path
+            key={pi}
+            d={path(pi)}
+            stroke={color}
+            strokeWidth={w}
+            fill="none"
+            strokeDasharray={dash || undefined}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            filter={glow ? "url(#mcMedianGlow)" : undefined}
+          />
+        ))}
+
+        {/* Etiquetas derechas (Badges) para P95, P75, P50, P25, P5 */}
+        {callouts.map((c) => {
+          const endX = PAD_L + plotW;
+          const badgeX = endX + 10;
+          return (
+            <g key={c.label}>
+              <line
+                x1={endX}
+                y1={c.rawY}
+                x2={badgeX}
+                y2={c.y}
+                stroke={c.color}
+                strokeWidth="1"
+                opacity="0.65"
+              />
+              <circle cx={endX} cy={c.rawY} r="3" fill={c.color} />
+              <rect
+                x={badgeX}
+                y={c.y - 9.5}
+                width={PAD_R - 14}
+                height="19"
+                rx="5"
+                fill={c.bg}
+                stroke={c.border}
+                strokeWidth="1"
+              />
+              <text
+                x={badgeX + 6}
+                y={c.y + 3.5}
+                fontSize="9.5"
+                fontWeight="800"
+                fill={c.color}
+              >
+                {c.label}
+              </text>
+              <text
+                x={badgeX + PAD_R - 20}
+                y={c.y + 3.5}
+                fontSize="9.5"
+                fontWeight="700"
+                fill="#E2E8F0"
+                textAnchor="end"
+                className="tabular-nums"
+              >
+                ${Math.round(c.val).toLocaleString()}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Crosshair interactivo al pasar el cursor */}
+        {activeLocalIdx !== null && activeBand && (
+          <g>
+            <line
+              x1={px(activeLocalIdx)}
+              y1={PAD_T}
+              x2={px(activeLocalIdx)}
+              y2={PAD_T + plotH}
+              stroke="#94A3B8"
+              strokeWidth="1.2"
+              strokeDasharray="3 3"
+            />
+            {[
+              { pi: 4, color: "#3B82F6" },
+              { pi: 3, color: "#F59E0B" },
+              { pi: 2, color: "#20E58D" },
+              { pi: 1, color: "#F59E0B" },
+              { pi: 0, color: "#EF4444" },
+            ].map(({ pi, color }) => (
+              <circle
+                key={pi}
+                cx={px(activeLocalIdx)}
+                cy={py(activeBand[pi])}
+                r={pi === 2 ? 4.5 : 3.5}
+                fill={color}
+                stroke="#07131F"
+                strokeWidth="1.5"
+              />
+            ))}
+          </g>
+        )}
+      </svg>
+
+      {/* Tooltip Flotante en Hover */}
+      {activeLocalIdx !== null && activeBand && activeTradeNum !== null && (
+        <div
+          className="pointer-events-none absolute top-11 z-20 rounded-xl border border-border-card bg-[#071524]/95 px-3.5 py-2.5 shadow-2xl backdrop-blur-md min-w-[205px]"
+          style={{
+            left: activeLocalIdx > visN * 0.62 ? "auto" : `${Math.max(8, (activeLocalIdx / visN) * 75)}%`,
+            right: activeLocalIdx > visN * 0.62 ? "14%" : "auto",
+          }}
+        >
+          <div className="flex items-center justify-between border-b border-border-card/60 pb-1.5 mb-1.5">
+            <span className="text-[11px] font-bold text-white">Operación T{activeTradeNum}</span>
+            <span className="text-[10px] text-green-primary font-semibold tabular-nums">
+              {(((activeBand[2] - startBalance) / Math.max(1, startBalance)) * 100 >= 0 ? "+" : "")}
+              {(((activeBand[2] - startBalance) / Math.max(1, startBalance)) * 100).toFixed(1)}% med.
+            </span>
+          </div>
+          <div className="space-y-1 text-[10.5px] tabular-nums">
+            {[
+              { label: "P95 (Mejor 5%)", val: activeBand[4], color: "text-blue-400" },
+              { label: "P75 (Cuartil sup.)", val: activeBand[3], color: "text-amber-400" },
+              { label: "P50 (Mediana)", val: activeBand[2], color: "text-green-primary font-bold" },
+              { label: "P25 (Cuartil inf.)", val: activeBand[1], color: "text-amber-400" },
+              { label: "P5 (Peor 5%)", val: activeBand[0], color: "text-red-400" },
+            ].map(row => (
+              <div key={row.label} className="flex items-center justify-between gap-4">
+                <span className="text-text-muted">{row.label}</span>
+                <span className={row.color}>${Math.round(row.val).toLocaleString()}</span>
+              </div>
+            ))}
+            <div className="pt-1 mt-1 border-t border-border-card/50 flex items-center justify-between text-[10px]">
+              <span className="text-text-muted">Amplitud (P95−P5)</span>
+              <span className="text-slate-300 font-semibold">
+                ${Math.round(activeBand[4] - activeBand[0]).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LegacyFanChartUnused({ bands, startBalance, numTrades }: {
   bands: number[][]; startBalance: number; numTrades: number;
 }) {
   const W = 560, H = 200;
@@ -546,7 +981,7 @@ export default function SimulatorPage() {
 
   /* ── Journal mode: compute stats from closed trades ── */
   const trades = useTradeStore(s => s.trades);
-  const closed = useMemo(() => trades.filter(t => t.result !== "Open"), [trades]);
+  const closed = useMemo(() => trades.filter(isStrictlyClosed), [trades]);
   const journalStats = useMemo(() => computeStats(closed), [closed]);
   const journalN = journalStats.closedTrades;
 
@@ -794,7 +1229,7 @@ export default function SimulatorPage() {
                   <RefreshCw className="h-3 w-3" /> Re-simular
                 </button>
               </div>
-              <FanChart bands={stats.fanBands} startBalance={B} numTrades={NT} />
+              <FanChart bands={stats.fanBands} samplePaths={stats.samplePaths} startBalance={B} numTrades={NT} />
               <div className="flex flex-wrap gap-4 mt-2 text-[10px]">
                 {[
                   { color:"#3B82F6", label:"P95 — Mejor 5%", dash:true },
