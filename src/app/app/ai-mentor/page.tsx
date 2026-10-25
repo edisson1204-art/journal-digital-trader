@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useChat } from "ai/react";
 import { useTradeStore } from "@/store/tradeStore";
-import { computeStats, getPointValue } from "@/lib/tradeTypes";
+import { computeStats, getPointValue, effectiveTradeDate, isStrictlyClosed } from "@/lib/tradeTypes";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 
@@ -40,7 +40,7 @@ export default function AIMentorPage() {
   ════════════════════════════════════════════════════ */
   const tradeContext = useMemo(() => {
     const closed = [...trades]
-      .filter(t => t.result !== "Open")
+      .filter(isStrictlyClosed)
       .sort((a, b) => `${b.dateOpen}T${b.timeOpen || "00:00"}`.localeCompare(`${a.dateOpen}T${a.timeOpen || "00:00"}`));
 
     if (closed.length === 0) return null;
@@ -78,7 +78,7 @@ export default function AIMentorPage() {
 
     closed.forEach((t) => {
       // Días
-      const d = days[new Date((t.dateClose || t.dateOpen) + "T12:00:00").getDay()];
+      const d = days[new Date(effectiveTradeDate(t) + "T12:00:00").getDay()];
       pnlByDay[d] = (pnlByDay[d] || 0) + (t.netPnl || 0);
       // Activos
       if (!pnlByAsset[t.instrument]) pnlByAsset[t.instrument] = { pnl: 0, wins: 0, total: 0 };

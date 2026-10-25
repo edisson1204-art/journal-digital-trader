@@ -412,8 +412,32 @@ export function calculateTrade(
 }
 
 /* ─── Compute statistics from trade list ─── */
+export function isStrictlyClosed(t: TradeRecord): boolean {
+  return (
+    t.result !== "Open" &&
+    t.status !== "OPEN" &&
+    t.status !== "PARTIALLY_CLOSED" &&
+    (t.openContracts === undefined || t.openContracts === 0) &&
+    typeof t.netPnl === "number" &&
+    Number.isFinite(t.netPnl)
+  );
+}
+
+/**
+ * Fecha efectiva de una operación para agrupación y filtrado temporal:
+ * En operaciones cerradas usa `dateClose` si existe y es >= `dateOpen`; de lo contrario usa `dateOpen`.
+ */
+export function effectiveTradeDate(t: TradeRecord): string {
+  const open = (t.dateOpen || "").slice(0, 10);
+  const close = (t.dateClose || "").slice(0, 10);
+  if (t.result !== "Open" && close && (!open || close >= open)) {
+    return close;
+  }
+  return open || close;
+}
+
 export function computeStats(trades: TradeRecord[]): TradeStats {
-  const chrono = (t: TradeRecord) => `${t.dateClose || t.dateOpen}T${t.timeClose || t.timeOpen || "00:00"}`;
+  const chrono = (t: TradeRecord) => `${effectiveTradeDate(t)}T${t.timeClose || t.timeOpen || "00:00"}`;
   const isStrictlyClosed = (t: TradeRecord) =>
     t.result !== "Open" &&
     t.status !== "OPEN" &&

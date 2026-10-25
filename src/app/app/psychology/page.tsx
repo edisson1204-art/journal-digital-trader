@@ -3,7 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { useMemo } from "react";
 import { useTradeStore } from "@/store/tradeStore";
-import { getPointValue } from "@/lib/tradeTypes";
+import { getPointValue, effectiveTradeDate, isStrictlyClosed } from "@/lib/tradeTypes";
 import { HeartPulse, AlertTriangle, TrendingUp, Brain, Target, Clock } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════
@@ -16,8 +16,8 @@ export default function PsychologyPage() {
 
   const psych = useMemo(() => {
     const closed = [...trades]
-      .filter(t => t.result !== "Open")
-      .sort((a, b) => `${a.dateClose || a.dateOpen}T${a.timeClose || a.timeOpen || "00:00"}`.localeCompare(`${b.dateClose || b.dateOpen}T${b.timeClose || b.timeOpen || "00:00"}`));
+      .filter(isStrictlyClosed)
+      .sort((a, b) => `${effectiveTradeDate(a)}T${a.timeClose || a.timeOpen || "00:00"}`.localeCompare(`${effectiveTradeDate(b)}T${b.timeClose || b.timeOpen || "00:00"}`));
     if (closed.length < 3) return null;
 
     // 1. Distribución de emociones (real)
@@ -53,7 +53,7 @@ export default function PsychologyPage() {
     const DOW_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const dowMap: Record<number, { pnl: number; trades: number; wins: number }> = {};
     for (const t of closed) {
-      const parts = (t.dateClose || t.dateOpen).split("-").map(Number);
+      const parts = effectiveTradeDate(t).split("-").map(Number);
       const dow = new Date(parts[0], parts[1] - 1, parts[2]).getDay();
       if (!dowMap[dow]) dowMap[dow] = { pnl: 0, trades: 0, wins: 0 };
       dowMap[dow].pnl += t.netPnl || 0;

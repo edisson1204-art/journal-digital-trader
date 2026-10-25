@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, X, TrendingUp, TrendingDown } from "lucide-react";
 import { useTradeStore } from "@/store/tradeStore";
-import { TradeRecord } from "@/lib/tradeTypes";
+import { TradeRecord, effectiveTradeDate, isStrictlyClosed } from "@/lib/tradeTypes";
 
 const MONTHS     = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DAYS_SHORT = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
@@ -129,9 +129,9 @@ export default function CalendarPage() {
   /* ── Mapa de días con trades ── */
   const TRADE_DAYS = useMemo(() => {
     const map: Record<string, { pnl: number; trades: number; wins: number; losses: number; breakevens: number }> = {};
-    const closed = trades.filter(t => t.result !== "Open");
+    const closed = trades.filter(isStrictlyClosed);
     for (const t of closed) {
-      const d = t.dateClose || t.dateOpen;
+      const d = effectiveTradeDate(t);
       if (!map[d]) map[d] = { pnl: 0, trades: 0, wins: 0, losses: 0, breakevens: 0 };
       map[d].pnl = parseFloat((map[d].pnl + (t.netPnl || 0)).toFixed(2));
       map[d].trades++;
@@ -146,7 +146,7 @@ export default function CalendarPage() {
   const selectedDayTrades = useMemo(() => {
     if (!selectedDay) return [];
     return trades
-      .filter(t => (t.dateClose || t.dateOpen) === selectedDay && t.result !== "Open")
+      .filter(t => effectiveTradeDate(t) === selectedDay && isStrictlyClosed(t))
       .sort((a, b) => (a.timeClose || a.timeOpen || "").localeCompare(b.timeClose || b.timeOpen || ""));
   }, [trades, selectedDay]);
 

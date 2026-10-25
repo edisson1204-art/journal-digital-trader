@@ -258,4 +258,55 @@ describe("R4 — Auditoría de Correlación Cruzada e Integridad Matemática (11
     expect(legacyOpen.openCommission).toBe(1);
     expect(legacyOpen.accruedCommission).toBe(1);
   });
+
+  it("R4-REP-04: Conciliación 1:1 entre computeStats y calculateQuantStats ante registros históricos de Supabase y fechas dateClose < dateOpen", () => {
+    const t1 = makeClosedTrade({
+      id: "legacy-1",
+      dateOpen: "2026-10-14",
+      dateClose: "2026-04-25", // Fecha de cierre anterior a apertura (error de captura histórica)
+      instrument: "MNQ",
+      side: "Buy",
+      contracts: 3,
+      entryPrice: 25500,
+      exitPrice: 25560,
+      stopLoss: 25450,
+      commissionPerSide: 0.09,
+    });
+    const t2Legacy = {
+      ...makeClosedTrade({
+        id: "legacy-2",
+        dateOpen: "2026-10-06",
+        dateClose: "2026-10-06",
+        instrument: "MNQ",
+        side: "Sell",
+        contracts: 2,
+        entryPrice: 29990,
+        exitPrice: 29930,
+        stopLoss: 30050,
+        commissionPerSide: 0.09,
+      }),
+      totalContracts: 2,
+      contractsExited: 1,
+      openContracts: undefined,
+      status: undefined,
+      result: "Win" as const,
+      netPnl: 239.64,
+      grossPnl: 240,
+      totalCommission: 0.36,
+    };
+
+    const filtered = filterReportTrades([t1, t2Legacy], "month", "2026-10", "2026", "all");
+    expect(filtered.length).toBe(2);
+
+    const stats = computeStats(filtered);
+    const quant = calculateQuantStats(filtered)!;
+
+    expect(stats.closedTrades).toBe(2);
+    expect(quant.longCount + quant.shortCount).toBe(stats.closedTrades);
+    expect(quant.efficiencyActive).toBe(stats.totalNet);
+    expect(Number((quant.longPnl + quant.shortPnl).toFixed(2))).toBe(stats.totalNet);
+    expect(Number(quant.assets.reduce((a, x) => a + x.netPnl, 0).toFixed(2))).toBe(stats.totalNet);
+    expect(Number(quant.setups.reduce((a, x) => a + x.netPnl, 0).toFixed(2))).toBe(stats.totalNet);
+    expect(Number(quant.emotions.reduce((a, x) => a + x.pnl, 0).toFixed(2))).toBe(stats.totalNet);
+  });
 });

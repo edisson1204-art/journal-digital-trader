@@ -1,6 +1,6 @@
 "use client";
 
-import { computeStats, formatProfitFactor } from "@/lib/tradeTypes";
+import { computeStats, formatProfitFactor, effectiveTradeDate, isStrictlyClosed } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { useState, useMemo } from "react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -106,9 +106,9 @@ export default function AnalyticsPage() {
     else cutoff.setFullYear(2000);
 
     const cutoffKey = toLocalDateStr(cutoff);
-    const chrono = (t: typeof trades[number]) => `${t.dateClose || t.dateOpen}T${t.timeClose || t.timeOpen || "00:00"}`;
+    const chrono = (t: typeof trades[number]) => `${effectiveTradeDate(t)}T${t.timeClose || t.timeOpen || "00:00"}`;
     return trades
-      .filter(t => t.result !== "Open" && (t.dateClose || t.dateOpen || "").slice(0, 10) >= cutoffKey)
+      .filter(t => isStrictlyClosed(t) && effectiveTradeDate(t) >= cutoffKey)
       .sort((a, b) => chrono(a).localeCompare(chrono(b)));
   }, [trades, period]);
 
@@ -121,7 +121,7 @@ export default function AnalyticsPage() {
     let current = 0;
     for (const t of filteredByPeriod) {
       current += t.netPnl || 0;
-      result.push({ date: t.dateClose || t.dateOpen, equity: parseFloat(current.toFixed(2)) });
+      result.push({ date: effectiveTradeDate(t), equity: parseFloat(current.toFixed(2)) });
     }
     return result.length > 1 ? result : [{ date: "Inicio", equity: 0 }, { date: "Hoy", equity: 0 }];
   }, [filteredByPeriod]);
@@ -136,7 +136,7 @@ export default function AnalyticsPage() {
       if (equity > peak) peak = equity;
       const dd = equity - peak; // siempre 0 o negativo, incluso cuando peak === 0
       return {
-        date: t.dateClose || t.dateOpen,
+        date: effectiveTradeDate(t),
         drawdown: parseFloat(dd.toFixed(2)),
       };
     });
@@ -167,7 +167,7 @@ export default function AnalyticsPage() {
     };
     const weeks: Record<string, number> = {};
     for (const t of filteredByPeriod) {
-      const d = new Date(`${(t.dateOpen || "").slice(0, 10)}T12:00:00`);
+      const d = new Date(`${effectiveTradeDate(t)}T12:00:00`);
       const key = `${d.getFullYear()}-W${String(getISOWeek(d)).padStart(2, "0")}`;
       weeks[key] = (weeks[key] || 0) + (t.netPnl || 0);
     }

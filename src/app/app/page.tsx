@@ -1,6 +1,6 @@
 "use client";
 
-import { formatProfitFactor } from "@/lib/tradeTypes";
+import { formatProfitFactor, effectiveTradeDate, isStrictlyClosed } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { TrendingUp, TrendingDown, BarChart2, Target } from "lucide-react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -26,14 +26,14 @@ function EquityChart({ trades }: { trades: any[] }) {
   // Generar curva de equity interactiva
   const data = useMemo(() => {
     const closed = [...trades]
-      .filter(t => t.result !== "Open")
-      .sort((a, b) => `${a.dateClose || a.dateOpen}T${a.timeClose || a.timeOpen || "00:00"}`.localeCompare(`${b.dateClose || b.dateOpen}T${b.timeClose || b.timeOpen || "00:00"}`));
+      .filter(isStrictlyClosed)
+      .sort((a, b) => `${effectiveTradeDate(a)}T${a.timeClose || a.timeOpen || "00:00"}`.localeCompare(`${effectiveTradeDate(b)}T${b.timeClose || b.timeOpen || "00:00"}`));
     const result = [{ date: "Inicio", equity: 0 }];
     let current = 0;
     for (const t of closed) {
       current += t.netPnl || 0;
       result.push({
-        date: `${t.dateClose || t.dateOpen} ${t.timeClose || t.timeOpen}`,
+        date: `${effectiveTradeDate(t)} ${t.timeClose || t.timeOpen}`,
         equity: parseFloat(current.toFixed(2)),
       });
     }
