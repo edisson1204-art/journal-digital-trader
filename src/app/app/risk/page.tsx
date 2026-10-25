@@ -68,10 +68,12 @@ export function calculateRiskView(params: {
   assetClass: AssetClass;
   pointValue: number;
   direction?: Direction;
+  commissionPerSide?: number;
 }) {
   const {
     accountSize, riskPct, entry, stop, target,
     assetClass, pointValue, direction = "LONG",
+    commissionPerSide = 0,
   } = params;
   const hasEntry = entry.trim() !== "" && Number.isFinite(Number(entry));
   const hasStop = stop.trim() !== "" && Number.isFinite(Number(stop));
@@ -106,10 +108,18 @@ export function calculateRiskView(params: {
     };
   }
 
+  if (!Number.isFinite(pointValue) || pointValue <= 0) {
+    return {
+      accNum, riskPctNum, riskAmount, stopDistance: 0, targetDistance: 0, rr: "—",
+      riskPerContract: 0, positionSizeRaw: 0, positionSize: "0", maxGain: 0, realRisk: 0,
+      effectiveRiskPct: 0, isValid: false, errors: ["El valor del punto debe ser mayor que 0."], warning: null as string | null,
+    };
+  }
+
   const entryD = new Decimal(entryNum);
   const stopD = hasStop ? new Decimal(stopNum) : null;
   const targetD = hasTarget ? new Decimal(targetNum) : null;
-  const pvD = new Decimal(pointValue > 0 ? pointValue : 1);
+  const pvD = new Decimal(pointValue);
 
   const stopDistanceD = stopD ? entryD.minus(stopD).abs() : new Decimal(0);
   const targetDistanceD = targetD ? targetD.minus(entryD).abs() : new Decimal(0);
@@ -139,7 +149,7 @@ export function calculateRiskView(params: {
       stop: stopD,
       target: targetD,
       pointValue: pvD,
-      roundTripFeesPerContract: new Decimal(0),
+      roundTripFeesPerContract: new Decimal(commissionPerSide > 0 ? commissionPerSide * 2 : 0),
     });
     const positionSizeRaw = sized.riskBudget.div(sized.riskPerContractGross).toNumber();
     return {
@@ -149,11 +159,11 @@ export function calculateRiskView(params: {
       stopDistance: stopDistanceD.toNumber(),
       targetDistance: targetDistanceD.toNumber(),
       rr: sized.plannedRR ? sized.plannedRR.toFixed(2) : "—",
-      riskPerContract: sized.riskPerContractGross.toNumber(),
+      riskPerContract: (commissionPerSide > 0 ? sized.riskPerContractNet : sized.riskPerContractGross).toNumber(),
       positionSizeRaw,
       positionSize: sized.contracts.toString(),
       maxGain: sized.plannedRewardGross ? sized.plannedRewardGross.toNumber() : 0,
-      realRisk: sized.effectiveRiskGross.toNumber(),
+      realRisk: (commissionPerSide > 0 ? sized.effectiveRiskNet : sized.effectiveRiskGross).toNumber(),
       effectiveRiskPct: sized.effectiveRiskFraction.mul(100).toNumber(),
       isValid: true,
       errors: [] as string[],
@@ -214,7 +224,7 @@ export default function RiskToolsPage() {
   /* ── Daily Risk Rules calculadas desde datos reales ── */
   const riskRules = useMemo(() => {
     const today = localDateKey();
-    const todayTrades  = trades.filter(t => t.dateOpen === today && t.result !== "Open");
+    const todayTrades  = trades.filter(t => (t.dateClose || t.dateOpen) === today && t.result !== "Open");
     const todayPnl     = todayTrades.reduce((s, t) => s + (t.netPnl || 0), 0);
     const todayLosses  = todayTrades.filter(t => t.result === "Loss").length;
     const todayConsec  = (() => {
@@ -228,7 +238,7 @@ export default function RiskToolsPage() {
 
     const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const weekKey   = localDateKey(weekStart);
-    const weekTrades = trades.filter(t => t.dateOpen >= weekKey && t.result !== "Open");
+    const weekTrades = trades.filter(t => (t.dateClose || t.dateOpen) >= weekKey && t.result !== "Open");
     const weekPnl    = weekTrades.reduce((s, t) => s + (t.netPnl || 0), 0);
 
     const maxDailyLoss = accNum > 0 ? -(accNum * 0.02) : -200;
@@ -283,17 +293,17 @@ export default function RiskToolsPage() {
     if (rrs.length === 0) return null;
 
     const buckets = [
-      { r: "<-2R", min: -Infinity, max: -2, color: "bg-red-loss/60" },
-      { r: "-2R",  min: -2, max: -1, color: "bg-red-loss/75" },
-      { r: "-1R",  min: -1, max:  0, color: "bg-red-loss/90" },
-      { r: "0R",   min:  0, max:  0.1, color: "bg-yellow-warn/70" },
-      { r: "+1R",  min: 0.1, max: 1.5, color: "bg-green-primary/60" },
-      { r: "+2R",  min: 1.5, max: 2.5, color: "bg-green-primary/80" },
-      { r: "+3R",  min: 2.5, max: 3.5, color: "bg-green-primary/90" },
-      { r: "+4R+", min: 3.5, max: Infinity, color: "bg-green-primary" },
+      { r: "<-2R",      match: (r: number) => r < -2,            color: "bg-red-loss/60" },
+      { r: "-2R a -1R", match: (r: number) => r >= -2 && r < -1, color: "bg-red-loss/75" },
+      { r: "-1R a 0R",  match: (r: number) => r >= -1 && r < 0,  color: "bg-red-loss/90" },
+      { r: "0R a 1R",   match: (r: number) => r >= 0 && r < 1,   color: "bg-green-primary/60" },
+      { r: "1R a 2R",   match: (r: number) => r >= 1 && r < 2,   color: "bg-green-primary/75" },
+      { r: "2R a 3R",   match: (r: number) => r >= 2 && r < 3,   color: "bg-green-primary/90" },
+      { r: ">3R",       match: (r: number) => r >= 3,            color: "bg-green-primary" },
     ].map(b => ({
-      ...b,
-      count: rrs.filter(r => r > b.min && r <= b.max).length,
+      r: b.r,
+      color: b.color,
+      count: rrs.filter(b.match).length,
     }));
 
     const maxCount = Math.max(...buckets.map(b => b.count), 1);

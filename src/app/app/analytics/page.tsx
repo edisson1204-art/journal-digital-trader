@@ -106,9 +106,10 @@ export default function AnalyticsPage() {
     else cutoff.setFullYear(2000);
 
     const cutoffKey = toLocalDateStr(cutoff);
+    const chrono = (t: typeof trades[number]) => `${t.dateClose || t.dateOpen}T${t.timeClose || t.timeOpen || "00:00"}`;
     return trades
-      .filter(t => t.result !== "Open" && (t.dateOpen || "").slice(0, 10) >= cutoffKey)
-      .sort((a, b) => `${a.dateOpen}T${a.timeOpen || "00:00"}`.localeCompare(`${b.dateOpen}T${b.timeOpen || "00:00"}`));
+      .filter(t => t.result !== "Open" && (t.dateClose || t.dateOpen || "").slice(0, 10) >= cutoffKey)
+      .sort((a, b) => chrono(a).localeCompare(chrono(b)));
   }, [trades, period]);
 
   /* ── Estadísticas correlacionadas al período activo ── */
@@ -120,7 +121,7 @@ export default function AnalyticsPage() {
     let current = 0;
     for (const t of filteredByPeriod) {
       current += t.netPnl || 0;
-      result.push({ date: t.dateOpen, equity: parseFloat(current.toFixed(2)) });
+      result.push({ date: t.dateClose || t.dateOpen, equity: parseFloat(current.toFixed(2)) });
     }
     return result.length > 1 ? result : [{ date: "Inicio", equity: 0 }, { date: "Hoy", equity: 0 }];
   }, [filteredByPeriod]);
@@ -135,7 +136,7 @@ export default function AnalyticsPage() {
       if (equity > peak) peak = equity;
       const dd = equity - peak; // siempre 0 o negativo, incluso cuando peak === 0
       return {
-        date: t.dateOpen,
+        date: t.dateClose || t.dateOpen,
         drawdown: parseFloat(dd.toFixed(2)),
       };
     });
@@ -145,9 +146,10 @@ export default function AnalyticsPage() {
   const ddStats = useMemo(() => {
     if (!drawdownData.length) return { max: 0, avg: 0, daysUnderwater: 0 };
     const vals = drawdownData.map(d => d.drawdown);
+    const negVals = vals.filter(v => v < 0);
     const max = Math.min(...vals); // el más negativo
-    const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-    const daysUnderwater = vals.filter(v => v < 0).length;
+    const avg = negVals.length > 0 ? negVals.reduce((s, v) => s + v, 0) / negVals.length : 0;
+    const daysUnderwater = negVals.length;
     return {
       max: parseFloat(max.toFixed(2)),
       avg: parseFloat(avg.toFixed(2)),
@@ -244,7 +246,7 @@ export default function AnalyticsPage() {
   const strategyData = useMemo(() => {
     const map: Record<string, { wins: number; total: number; pnl: number }> = {};
     for (const t of filteredByPeriod) {
-      const s = t.strategy || "Sin Estrategia";
+      const s = t.setup || t.strategy || "Sin Estrategia";
       if (!map[s]) map[s] = { wins: 0, total: 0, pnl: 0 };
       map[s].total++;
       if (t.result === "Win") map[s].wins++;
@@ -253,7 +255,7 @@ export default function AnalyticsPage() {
     return Object.entries(map).map(([name, data]) => ({
       name,
       trades: data.total,
-      winRate: Math.round((data.wins / data.total) * 100),
+      winRate: Number(((data.wins / data.total) * 100).toFixed(1)),
       pnlRaw: parseFloat(data.pnl.toFixed(2)),
       pnl: `${data.pnl >= 0 ? "+" : "-"}$${Math.abs(data.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       color: data.pnl >= 0 ? "bg-green-primary" : "bg-red-loss",

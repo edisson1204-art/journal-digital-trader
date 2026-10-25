@@ -77,18 +77,25 @@ export function runMonteCarlo(
   numSims: number, commission: number,
   sampleN: number | null = null, // real historical N for error bounds (null or 0 in manual mode)
   seed = 42,
+  lossRatePct: number | null = null,
 ): SimStats {
   const rng = seededRandom(String(seed));
   const wr  = Math.min(1, Math.max(0, winRate / 100));
+  const lr  = lossRatePct !== null
+    ? Math.min(Math.max(0, 1 - wr), Math.max(0, lossRatePct / 100))
+    : (1 - wr);
+  const ber = Math.max(0, 1 - wr - lr);
   const varFactor = Math.max(0, variability) / 100;
   const sw  = avgWin  * varFactor;
   const sl  = avgLoss * varFactor;
-  const exp = wr * (avgWin - commission) - (1 - wr) * (avgLoss + commission);
+  const expRaw = wr * (avgWin - commission) - lr * (avgLoss + commission) - ber * commission;
+  const exp = new Decimal(Number.isFinite(expRaw) ? expRaw : 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
 
   // Per-trade variance & std (without artificial 0.001 floor that fabricates giant Sharpe when variance = 0)
-  const varPT = wr * Math.pow(avgWin - commission - exp, 2) +
-                (1 - wr) * Math.pow(-(avgLoss + commission) - exp, 2) +
-                wr * sw * sw + (1 - wr) * sl * sl;
+  const varPT = wr * Math.pow(avgWin - commission - expRaw, 2) +
+                lr * Math.pow(-(avgLoss + commission) - expRaw, 2) +
+                ber * Math.pow(-commission - expRaw, 2) +
+                wr * sw * sw + lr * sl * sl;
   const stdPT = varPT > 1e-12 ? Math.sqrt(varPT) : 0;
   const sharpe = stdPT > 0 ? exp / stdPT : null;
   const horizonSharpe = stdPT > 0 ? (exp / stdPT) * Math.sqrt(numTrades) : null;
@@ -135,17 +142,21 @@ export function runMonteCarlo(
     fanMatrix[0].push(startBalance);
 
     for (let t = 0; t < numTrades; t++) {
-      const win = winRate >= 100 ? true : winRate <= 0 ? false : rng() * 100 < winRate;
+      const u = rng() * 100;
+      const isWin = winRate >= 100 ? true : winRate <= 0 ? false : u < winRate;
+      const isLoss = !isWin && (lossRatePct === null ? true : u < winRate + lr * 100);
       const winGross = sw > 0 ? Math.max(0, randNormal(avgWin, sw, rng)) : avgWin;
       const lossGross = sl > 0 ? Math.max(0, randNormal(avgLoss, sl, rng)) : avgLoss;
-      const delta = win
+      const delta = isWin
         ? winGross - commission
-        : -(lossGross + commission);
+        : isLoss
+        ? -(lossGross + commission)
+        : -commission;
       bal += delta;
       if (bal > peak) peak = bal;
       const dd = (peak > 0) ? ((peak - bal) / peak) * 100 : 0;
       if (dd > maxDD) maxDD = dd;
-      if (!win) { consec++; if (consec > maxC) maxC = consec; } else consec = 0;
+      if (isLoss) { consec++; if (consec > maxC) maxC = consec; } else consec = 0;
       if (bal <= 0) { bal = 0; ruined = true; }
       fanMatrix[t + 1].push(bal);
       if (ruined) { for (let r = t + 2; r <= numTrades; r++) fanMatrix[r].push(0); break; }
@@ -468,14 +479,28 @@ export function resolveSimParams(params: {
         ? (journalStats.wins / journalStats.closedTrades) * 100
         : journalStats.winRate)
     : Math.min(100, Math.max(0, parseFinite(winRate, 60)));
+  const LR = mode === "journal"
+    ? (journalStats.closedTrades > 0 && typeof journalStats.losses === "number"
+        ? (journalStats.losses / journalStats.closedTrades) * 100
+        : Math.max(0, 100 - WR))
+    : Math.max(0, 100 - WR);
+  const BER = mode === "journal"
+    ? (journalStats.closedTrades > 0 && typeof journalStats.breakevenCount === "number"
+        ? (journalStats.breakevenCount / journalStats.closedTrades) * 100
+        : Math.max(0, 100 - WR - LR))
+    : 0;
+  const exactPf = mode === "journal" && journalStats.exactProfitFactor ? Number(journalStats.exactProfitFactor) : NaN;
+  const canReconstructExact = mode === "journal" && Number.isFinite(exactPf) && Math.abs(exactPf - 1) > 1e-12 && journalStats.wins > 0 && journalStats.losses > 0;
+  const exactLossSum = canReconstructExact ? journalStats.totalNet / (exactPf - 1) : 0;
+  const exactWinSum = canReconstructExact ? journalStats.totalNet + exactLossSum : 0;
   const AW = mode === "journal"
-    ? Math.abs(journalStats.avgWin)
+    ? (canReconstructExact ? Math.abs(exactWinSum / journalStats.wins) : Math.abs(journalStats.avgWin))
     : Math.max(0, parseFinite(avgWin, 150));
   const AL = mode === "journal"
-    ? Math.abs(journalStats.avgLoss)
+    ? (canReconstructExact ? Math.abs(exactLossSum / journalStats.losses) : Math.abs(journalStats.avgLoss))
     : Math.max(0, parseFinite(avgLoss, 75));
   // STA-02: Preserve explicit 0% variability and $0 commission instead of replacing with 40% via ||
-  const VA = Math.max(0, parseFinite(varPct, 40));
+  const VA = Math.max(0, parseFinite(varPct, mode === "journal" ? 0 : 40));
   // SIM-R3-01: En modo Journal, journalStats.avgWin y avgLoss YA son netos de comisiones.
   // Si se restara CM de nuevo en cada trade simulado, la comisión se descontaría dos veces.
   const journalAvgComm = parseFloat((journalStats.totalCommissions / Math.max(journalStats.closedTrades, 1)).toFixed(3));
@@ -501,7 +526,7 @@ export function resolveSimParams(params: {
       ? "Buena (50-99 trades)"
       : "Excelente (100+ trades)";
   const canRun = mode === "manual" ? B > 0 && NT > 0 && NS > 0 : journalN > 0;
-  return { B, WR, AW, AL, VA, CM, journalAvgComm, NT, NS, SN, initialAdequacyLabel, canRun };
+  return { B, WR, LR, BER, AW, AL, VA, CM, journalAvgComm, NT, NS, SN, initialAdequacyLabel, canRun };
 }
 
 export default function SimulatorPage() {
@@ -511,7 +536,7 @@ export default function SimulatorPage() {
   const [winRate, setWinRate]     = useState("60");
   const [avgWin,  setAvgWin]      = useState("150");
   const [avgLoss, setAvgLoss]     = useState("75");
-  const [varPct,  setVarPct]      = useState("40");
+  const [varPct,  setVarPct]      = useState("0");
   const [comm,    setComm]        = useState("0.18");
   const [nTrades, setNTrades]     = useState("100");
   const [nSims,   setNSims]       = useState("1000");
@@ -526,18 +551,20 @@ export default function SimulatorPage() {
   const journalN = journalStats.closedTrades;
 
   // Effective params (journal or manual)
-  const { B, WR, AW, AL, VA, CM, NT, NS, SN, initialAdequacyLabel, canRun } = resolveSimParams({
+  const { B, WR, LR, BER, AW, AL, VA, CM, NT, NS, SN, initialAdequacyLabel, canRun } = resolveSimParams({
     mode, balance, winRate, avgWin, avgLoss, varPct, comm, nTrades, nSims, journalStats, journalN,
   });
 
-  const liveExp = (WR / 100) * (AW - CM) - (1 - WR / 100) * (AL + CM);
+  const liveExp = new Decimal((WR / 100) * (AW - CM) - (LR / 100) * (AL + CM) - (BER / 100) * CM)
+    .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+    .toNumber();
   const liveRR  = AL > 0 ? (AW / AL).toFixed(2) : "—";
 
   const run = () => {
     if (!canRun) return;
     setRunning(true);
     setTimeout(() => {
-      setStats(runMonteCarlo(B, WR, AW, AL, VA, NT, NS, CM, SN));
+      setStats(runMonteCarlo(B, WR, AW, AL, VA, NT, NS, CM, SN, 42, LR));
       setRunning(false);
     }, 20);
   };

@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { useMemo } from "react";
 import { useTradeStore } from "@/store/tradeStore";
+import { getPointValue } from "@/lib/tradeTypes";
 import { HeartPulse, AlertTriangle, TrendingUp, Brain, Target, Clock } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════
@@ -16,7 +17,7 @@ export default function PsychologyPage() {
   const psych = useMemo(() => {
     const closed = [...trades]
       .filter(t => t.result !== "Open")
-      .sort((a, b) => `${a.dateOpen}T${a.timeOpen || "00:00"}`.localeCompare(`${b.dateOpen}T${b.timeOpen || "00:00"}`));
+      .sort((a, b) => `${a.dateClose || a.dateOpen}T${a.timeClose || a.timeOpen || "00:00"}`.localeCompare(`${b.dateClose || b.dateOpen}T${b.timeClose || b.timeOpen || "00:00"}`));
     if (closed.length < 3) return null;
 
     // 1. Distribución de emociones (real)
@@ -52,7 +53,7 @@ export default function PsychologyPage() {
     const DOW_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const dowMap: Record<number, { pnl: number; trades: number; wins: number }> = {};
     for (const t of closed) {
-      const parts = t.dateOpen.split("-").map(Number);
+      const parts = (t.dateClose || t.dateOpen).split("-").map(Number);
       const dow = new Date(parts[0], parts[1] - 1, parts[2]).getDay();
       if (!dowMap[dow]) dowMap[dow] = { pnl: 0, trades: 0, wins: 0 };
       dowMap[dow].pnl += t.netPnl || 0;
@@ -76,16 +77,19 @@ export default function PsychologyPage() {
     // 5. Plan follow rate (disciplina real)
     const planTrades = closed.filter(t => t.planFollowed !== undefined);
     const planFollowRate = planTrades.length
-      ? Math.round((planTrades.filter(t => t.planFollowed).length / planTrades.length) * 100)
+      ? Number(((planTrades.filter(t => t.planFollowed).length / planTrades.length) * 100).toFixed(1))
       : 0;
 
     // 6. Discipline Score compuesto (0-100)
     const winsTotal = closed.filter(t => t.result === "Win").length;
-    const winRate = Math.round((winsTotal / closed.length) * 100);
+    const winRate = Number(((winsTotal / closed.length) * 100).toFixed(1));
+    const consistencyComponent = !worstDay || worstDay.pnl >= 0
+      ? 100
+      : Math.min(Math.max(100 - Math.abs(worstDay.pnl) / 20, 0), 100);
     const disciplineScore = Math.round(
       planFollowRate * 0.4 +
       Math.min(winRate, 100) * 0.3 +
-      Math.min(Math.max((100 - (worstDay ? Math.abs(worstDay.pnl) / 20 : 0)), 0), 100) * 0.3
+      consistencyComponent * 0.3
     );
 
     const fmtPnl = (v: number) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
@@ -93,19 +97,28 @@ export default function PsychologyPage() {
     // 7. Patrones de comportamiento reales detectados
     const behaviors: { behavior: string; detail: string; impact: string; positive: boolean }[] = [];
 
-    // Revenge Trading: ¿opera con más contratos inmediatamente después de una pérdida? (orden cronológico ascendente)
+    // Revenge Trading: incremento de riesgo monetario >30% en la misma sesión/día tras una pérdida
+    const tradeRiskUsd = (t: typeof closed[number]) => {
+      const pv = getPointValue(t.assetClass, t.instrument);
+      const sl = t.initialStopLoss ?? t.stopLoss ?? 0;
+      const dist = Math.abs((t.avgEntryPrice || 0) - sl);
+      return dist > 0 ? dist * (t.totalContracts || 1) * pv : (t.totalContracts || 1) * pv;
+    };
+    const isRevengePair = (prev: typeof closed[number], curr: typeof closed[number]) =>
+      prev.result === "Loss" &&
+      (curr.dateOpen || "") === (prev.dateOpen || "") &&
+      tradeRiskUsd(curr) > tradeRiskUsd(prev) * 1.3;
+
     let revengeTrades = 0;
     for (let i = 1; i < closed.length; i++) {
-      const prev = closed[i - 1];
-      const curr = closed[i];
-      if (prev.result === "Loss" && curr.totalContracts > prev.totalContracts * 1.3) {
+      if (isRevengePair(closed[i - 1], closed[i])) {
         revengeTrades++;
       }
     }
     if (revengeTrades > 0) {
       const revPnl = closed.filter((_, i) => {
         if (i === 0) return false;
-        return closed[i - 1].result === "Loss" && closed[i].totalContracts > closed[i - 1].totalContracts * 1.3;
+        return isRevengePair(closed[i - 1], closed[i]);
       }).reduce((s, t) => s + (t.netPnl || 0), 0);
       behaviors.push({
         behavior: "Revenge Trading",
@@ -117,7 +130,7 @@ export default function PsychologyPage() {
 
     // Sobreoperación: días con más de 5 trades
     const dailyTrades: Record<string, number> = {};
-    closed.forEach(t => { dailyTrades[t.dateOpen] = (dailyTrades[t.dateOpen] || 0) + 1; });
+    closed.forEach(t => { const dKey = t.dateClose || t.dateOpen; dailyTrades[dKey] = (dailyTrades[dKey] || 0) + 1; });
     const overTradingDays = Object.values(dailyTrades).filter(n => n > 5).length;
     if (overTradingDays > 0) {
       const overTradingPnl = closed
@@ -224,8 +237,8 @@ export default function PsychologyPage() {
             {
               label: "Peor Día de la Semana",
               value: psych.worstDay?.day ?? "—",
-              color: "text-red-loss",
-              icon: AlertTriangle,
+              color: (psych.worstDay?.pnl ?? 0) >= 0 ? "text-green-primary" : "text-red-loss",
+              icon: (psych.worstDay?.pnl ?? 0) >= 0 ? TrendingUp : AlertTriangle,
               sub: psych.worstDay ? `${psych.worstDay.pnl >= 0 ? "+" : "-"}$${Math.abs(psych.worstDay.pnl).toFixed(2)} neto` : "",
             },
             {
@@ -285,7 +298,7 @@ export default function PsychologyPage() {
             <h2 className="text-sm font-semibold text-text-primary mb-1">Distribución de Emociones</h2>
             <p className="text-[11px] text-text-muted mb-5">Cómo te sentiste en cada operación real</p>
             <div className="flex flex-col gap-3">
-              {psych.emotions.slice(0, 7).map(e => (
+              {psych.emotions.map(e => (
                 <div key={e.label}>
                   <div className="flex justify-between mb-1.5">
                     <span className="text-[12px] text-text-secondary font-medium">{e.label}</span>
@@ -381,7 +394,7 @@ export default function PsychologyPage() {
                 <p className="text-[12px] text-text-muted text-center py-4">No has registrado errores en tus trades (o aún no hay muestra).</p>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {psych.mistakes.slice(0, 4).map(m => (
+                  {psych.mistakes.map(m => (
                     <div key={m.label} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-xl bg-red-loss/10 flex items-center justify-center flex-shrink-0">

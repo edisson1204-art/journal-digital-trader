@@ -392,7 +392,14 @@ export function calculateTrade(
   contractsExited: number = contracts,
 ): FillCalcResult {
   if (avgExit === undefined || avgExit === null || contractsExited === 0) {
-    return { result: "Open", status: "OPEN" };
+    return calculateTradeFromFills(
+      side,
+      [{ price: avgEntry, contracts }],
+      [],
+      stopLoss || undefined,
+      commissionPerSide,
+      pipValue,
+    );
   }
   return calculateTradeFromFills(
     side,

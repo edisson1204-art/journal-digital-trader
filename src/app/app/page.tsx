@@ -27,13 +27,13 @@ function EquityChart({ trades }: { trades: any[] }) {
   const data = useMemo(() => {
     const closed = [...trades]
       .filter(t => t.result !== "Open")
-      .sort((a, b) => `${a.dateOpen}T${a.timeOpen || "00:00"}`.localeCompare(`${b.dateOpen}T${b.timeOpen || "00:00"}`));
+      .sort((a, b) => `${a.dateClose || a.dateOpen}T${a.timeClose || a.timeOpen || "00:00"}`.localeCompare(`${b.dateClose || b.dateOpen}T${b.timeClose || b.timeOpen || "00:00"}`));
     const result = [{ date: "Inicio", equity: 0 }];
     let current = 0;
     for (const t of closed) {
       current += t.netPnl || 0;
       result.push({
-        date: `${t.dateOpen} ${t.timeOpen}`,
+        date: `${t.dateClose || t.dateOpen} ${t.timeClose || t.timeOpen}`,
         equity: parseFloat(current.toFixed(2)),
       });
     }
@@ -207,7 +207,11 @@ export default function AppDashboard() {
                     <td className="px-4 py-2.5 text-text-muted">{t.strategy}</td>
                     <td className={`px-4 py-2.5 font-medium ${t.side === "Buy" ? "text-green-primary" : "text-red-loss"}`}>{t.side}</td>
                     <td className="px-4 py-2.5 tabular-nums text-text-secondary">{t.avgEntryPrice}</td>
-                    <td className="px-4 py-2.5 tabular-nums text-text-secondary">{t.avgExitPrice || "Abierto"}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-text-secondary">
+                      {t.status === "PARTIALLY_CLOSED" || (t.result === "Open" && (t.contractsExited ?? 0) > 0 && (t.contractsExited ?? 0) < t.totalContracts)
+                        ? `${t.avgExitPrice} (Parcial ${t.contractsExited}/${t.totalContracts})`
+                        : (t.avgExitPrice || "Abierto")}
+                    </td>
                     <td className={`px-4 py-2.5 tabular-nums font-bold ${pnlVal === undefined || pnlVal === null ? "text-text-muted" : isWin ? "text-green-primary" : isBE ? "text-yellow-warn" : "text-red-loss"}`}>
                       {pnlVal === undefined || pnlVal === null ? "—" : `${pnlVal >= 0 ? "+" : "-"}$${Math.abs(pnlVal).toFixed(2)}`}
                     </td>

@@ -857,7 +857,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
     const avgExitN = calc.avgExitPrice;
 
     let holdTimeMinutes: number | undefined;
-    if (dateOpen && timeOpen && timeClose) {
+    if (savedResult !== "Open" && dateOpen && timeOpen && timeClose) {
       const open_ = new Date(`${dateOpen}T${timeOpen}`);
       const close_ = new Date(`${dateClose || dateOpen}T${timeClose}`);
       holdTimeMinutes = Math.round((close_.getTime() - open_.getTime()) / 60000);
@@ -877,12 +877,16 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
       exits: hasExit ? validExits.map(({ price, contracts, time }) => ({ price, contracts, time })) : [],
       avgExitPrice: avgExitN !== undefined ? parseFloat(avgExitN.toFixed(assetCfg.decimalPlaces)) : undefined,
       contractsExited: hasExit ? validExitContracts : 0,
+      openContracts: calc.openContracts,
       brokerId: broker, commissionPerSide: commPerSide,
       totalCommission: calc.totalCommission ?? 0,
+      accruedCommission: calc.accruedCommission,
+      openCommission: calc.openCommission,
       grossPnl: calc.grossPnl, netPnl: calc.netPnl,
       pnlPerContract: calc.pnlPerContract,
       rMultiple: calc.rMultiple,
       grossRMultiple: calc.grossRMultiple,
+      status: calc.status,
       result: savedResult,
       mae: parseFloat(mae) || undefined, mfe: parseFloat(mfe) || undefined,
       strategy, setup, setupGrade, planFollowed, isBreakeven, isFundedAccount: isFunded,

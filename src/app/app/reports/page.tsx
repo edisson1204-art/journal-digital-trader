@@ -19,7 +19,7 @@ const REPORT_TYPES = [
 ];
 
 import { useTradeStore } from "@/store/tradeStore";
-import { computeStats, localDateKey, type TradeRecord } from "@/lib/tradeTypes";
+import { computeStats, getPointValue, localDateKey, type TradeRecord } from "@/lib/tradeTypes";
 
 export type ReportAccount = "all" | "personal" | "funded";
 
@@ -28,7 +28,7 @@ export function filterReportTrades(
   trades: TradeRecord[], period: string, month: string, year: string, account: ReportAccount
 ): TradeRecord[] {
   return trades.filter(t => {
-    const d = t.dateOpen || "";
+    const d = (t.result !== "Open" ? (t.dateClose || t.dateOpen) : t.dateOpen) || "";
     let inPeriod = false;
     if (period === "month") inPeriod = d.startsWith(month);
     else if (period === "year") inPeriod = d.startsWith(year);
@@ -70,50 +70,83 @@ export function calculateQuantStats(trades: TradeRecord[]) {
   const tradesWithMae = closed.filter(t => t.mae !== undefined && t.mae !== null && Number.isFinite(t.mae));
   const tradesWithMfe = closed.filter(t => t.mfe !== undefined && t.mfe !== null && Number.isFinite(t.mfe));
   const mae: number | null = tradesWithMae.length > 0
-    ? round2dp(tradesWithMae.reduce((acc, t) => acc + (t.mae as number), 0) / tradesWithMae.length)
+    ? tradesWithMae
+        .reduce((acc, t) => acc.plus(new Decimal(t.mae as number)), new Decimal(0))
+        .div(tradesWithMae.length)
+        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+        .toNumber()
     : null;
   const mfe: number | null = tradesWithMfe.length > 0
-    ? round2dp(tradesWithMfe.reduce((acc, t) => acc + (t.mfe as number), 0) / tradesWithMfe.length)
+    ? tradesWithMfe
+        .reduce((acc, t) => acc.plus(new Decimal(t.mfe as number)), new Decimal(0))
+        .div(tradesWithMfe.length)
+        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+        .toNumber()
+    : null;
+  const maeUsd: number | null = tradesWithMae.length > 0
+    ? tradesWithMae
+        .reduce((acc, t) => {
+          const pv = getPointValue(t.assetClass, t.instrument);
+          const qty = t.contractsExited || t.totalContracts || 1;
+          return acc.plus(new Decimal(t.mae as number).mul(pv).mul(qty));
+        }, new Decimal(0))
+        .div(tradesWithMae.length)
+        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+        .toNumber()
+    : null;
+  const mfeUsd: number | null = tradesWithMfe.length > 0
+    ? tradesWithMfe
+        .reduce((acc, t) => {
+          const pv = getPointValue(t.assetClass, t.instrument);
+          const qty = t.contractsExited || t.totalContracts || 1;
+          return acc.plus(new Decimal(t.mfe as number).mul(pv).mul(qty));
+        }, new Decimal(0))
+        .div(tradesWithMfe.length)
+        .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+        .toNumber()
     : null;
 
   // R2-06: Eliminado el contrafactual "Set & Forget" (efficiencyPassive) sin serie intratrade real
-  const efficiencyActive = closed.reduce((acc, t) => acc + (t.netPnl ?? 0), 0);
+  const efficiencyActive = closed
+    .reduce((acc, t) => acc.plus(new Decimal(t.netPnl ?? 0)), new Decimal(0))
+    .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+    .toNumber();
 
-  const setupGroups: Record<string, { wins: number, count: number, net: number }> = {};
+  const setupGroups: Record<string, { wins: number, count: number, net: Decimal }> = {};
   closed.forEach(t => {
     const s = t.setup || t.strategy || "General";
-    if (!setupGroups[s]) setupGroups[s] = { wins: 0, count: 0, net: 0 };
+    if (!setupGroups[s]) setupGroups[s] = { wins: 0, count: 0, net: new Decimal(0) };
     setupGroups[s].count++;
-    setupGroups[s].net += t.netPnl ?? 0;
+    setupGroups[s].net = setupGroups[s].net.plus(new Decimal(t.netPnl ?? 0));
     if (t.result === "Win") setupGroups[s].wins++;
   });
   const setups = Object.entries(setupGroups).map(([name, data]) => ({
     name,
     count: data.count,
-    winRate: round2dp((data.wins / data.count) * 100),
-    netPnl: round2dp(data.net),
-    expectancy: round2dp(data.net / data.count),
-  })).sort((a,b) => b.expectancy - a.expectancy).slice(0, 6);
+    winRate: new Decimal(data.wins).div(data.count).mul(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+    netPnl: data.net.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+    expectancy: data.net.div(data.count).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+  })).sort((a,b) => b.expectancy - a.expectancy);
 
-  const sessionGroups: Record<string, { wins: number, count: number, net: number }> = {};
+  const sessionGroups: Record<string, { wins: number, count: number, net: Decimal }> = {};
   closed.forEach(t => {
     const s = t.session || "Other";
-    if (!sessionGroups[s]) sessionGroups[s] = { wins: 0, count: 0, net: 0 };
+    if (!sessionGroups[s]) sessionGroups[s] = { wins: 0, count: 0, net: new Decimal(0) };
     sessionGroups[s].count++;
-    sessionGroups[s].net += t.netPnl ?? 0;
+    sessionGroups[s].net = sessionGroups[s].net.plus(new Decimal(t.netPnl ?? 0));
     if (t.result === "Win") sessionGroups[s].wins++;
   });
   const sessions = Object.entries(sessionGroups).map(([name, data]) => ({
     name,
     count: data.count,
-    winRate: round2dp((data.wins / data.count) * 100),
-    pnl: round2dp(data.net),
-  })).sort((a,b) => b.pnl - a.pnl).slice(0, 4);
+    winRate: new Decimal(data.wins).div(data.count).mul(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+    pnl: data.net.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+  })).sort((a,b) => b.pnl - a.pnl);
 
   const holdingGroups = [
-    { name: "Scalping (< 15m)", min: 0, max: 15, wins: 0, count: 0, net: 0 },
-    { name: "Intraday (15m - 4h)", min: 15, max: 240, wins: 0, count: 0, net: 0 },
-    { name: "Swing (> 4h)", min: 240, max: 999999, wins: 0, count: 0, net: 0 }
+    { name: "Scalping (< 15m)", min: 0, max: 15, wins: 0, count: 0, net: new Decimal(0) },
+    { name: "Intraday (15m - 4h)", min: 15, max: 240, wins: 0, count: 0, net: new Decimal(0) },
+    { name: "Swing (> 4h)", min: 240, max: 999999, wins: 0, count: 0, net: new Decimal(0) }
   ];
   let unrecordedHoldTimeCount = 0;
   closed.forEach(t => {
@@ -124,7 +157,7 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     }
     const ht = t.holdTimeMinutes;
     const g = holdingGroups.find(grp => ht >= grp.min && ht < grp.max);
-    if (g) { g.count++; g.net += t.netPnl ?? 0; if (t.result === "Win") g.wins++; }
+    if (g) { g.count++; g.net = g.net.plus(new Decimal(t.netPnl ?? 0)); if (t.result === "Win") g.wins++; }
   });
   
   const holdingTimes = holdingGroups
@@ -132,28 +165,34 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     .map(g => ({
       type: g.name,
       count: g.count,
-      winRate: g.count ? round2dp((g.wins / g.count) * 100) : 0, 
-      pnl: round2dp(g.net)
+      winRate: g.count ? new Decimal(g.wins).div(g.count).mul(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber() : 0, 
+      pnl: g.net.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber()
     }));
 
   const stats = computeStats(closed);
-  const wr = stats.winRate / 100;
+  const pWin = closed.length > 0 ? stats.wins / closed.length : 0;
+  const pLoss = closed.length > 0 ? stats.losses / closed.length : 0;
 
   let riskOfRuin: number | null = null;
-  if (closed.length >= 10 && wr > 0 && stats.avgWin > 0 && stats.avgLoss > 0) {
-    const rr = stats.avgLoss / stats.avgWin;
-    const edge = wr - (1 - wr) * rr;
-    if (edge <= 0) {
-      riskOfRuin = 99.9;
+  if (closed.length >= 10 && pWin > 0 && stats.avgWin > 0) {
+    if (pLoss <= 0 || stats.avgLoss <= 0) {
+      riskOfRuin = 0;
     } else {
-      const rorRaw = Math.pow((1 - edge) / (1 + edge), 20) * 100;
-      riskOfRuin = parseFloat(Math.min(99.9, Math.max(0.01, rorRaw)).toFixed(2));
+      const payoff = stats.avgWin / stats.avgLoss;
+      const edge = pWin * payoff - pLoss;
+      if (edge <= 0) {
+        riskOfRuin = 99.9;
+      } else {
+        const q = pLoss / (pWin * payoff);
+        const rorRaw = Math.pow(q, 20) * 100;
+        riskOfRuin = round2dp(Math.min(99.9, Math.max(0, rorRaw)));
+      }
     }
   }
 
   const dailyPnlMap: Record<string, number> = {};
   closed.forEach(t => {
-    const day = t.dateOpen;
+    const day = t.dateClose || t.dateOpen;
     dailyPnlMap[day] = (dailyPnlMap[day] || 0) + (t.netPnl ?? 0);
   });
   const dailyPnls = Object.values(dailyPnlMap).filter(v => v > 0);
@@ -172,10 +211,12 @@ export function calculateQuantStats(trades: TradeRecord[]) {
     riskOfRuin,
     mae,
     mfe,
+    maeUsd,
+    mfeUsd,
     recordedMaeCount: tradesWithMae.length,
     recordedMfeCount: tradesWithMfe.length,
     unrecordedHoldTimeCount,
-    efficiencyActive: round2dp(efficiencyActive),
+    efficiencyActive,
     recoveryDays,
     sessions, holdingTimes, setups
   };
@@ -249,10 +290,18 @@ export function generateNarrativeTraceability(
   if (!stats || !stats.closedTrades || stats.closedTrades <= 0 || !quant) return [];
   const pfFormatted = formatProfitFactor(stats);
   const sampleN = stats.closedTrades;
-  const maeTextEs = quant.mae !== null ? `-$${quant.mae} (n=${quant.recordedMaeCount})` : "No registrado";
-  const mfeTextEs = quant.mfe !== null ? `+$${quant.mfe} (n=${quant.recordedMfeCount})` : "No registrado";
-  const maeTextEn = quant.mae !== null ? `-$${quant.mae} (n=${quant.recordedMaeCount})` : "Not recorded";
-  const mfeTextEn = quant.mfe !== null ? `+$${quant.mfe} (n=${quant.recordedMfeCount})` : "Not recorded";
+  const maeTextEs = quant.mae !== null
+    ? `${quant.mae} pts${quant.maeUsd !== undefined && quant.maeUsd !== null ? ` (-$${quant.maeUsd.toFixed(2)})` : ""} (n=${quant.recordedMaeCount})`
+    : "No registrado";
+  const mfeTextEs = quant.mfe !== null
+    ? `${quant.mfe} pts${quant.mfeUsd !== undefined && quant.mfeUsd !== null ? ` (+$${quant.mfeUsd.toFixed(2)})` : ""} (n=${quant.recordedMfeCount})`
+    : "No registrado";
+  const maeTextEn = quant.mae !== null
+    ? `${quant.mae} pts${quant.maeUsd !== undefined && quant.maeUsd !== null ? ` (-$${quant.maeUsd.toFixed(2)})` : ""} (n=${quant.recordedMaeCount})`
+    : "Not recorded";
+  const mfeTextEn = quant.mfe !== null
+    ? `${quant.mfe} pts${quant.mfeUsd !== undefined && quant.mfeUsd !== null ? ` (+$${quant.mfeUsd.toFixed(2)})` : ""} (n=${quant.recordedMfeCount})`
+    : "Not recorded";
 
   if (lang === "en") {
     if (type === "technical") {
@@ -646,13 +695,17 @@ export default function ReportsPage() {
                         <div className="flex justify-between items-center mb-3 print:mb-1">
                           <span className="text-[12px] print:text-[11px] text-slate-600 font-medium">MAE Promedio</span>
                           <span className="text-[13px] print:text-[12px] font-black text-red-500 tabular-nums">
-                            {QUANT_STATS.mae !== null ? `-$${QUANT_STATS.mae.toFixed(2)}` : "No registrado"}
+                            {QUANT_STATS.mae !== null
+                              ? `${QUANT_STATS.mae.toFixed(2)} pts${QUANT_STATS.maeUsd != null ? ` (-$${QUANT_STATS.maeUsd.toFixed(2)})` : ""}`
+                              : "No registrado"}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[12px] print:text-[11px] text-slate-600 font-medium">MFE Promedio</span>
                           <span className="text-[13px] print:text-[12px] font-black text-emerald-600 tabular-nums">
-                            {QUANT_STATS.mfe !== null ? `+$${QUANT_STATS.mfe.toFixed(2)}` : "No registrado"}
+                            {QUANT_STATS.mfe !== null
+                              ? `${QUANT_STATS.mfe.toFixed(2)} pts${QUANT_STATS.mfeUsd != null ? ` (+$${QUANT_STATS.mfeUsd.toFixed(2)})` : ""}`
+                              : "No registrado"}
                           </span>
                         </div>
                       </div>

@@ -74,8 +74,8 @@ export async function POST(req: Request) {
 - Peor día de la semana: ${patterns.worstDay || 'Sin datos'} (P&L: $${patterns.worstDayPnl?.toFixed(2) || '—'})
 - Mejor instrumento: ${patterns.bestAsset || 'Sin datos'} ($${patterns.bestAssetPnl?.toFixed(2) || '—'} neto)
 - Revenge Trading detectado: ${patterns.revengeCount || 0} casos
-- Win Rate en Long: ${patterns.longWinRate || '—'}%
-- Win Rate en Short: ${patterns.shortWinRate || '—'}%
+- Win Rate en Long: ${patterns.longWinRate ?? '—'}%
+- Win Rate en Short: ${patterns.shortWinRate ?? '—'}%
 - Mejor sesión de mercado: ${patterns.bestSession || 'Sin datos'}
 `;
       }

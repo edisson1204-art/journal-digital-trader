@@ -17,12 +17,14 @@ import {
 import { useTradeStore } from "@/store/tradeStore";
 
 /* ─── Result badge ─── */
-function ResultBadge({ result }: { result: TradeResult }) {
-  const c = result === "Win" ? "bg-green-primary/15 text-green-primary" :
+function ResultBadge({ result, isPartial }: { result: TradeResult; isPartial?: boolean }) {
+  const label = isPartial ? "Partial" : result;
+  const c = isPartial ? "bg-amber-500/15 text-amber-400" :
+            result === "Win" ? "bg-green-primary/15 text-green-primary" :
             result === "Loss" ? "bg-red-loss/15 text-red-loss" :
             result === "Breakeven" ? "bg-yellow-warn/15 text-yellow-warn" :
             "bg-blue-accent/15 text-blue-accent";
-  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap ${c}`}>{result}</span>;
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap ${c}`}>{label}</span>;
 }
 
 /* ─── P&L colored cell ─── */
@@ -311,7 +313,7 @@ export default function JournalPage() {
                         <td className={`px-3 py-2.5 font-bold tabular-nums ${(t.rMultiple??0)>=0?"text-blue-accent":"text-red-loss"}`}>
                           {t.rMultiple !== undefined ? `${t.rMultiple>=0?"+":""}${t.rMultiple}R` : "—"}
                         </td>
-                        <td className="px-3 py-2.5"><ResultBadge result={t.result} /></td>
+                        <td className="px-3 py-2.5"><ResultBadge result={t.result} isPartial={t.status === "PARTIALLY_CLOSED" || (t.result === "Open" && (t.contractsExited ?? 0) > 0 && (t.contractsExited ?? 0) < t.totalContracts)} /></td>
                         <td className="px-3 py-2.5 text-text-secondary whitespace-nowrap">{t.strategy}</td>
                         <td className="px-3 py-2.5">
                           <span className={`font-bold ${t.setupGrade==="A+"||t.setupGrade==="A"?"text-green-primary":t.setupGrade==="B"?"text-blue-accent":"text-yellow-warn"}`}>
@@ -361,12 +363,27 @@ export default function JournalPage() {
                       </td>
                       <td className="px-3 py-3 tabular-nums text-yellow-warn font-bold text-[12px]">
                         -${stats.totalCommissions.toFixed(2)}
+                        {(stats.partialPositionsCount ?? 0) > 0 && (
+                          <div className="text-[10px] text-amber-400 font-normal">
+                            -${(stats.partialRealizedCommission ?? 0).toFixed(2)} parcial
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-3 tabular-nums font-bold text-[12px]">
                         <Pnl v={stats.totalGross} />
+                        {(stats.partialPositionsCount ?? 0) > 0 && (
+                          <div className="text-[10px] text-amber-400 font-normal">
+                            {(stats.partialRealizedGross ?? 0) >= 0 ? "+" : "-"}${Math.abs(stats.partialRealizedGross ?? 0).toFixed(2)} parcial
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-3 tabular-nums font-bold text-[12px]">
                         <Pnl v={stats.totalNet} />
+                        {(stats.partialPositionsCount ?? 0) > 0 && (
+                          <div className="text-[10px] text-amber-400 font-normal">
+                            {(stats.partialRealizedNet ?? 0) >= 0 ? "+" : "-"}${Math.abs(stats.partialRealizedNet ?? 0).toFixed(2)} parcial
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-3 tabular-nums font-bold text-[12px]">
                         <span className={stats.avgRMultiple>=0?"text-blue-accent":"text-red-loss"}>

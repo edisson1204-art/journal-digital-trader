@@ -42,7 +42,7 @@ function DayDetailPanel({ date, dayTrades, onClose }: {
       <div className="flex items-center justify-between px-5 py-4 border-b border-border-card/60 bg-bg-section/40">
         <div>
           <p className="text-[13px] font-bold text-text-primary capitalize">{dayLabel}</p>
-          <p className="text-[11px] text-text-muted">{dayTrades.length} operaciones · Win Rate: {dayTrades.length ? Math.round((dayWins / dayTrades.length) * 100) : 0}%</p>
+          <p className="text-[11px] text-text-muted">{dayTrades.length} operaciones · Win Rate: {dayTrades.length ? Number(((dayWins / dayTrades.length) * 100).toFixed(1)) : 0}%</p>
         </div>
         <div className="flex items-center gap-3">
           <p className={`text-[20px] font-black tabular-nums ${dayPnl >= 0 ? "text-green-primary" : "text-red-loss"}`}>
@@ -131,7 +131,7 @@ export default function CalendarPage() {
     const map: Record<string, { pnl: number; trades: number; wins: number; losses: number; breakevens: number }> = {};
     const closed = trades.filter(t => t.result !== "Open");
     for (const t of closed) {
-      const d = t.dateOpen;
+      const d = t.dateClose || t.dateOpen;
       if (!map[d]) map[d] = { pnl: 0, trades: 0, wins: 0, losses: 0, breakevens: 0 };
       map[d].pnl = parseFloat((map[d].pnl + (t.netPnl || 0)).toFixed(2));
       map[d].trades++;
@@ -146,8 +146,8 @@ export default function CalendarPage() {
   const selectedDayTrades = useMemo(() => {
     if (!selectedDay) return [];
     return trades
-      .filter(t => t.dateOpen === selectedDay && t.result !== "Open")
-      .sort((a, b) => (a.timeOpen || "").localeCompare(b.timeOpen || ""));
+      .filter(t => (t.dateClose || t.dateOpen) === selectedDay && t.result !== "Open")
+      .sort((a, b) => (a.timeClose || a.timeOpen || "").localeCompare(b.timeClose || b.timeOpen || ""));
   }, [trades, selectedDay]);
 
   if (!isHydrated) return null;
@@ -179,7 +179,7 @@ export default function CalendarPage() {
             { label: "Total Trades",      value: String(monthTrades),   color: "text-text-primary" },
             { label: "Días con Profit",   value: String(profitDays),    color: "text-green-primary" },
             { label: "Días con Pérdida",  value: String(lossDays),      color: "text-red-loss" },
-            { label: "Win Rate (trades)", value: monthTrades ? `${Math.round(monthWins / monthTrades * 100)}%` : "—", color: "text-blue-accent" },
+            { label: "Win Rate (trades)", value: monthTrades ? `${Number(((monthWins / monthTrades) * 100).toFixed(1))}%` : "—", color: "text-blue-accent" },
           ].map(s => (
             <div key={s.label} className="rounded-card border border-border-card bg-bg-card p-3">
               <p className="text-[10px] text-text-muted mb-1">{s.label}</p>

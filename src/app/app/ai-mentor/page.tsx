@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useChat } from "ai/react";
 import { useTradeStore } from "@/store/tradeStore";
-import { computeStats } from "@/lib/tradeTypes";
+import { computeStats, getPointValue } from "@/lib/tradeTypes";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 
@@ -56,11 +56,21 @@ export default function AIMentorPage() {
     let revengeCount = 0;
 
     // Orden cronológico ascendente (más antiguo -> más reciente) para evaluar secuencia temporal
+    const tradeRiskUsd = (t: typeof closed[number]) => {
+      const pv = getPointValue(t.assetClass, t.instrument);
+      const sl = t.initialStopLoss ?? t.stopLoss ?? 0;
+      const dist = Math.abs((t.avgEntryPrice || 0) - sl);
+      return dist > 0 ? dist * (t.totalContracts || 1) * pv : (t.totalContracts || 1) * pv;
+    };
     const chronological = [...closed].reverse();
     chronological.forEach((curr, idx) => {
       if (idx > 0) {
         const prev = chronological[idx - 1];
-        if (prev.result === "Loss" && curr.totalContracts > prev.totalContracts * 1.3) {
+        if (
+          prev.result === "Loss" &&
+          (curr.dateOpen || "") === (prev.dateOpen || "") &&
+          tradeRiskUsd(curr) > tradeRiskUsd(prev) * 1.3
+        ) {
           revengeCount++;
         }
       }
@@ -68,7 +78,7 @@ export default function AIMentorPage() {
 
     closed.forEach((t) => {
       // Días
-      const d = days[new Date(t.dateOpen + "T12:00:00").getDay()];
+      const d = days[new Date((t.dateClose || t.dateOpen) + "T12:00:00").getDay()];
       pnlByDay[d] = (pnlByDay[d] || 0) + (t.netPnl || 0);
       // Activos
       if (!pnlByAsset[t.instrument]) pnlByAsset[t.instrument] = { pnl: 0, wins: 0, total: 0 };
@@ -121,8 +131,8 @@ export default function AIMentorPage() {
         bestAssetPnl: bestAsset?.[1]?.pnl,
         bestAssetWinRate: bestAsset ? Math.round((bestAsset[1].wins / bestAsset[1].total) * 100) : null,
         bestSession: bestSession?.[0],
-        longWinRate: longTotal > 0 ? Math.round((longWins / longTotal) * 100) : null,
-        shortWinRate: shortTotal > 0 ? Math.round((shortWins / shortTotal) * 100) : null,
+        longWinRate: longTotal > 0 ? Number(((longWins / longTotal) * 100).toFixed(1)) : null,
+        shortWinRate: shortTotal > 0 ? Number(((shortWins / shortTotal) * 100).toFixed(1)) : null,
         revengeCount,
         totalInstruments: Object.keys(pnlByAsset).length,
       },
