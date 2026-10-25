@@ -292,7 +292,17 @@ export const useTradeStore = create<TradeStore>()(
     }),
     {
       name: "trading-intelligence-storage",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
+          return window.localStorage;
+        }
+        const mem = new Map<string, string>();
+        return {
+          getItem: (k: string) => mem.get(k) ?? null,
+          setItem: (k: string, v: string) => { mem.set(k, v); },
+          removeItem: (k: string) => { mem.delete(k); },
+        };
+      }),
       partialize: (s) => ({ trades: s.trades, stats: s.stats, settings: s.settings, ownerId: s.ownerId }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated(true);

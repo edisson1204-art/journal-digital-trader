@@ -1393,13 +1393,21 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>MAE — Máxima Excursión Adversa (puntos)</Label>
-                      <NumInput value={mae} onChange={setMae} placeholder="Máximo drawdown dentro del trade" />
-                      <Hint>Cuánto fue el precio en tu contra antes de la salida</Hint>
+                      <NumInput value={mae} onChange={setMae} placeholder="Ej. 5.5 (en puntos)" suffix="pts" />
+                      <Hint>
+                        {parseFloat(mae) > 0
+                          ? `Excursión adversa en puntos · Equiv.: -$${(parseFloat(mae) * getPointValue(instrument === "Custom" ? customInstrument : instrument, assetClass) * (contractsExited || totalContracts || 1)).toFixed(2)} USD`
+                          : "Cuánto fue el precio en tu contra en puntos del instrumento"}
+                      </Hint>
                     </div>
                     <div>
                       <Label>MFE — Máxima Excursión Favorable (puntos)</Label>
-                      <NumInput value={mfe} onChange={setMfe} placeholder="Máximo profit visto" />
-                      <Hint>El máximo profit que podría haberse tomado</Hint>
+                      <NumInput value={mfe} onChange={setMfe} placeholder="Ej. 15.0 (en puntos)" suffix="pts" />
+                      <Hint>
+                        {parseFloat(mfe) > 0
+                          ? `Excursión favorable en puntos · Equiv.: +$${(parseFloat(mfe) * getPointValue(instrument === "Custom" ? customInstrument : instrument, assetClass) * (contractsExited || totalContracts || 1)).toFixed(2)} USD`
+                          : "Máximo recorrido a favor en puntos del instrumento"}
+                      </Hint>
                     </div>
                   </div>
                 </Section>
@@ -1451,13 +1459,42 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                     </div>
                   </div>
 
-                  <div>
-                    <Label>Tipo de Error Cometido (si aplica)</Label>
-                    <Sel
-                      value={mistakeType || ""}
-                      onChange={setMistakeType}
-                      options={["(Ninguno — ejecución limpia)", ...MISTAKE_TYPES]}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                    <div>
+                      <Label>Tipo de Error Cometido (si aplica)</Label>
+                      <Sel
+                        value={mistakeType || ""}
+                        onChange={setMistakeType}
+                        options={["(Ninguno — ejecución limpia)", ...MISTAKE_TYPES]}
+                      />
+                    </div>
+                    <div>
+                      <Label>Cumplimiento del Plan Operativo</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPlanFollowed(true)}
+                          className={`py-2.5 px-3 rounded-lg text-[12px] font-bold transition-all ${
+                            planFollowed
+                              ? "bg-green-primary/20 text-green-primary border border-green-primary/40"
+                              : "bg-bg-section border border-border-card text-text-muted hover:text-text-secondary"
+                          }`}
+                        >
+                          ✓ Sí seguí el plan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPlanFollowed(false)}
+                          className={`py-2.5 px-3 rounded-lg text-[12px] font-bold transition-all ${
+                            !planFollowed
+                              ? "bg-red-loss/20 text-red-loss border border-red-loss/40"
+                              : "bg-bg-section border border-border-card text-text-muted hover:text-text-secondary"
+                          }`}
+                        >
+                          ✕ No seguí el plan
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </Section>
 
