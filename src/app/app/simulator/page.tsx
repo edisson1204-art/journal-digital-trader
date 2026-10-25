@@ -706,7 +706,7 @@ export default function SimulatorPage() {
               <div className="mt-4 rounded-xl bg-bg-section border border-border-card/60 p-3 text-[11px] flex flex-col gap-1.5">
                 <p className="text-[9px] font-bold uppercase tracking-wider text-text-muted mb-1">Vista Previa</p>
                 {[
-                  { label:"WR efectivo",       value: canRun ? `${WR}%` : "—" },
+                  { label:"WR efectivo",       value: canRun ? `${Number(WR.toFixed(1))}%` : "—" },
                   { label:"Expectancy/trade",  value: canRun ? `${liveExp >= 0?"+":"-"}$${Math.abs(liveExp).toFixed(2)}` : "—", color: !canRun ? "text-text-muted" : liveExp >= 0 ? "text-green-primary":"text-red-loss" },
                   { label:"R:R efectivo",      value: canRun && liveRR !== "—" ? `1:${liveRR}` : "—", color:"text-blue-accent" },
                   { label:"Ganancia esperada", value: canRun ? `${liveExp >= 0?"+":"-"}$${Math.abs(liveExp * NT).toFixed(0)} en ${NT}T` : "—", color: !canRun ? "text-text-muted" : liveExp >= 0 ? "text-green-primary":"text-red-loss" },

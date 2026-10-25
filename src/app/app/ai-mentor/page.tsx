@@ -236,23 +236,26 @@ export default function AIMentorPage() {
     const insights = [];
     const nBadge = `Muestra n=${closed.length}`;
 
+    const pluralDay = (d: string) => (d.endsWith("s") ? d : `${d}s`);
     if (patterns.bestDay && (patterns.bestDayPnl ?? 0) > 0) {
+      const bDay = pluralDay(patterns.bestDay);
       insights.push({
         type: "performance",
         icon: <TrendingUp className="h-5 w-5 text-green-primary" />,
-        title: `✅ Mayor resultado por día: ${patterns.bestDay}s`,
-        body: `En la muestra registrada, los ${patterns.bestDay}s concentran el mayor P&L neto acumulado (+$${Math.abs(patterns.bestDayPnl ?? 0).toFixed(2)}). Mantén las mismas reglas de riesgo y ejecución en esa sesión.`,
+        title: `✅ Mayor resultado por día: ${bDay}`,
+        body: `En la muestra registrada, los ${bDay} concentran el mayor P&L neto acumulado (+$${Math.abs(patterns.bestDayPnl ?? 0).toFixed(2)}). Mantén las mismas reglas de riesgo y ejecución en esa sesión.`,
         sampleBadge: nBadge,
         color: "border-green-primary/30 bg-green-primary/5",
       });
     }
 
     if (patterns.worstDay && (patterns.worstDayPnl ?? 0) < 0) {
+      const wDay = pluralDay(patterns.worstDay);
       insights.push({
         type: "warning",
         icon: <TrendingDown className="h-5 w-5 text-red-loss" />,
-        title: `⚠️ Menor resultado por día: ${patterns.worstDay}s`,
-        body: `En la muestra actual, los ${patterns.worstDay}s registran un resultado neto acumulado de -$${Math.abs(patterns.worstDayPnl ?? 0).toFixed(2)}. Revisa si coincide con mayor frecuencia de entradas fuera de plan.`,
+        title: `⚠️ Menor resultado por día: ${wDay}`,
+        body: `En la muestra actual, los ${wDay} registran un resultado neto acumulado de -$${Math.abs(patterns.worstDayPnl ?? 0).toFixed(2)}. Revisa si coincide con mayor frecuencia de entradas fuera de plan.`,
         sampleBadge: nBadge,
         color: "border-red-loss/30 bg-red-loss/5",
       });
