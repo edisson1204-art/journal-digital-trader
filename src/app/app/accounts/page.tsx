@@ -13,6 +13,11 @@ import {
   TrendingUp,
   Award,
   Lock,
+  Target,
+  Calendar,
+  Layers,
+  Scale,
+  Activity,
   X,
 } from "lucide-react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -36,16 +41,16 @@ export interface PropAccountConfig {
   maxDailyLoss: number;
   maxTotalLoss: number;
   minTradingDays: number;
-  consistencyRulePct: number; // ej. 40% en MFFU Starter / LucidFlex, 50% en TopStep, 0% en MFFU Expert / LucidPro
-  maxMicros?: number;         // ej. 50 Micros (5 Minis) en MFFU Expert $50K, 40 en Lucy $50K
+  consistencyRulePct: number;
+  maxMicros?: number;
   status: "Active" | "Passed" | "Breached";
 }
 
 const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
   {
     id: "default-mffu-50k",
-    name: "My Funded Futures (MFFU) $50K",
-    firm: "My Funded Futures (MFFU)",
+    name: "MFFU Starter/Pro $50K",
+    firm: "My Funded Futures",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
@@ -60,7 +65,7 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
   },
   {
     id: "default-lucy-50k",
-    name: "Lucy Trading / LucidPro $50K",
+    name: "Lucy / LucidPro $50K",
     firm: "Lucy Trading (Lucid)",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
@@ -76,8 +81,8 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
   },
   {
     id: "default-funded-topstep",
-    name: "TopStep $50K — Cuenta Fondeada",
-    firm: "TopStep / Prop Firm",
+    name: "TopStep $50K Combine",
+    firm: "TopStep",
     accountType: "Cuenta Fondeada (PA / XFA)",
     filterMode: "funded",
     brokerFilter: "topstep",
@@ -93,7 +98,7 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
   {
     id: "default-personal",
     name: "Cuenta Personal Directa",
-    firm: "Bróker Personal",
+    firm: "Capital Propio",
     accountType: "Cuenta Personal",
     filterMode: "personal",
     initialBalance: 25000,
@@ -107,8 +112,8 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
   },
   {
     id: "default-all-portfolio",
-    name: "Portafolio Consolidado (Global)",
-    firm: "Todas las Cuentas",
+    name: "Portafolio Global",
+    firm: "Consolidado Total",
     accountType: "Portafolio Global",
     filterMode: "all",
     initialBalance: 50000,
@@ -122,10 +127,14 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
   },
 ];
 
-const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
+type PresetCategory = "MFFU" | "Lucy" | "TopStep" | "Otras";
+
+const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory; badge: string })[] = [
   {
-    name: "MFFU (My Funded Futures) Starter/Core $50K",
-    firm: "My Funded Futures (MFFU)",
+    category: "MFFU",
+    badge: "$50K · DLL $1,200 · Consistencia 40%",
+    name: "MFFU Starter / Core $50K",
+    firm: "My Funded Futures",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
@@ -139,8 +148,10 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
-    name: "MFFU (My Funded Futures) Expert/Pro $50K",
-    firm: "My Funded Futures (MFFU)",
+    category: "MFFU",
+    badge: "$50K · Sin DLL · Sin Consistencia",
+    name: "MFFU Expert / Pro $50K",
+    firm: "My Funded Futures",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
@@ -154,8 +165,10 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
-    name: "MFFU (My Funded Futures) Starter $100K",
-    firm: "My Funded Futures (MFFU)",
+    category: "MFFU",
+    badge: "$100K · DLL $2,400 · Consistencia 40%",
+    name: "MFFU Starter $100K",
+    firm: "My Funded Futures",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
@@ -169,8 +182,10 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
-    name: "MFFU (My Funded Futures) Expert/Pro $100K",
-    firm: "My Funded Futures (MFFU)",
+    category: "MFFU",
+    badge: "$100K · Sin DLL · Sin Consistencia",
+    name: "MFFU Expert / Pro $100K",
+    firm: "My Funded Futures",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
@@ -184,8 +199,10 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
-    name: "MFFU (My Funded Futures) Expert $150K",
-    firm: "My Funded Futures (MFFU)",
+    category: "MFFU",
+    badge: "$150K · Target $9K · EOD DD $4,500",
+    name: "MFFU Expert $150K",
+    firm: "My Funded Futures",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
@@ -199,6 +216,8 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "Lucy",
+    badge: "$50K · DLL $1,200 · Sin Consistencia",
     name: "Lucy Trading / LucidPro $50K",
     firm: "Lucy Trading (Lucid)",
     accountType: "Evaluación / Challenge",
@@ -214,6 +233,8 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "Lucy",
+    badge: "$50K · Sin DLL · Consistencia 40%",
     name: "Lucy Trading / LucidFlex $50K",
     firm: "Lucy Trading (Lucid)",
     accountType: "Evaluación / Challenge",
@@ -229,6 +250,8 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "Lucy",
+    badge: "$100K · DLL $1,800 · Sin Consistencia",
     name: "Lucy Trading / LucidPro $100K",
     firm: "Lucy Trading (Lucid)",
     accountType: "Evaluación / Challenge",
@@ -244,6 +267,8 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "Lucy",
+    badge: "$100K · Sin DLL · Consistencia 40%",
     name: "Lucy Trading / LucidFlex $100K",
     firm: "Lucy Trading (Lucid)",
     accountType: "Evaluación / Challenge",
@@ -259,6 +284,8 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "TopStep",
+    badge: "$50K · Target $3K · DLL $1K · DD $2K",
     name: "TopStep $50K Combine / XFA",
     firm: "TopStep",
     accountType: "Cuenta Fondeada (PA / XFA)",
@@ -274,6 +301,8 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "TopStep",
+    badge: "$100K · Target $6K · DLL $2K · DD $3K",
     name: "TopStep $100K Combine / XFA",
     firm: "TopStep",
     accountType: "Cuenta Fondeada (PA / XFA)",
@@ -289,6 +318,25 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "TopStep",
+    badge: "$150K · Target $9K · DLL $3K · DD $4.5K",
+    name: "TopStep $150K Combine / XFA",
+    firm: "TopStep",
+    accountType: "Cuenta Fondeada (PA / XFA)",
+    filterMode: "funded",
+    brokerFilter: "topstep",
+    initialBalance: 150000,
+    profitTarget: 9000,
+    maxDailyLoss: 3000,
+    maxTotalLoss: 4500,
+    minTradingDays: 5,
+    consistencyRulePct: 50,
+    maxMicros: 150,
+    status: "Active",
+  },
+  {
+    category: "Otras",
+    badge: "$50K · Target $3K · DD $2,500 · 7 días",
     name: "Apex Trader Funding $50K",
     firm: "Apex",
     accountType: "Evaluación / Challenge",
@@ -304,6 +352,8 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "Otras",
+    badge: "$50K · Target $3K · DLL $1,100 · DD $2K",
     name: "Take Profit Trader $50K",
     firm: "Take Profit Trader",
     accountType: "Evaluación / Challenge",
@@ -319,6 +369,8 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     status: "Active",
   },
   {
+    category: "Otras",
+    badge: "$100K · Target $10K · DLL $5K · DD $10K",
     name: "FTMO $100K Challenge",
     firm: "FTMO",
     accountType: "Evaluación / Challenge",
@@ -335,78 +387,97 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
   },
 ];
 
-const STORAGE_KEY = "tdi_prop_accounts_v3";
+const STORAGE_KEY = "tdi_prop_accounts_v4";
 
-function ProgressBar({ value, max, color = "bg-green-primary" }: {
-  value: number; max: number; color?: string;
+function ProgressBar({ value, max, color = "bg-green-primary", height = "h-2" }: {
+  value: number; max: number; color?: string; height?: string;
 }) {
   const pct = max > 0 ? Math.min(Math.max((value / max) * 100, 0), 100) : 0;
   return (
-    <div className="h-2.5 w-full rounded-full bg-border-card overflow-hidden">
-      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+    <div className={`${height} w-full rounded-full bg-border-card/80 overflow-hidden`}>
+      <div className={`h-full rounded-full transition-all duration-300 ${color}`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
-function RuleRow({
-  label,
-  current,
-  limit,
-  format = "dollar",
-  warn = 80,
+function RuleCard({
+  icon: Icon,
+  title,
+  badgeText,
+  badgeStatus,
+  currentLabel,
+  limitLabel,
+  pctUsed,
   isGoal = false,
-  subText,
+  warn = 80,
+  footerLeft,
+  footerRight,
+  disabledText,
 }: {
-  label: string;
-  current: number;
-  limit: number;
-  format?: "dollar" | "percent" | "days" | "contracts";
-  warn?: number;
+  icon: React.ElementType;
+  title: string;
+  badgeText: string;
+  badgeStatus: "ok" | "warn" | "danger" | "info";
+  currentLabel: string;
+  limitLabel: string;
+  pctUsed: number;
   isGoal?: boolean;
-  subText?: string;
+  warn?: number;
+  footerLeft: string;
+  footerRight?: string;
+  disabledText?: string;
 }) {
-  if (limit <= 0) return null;
-  const rawPct = (Math.max(0, current) / limit) * 100;
+  const badgeStyles =
+    badgeStatus === "ok"
+      ? "bg-green-primary/15 text-green-primary border-green-primary/30"
+      : badgeStatus === "warn"
+        ? "bg-yellow-warn/15 text-yellow-warn border-yellow-warn/30"
+        : badgeStatus === "danger"
+          ? "bg-red-loss/15 text-red-loss border-red-loss/30"
+          : "bg-blue-accent/15 text-blue-accent border-blue-accent/30";
 
-  let color = "bg-green-primary";
-  let textColor = "text-green-primary";
+  let barColor = "bg-green-primary";
   if (isGoal) {
-    color = rawPct >= 100 ? "bg-green-primary" : "bg-blue-accent";
-    textColor = rawPct >= 100 ? "text-green-primary" : "text-blue-accent";
+    barColor = pctUsed >= 100 ? "bg-green-primary" : "bg-blue-accent";
   } else {
-    const isDanger = rawPct >= 95;
-    const isWarn = rawPct >= warn;
-    color = isDanger ? "bg-red-loss" : isWarn ? "bg-yellow-warn" : "bg-green-primary";
-    textColor = isDanger ? "text-red-loss" : isWarn ? "text-yellow-warn" : "text-green-primary";
+    barColor = pctUsed >= 95 ? "bg-red-loss" : pctUsed >= warn ? "bg-yellow-warn" : "bg-green-primary";
   }
 
-  const fmt = (v: number) =>
-    format === "dollar"
-      ? `$${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      : format === "percent"
-        ? `${v.toFixed(1)}%`
-        : format === "days"
-          ? `${v} días`
-          : `${v} contratos`;
-
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5 text-[12px]">
-        <span className="text-text-secondary font-medium">{label}</span>
+    <div className="rounded-xl border border-border-card bg-bg-section/35 p-4 flex flex-col justify-between gap-3 hover:border-border-card/90 transition-colors">
+      <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className={`font-bold tabular-nums ${textColor}`}>{fmt(current)}</span>
-          <span className="text-text-muted tabular-nums">/ {fmt(limit)}</span>
-          {!isGoal && rawPct >= 95 && <AlertTriangle className="h-3.5 w-3.5 text-red-loss" />}
-          {isGoal && rawPct >= 100 && <CheckCircle className="h-3.5 w-3.5 text-green-primary" />}
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-bg-card border border-border-card text-text-secondary">
+            <Icon className="h-3.5 w-3.5" />
+          </div>
+          <span className="text-[12px] font-bold text-text-primary leading-tight">{title}</span>
         </div>
+        <span className={`rounded-full border px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider whitespace-nowrap ${badgeStyles}`}>
+          {badgeText}
+        </span>
       </div>
-      <ProgressBar value={Math.max(0, current)} max={limit} color={color} />
-      <div className="flex items-center justify-between mt-1">
-        <p className="text-[10px] text-text-muted">
-          {rawPct.toFixed(1)}% {isGoal ? "completado" : "utilizado"}
-        </p>
-        {subText && <p className="text-[10px] text-text-muted">{subText}</p>}
-      </div>
+
+      {disabledText ? (
+        <div className="py-2">
+          <p className="text-[13px] font-bold text-green-primary">{disabledText}</p>
+          <p className="text-[10.5px] text-text-muted mt-0.5">{footerLeft}</p>
+        </div>
+      ) : (
+        <>
+          <div>
+            <div className="flex items-baseline justify-between gap-2 mb-1.5">
+              <span className="text-[17px] font-black tabular-nums text-text-primary">{currentLabel}</span>
+              <span className="text-[11px] font-semibold tabular-nums text-text-muted">de {limitLabel}</span>
+            </div>
+            <ProgressBar value={pctUsed} max={100} color={barColor} />
+          </div>
+
+          <div className="flex items-center justify-between gap-2 text-[10.5px] text-text-muted pt-0.5 border-t border-border-card/40">
+            <span className="truncate">{footerLeft}</span>
+            {footerRight && <span className="font-semibold text-text-secondary shrink-0 tabular-nums">{footerRight}</span>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -415,10 +486,11 @@ export default function AccountsPage() {
   const { trades, isHydrated } = useTradeStore();
   const [accounts, setAccounts] = useState<PropAccountConfig[]>(DEFAULT_ACCOUNTS);
   const [selectedId, setSelectedId] = useState<string>(DEFAULT_ACCOUNTS[0].id);
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "prop" | "personal">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<PropAccountConfig | null>(null);
+  const [presetTab, setPresetTab] = useState<PresetCategory>("MFFU");
 
-  // Cargar cuentas personalizadas de localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -443,7 +515,6 @@ export default function AccountsPage() {
     }
   };
 
-  // Calcular métricas en tiempo real desde el Ledger para cada cuenta
   const computedAccounts = useMemo(() => {
     const todayKey = localDateKey();
     return accounts.map(acc => {
@@ -459,7 +530,6 @@ export default function AccountsPage() {
       const stats = computeStats(matchingTrades);
       const closed = matchingTrades.filter(isStrictlyClosed);
 
-      // P&L por día efectivo ordenado cronológicamente para calcular EOD Trailing Floor
       const dayMap: Record<string, number> = {};
       for (const t of closed) {
         const d = effectiveTradeDate(t);
@@ -475,7 +545,6 @@ export default function AccountsPage() {
       const currentProfit = stats.totalNet;
       const currentBalance = parseFloat((acc.initialBalance + currentProfit).toFixed(2));
 
-      // EOD High-Water Mark y Piso de Liquidación EOD (con candado en Balance Inicial como MFFU / Lucy / TopStep)
       let runningBalance = acc.initialBalance;
       let eodHighWaterMark = acc.initialBalance;
       for (const d of sortedDays) {
@@ -493,14 +562,10 @@ export default function AccountsPage() {
         ? parseFloat(Math.max(0, currentBalance - eodLiquidationFloor).toFixed(2))
         : 0;
 
-      // Máximo tamaño de posición observado (contratos)
       const maxContractsUsed = closed.reduce((mx, t) => Math.max(mx, t.totalContracts || 0), 0);
-
-      // Pérdida consumida hoy (si hoy es negativo) y en el peor día histórico
       const dailyLossToday = todayPnl < 0 ? Math.abs(todayPnl) : 0;
       const maxObservedDailyLoss = worstDayPnl < 0 ? Math.abs(worstDayPnl) : 0;
 
-      // Consistencia: qué % representa el mejor día sobre el profit total positivo
       const consistencyPctObserved = currentProfit > 0
         ? parseFloat(((bestDayPnl / currentProfit) * 100).toFixed(1))
         : 0;
@@ -543,13 +608,23 @@ export default function AccountsPage() {
     });
   }, [accounts, trades]);
 
+  const visibleAccounts = useMemo(() => {
+    if (categoryFilter === "prop") {
+      return computedAccounts.filter(a => a.config.filterMode === "funded" || a.config.filterMode === "broker");
+    }
+    if (categoryFilter === "personal") {
+      return computedAccounts.filter(a => a.config.filterMode === "personal" || a.config.filterMode === "all");
+    }
+    return computedAccounts;
+  }, [computedAccounts, categoryFilter]);
+
   const active = computedAccounts.find(a => a.config.id === selectedId) ?? computedAccounts[0];
 
   const openNewAccountModal = () => {
     setEditingAccount({
       id: `acc-${Date.now()}`,
-      name: "My Funded Futures (MFFU) $50K",
-      firm: "My Funded Futures (MFFU)",
+      name: "MFFU Starter / Core $50K",
+      firm: "My Funded Futures",
       accountType: "Evaluación / Challenge",
       filterMode: "funded",
       brokerFilter: "my_funded_futures",
@@ -559,14 +634,24 @@ export default function AccountsPage() {
       maxTotalLoss: 2000,
       minTradingDays: 2,
       consistencyRulePct: 40,
-      maxMicros: 50,
+      maxMicros: 30,
       status: "Active",
     });
+    setPresetTab("MFFU");
     setIsModalOpen(true);
   };
 
   const openEditModal = (cfg: PropAccountConfig) => {
     setEditingAccount({ ...cfg });
+    if (cfg.firm.toLowerCase().includes("lucy") || cfg.firm.toLowerCase().includes("lucid")) {
+      setPresetTab("Lucy");
+    } else if (cfg.firm.toLowerCase().includes("topstep")) {
+      setPresetTab("TopStep");
+    } else if (cfg.firm.toLowerCase().includes("funded futures") || cfg.firm.toLowerCase().includes("mffu")) {
+      setPresetTab("MFFU");
+    } else {
+      setPresetTab("Otras");
+    }
     setIsModalOpen(true);
   };
 
@@ -617,74 +702,118 @@ export default function AccountsPage() {
     contractsOk,
   } = active;
 
-  const remainingProfit = acc.profitTarget > 0 ? Math.max(0, acc.profitTarget - currentProfit) : null;
+  const remainingProfit = acc.profitTarget > 0 ? Math.max(0, acc.profitTarget - currentProfit) : 0;
+  const targetPct = acc.profitTarget > 0 ? (Math.max(0, currentProfit) / acc.profitTarget) * 100 : 0;
+  const dllPct = acc.maxDailyLoss > 0 ? (dailyLossToday / acc.maxDailyLoss) * 100 : 0;
+  const ddPct = acc.maxTotalLoss > 0 ? (stats.maxDrawdown / acc.maxTotalLoss) * 100 : 0;
+  const contractsPct = acc.maxMicros && acc.maxMicros > 0 ? (maxContractsUsed / acc.maxMicros) * 100 : 0;
+  const daysPct = acc.minTradingDays > 0 ? (daysTraded / acc.minTradingDays) * 100 : 100;
+  const consistencyBarPct = consistencyDollarLimit > 0 ? (bestDayPnl / consistencyDollarLimit) * 100 : 0;
+
   const allRulesOk = !dailyLossBreached && !drawdownBreached && consistencyOk && contractsOk;
 
   return (
     <AppShell
       title="Cuentas de Trading & Prop Firms"
-      subtitle="Monitoreo en tiempo real conectado 1:1 con tu Journal (My Funded Futures MFFU, Lucy Trading / Lucid, TopStep, Apex, TPT, FTMO)"
+      subtitle="Centro de control estructurado para My Funded Futures (MFFU), Lucy Trading (Lucid), TopStep y Capital Propio"
     >
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
 
-        {/* ── Barra superior: Selector de cuentas + Botón Crear/Configurar ── */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2.5">
-            {computedAccounts.map(item => {
+        {/* ── BLOQUE 1: Barra de Control Limpia + Cuadrícula Simétrica de Cuentas ── */}
+        <div className="rounded-card border border-border-card bg-bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-border-card/60">
+            <div className="flex items-center gap-1.5 rounded-lg bg-bg-section p-1 border border-border-card">
+              {[
+                { id: "all", label: `Todas (${computedAccounts.length})` },
+                { id: "prop", label: "Prop Firms / Fondeo" },
+                { id: "personal", label: "Personal & Global" },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setCategoryFilter(tab.id as "all" | "prop" | "personal")}
+                  className={`rounded-md px-3 py-1.5 text-[11px] font-bold transition-all ${
+                    categoryFilter === tab.id
+                      ? "bg-green-primary text-bg-main shadow-sm"
+                      : "text-text-muted hover:text-text-primary"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openEditModal(acc)}
+                className="flex items-center gap-1.5 rounded-btn border border-border-card bg-bg-section px-3.5 py-2 text-[11.5px] font-semibold text-text-secondary hover:text-text-primary hover:border-blue-accent/40 transition-colors"
+              >
+                <Settings2 className="h-3.5 w-3.5 text-blue-accent" />
+                Configurar Cuenta Activa
+              </button>
+              <button
+                onClick={openNewAccountModal}
+                className="flex items-center gap-1.5 rounded-btn bg-green-primary px-4 py-2 text-[11.5px] font-bold text-bg-main shadow-green-glow hover:bg-green-primary/90 transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Agregar Cuenta / Plantilla
+              </button>
+            </div>
+          </div>
+
+          {/* Grid uniforme de tarjetas de cuenta */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {visibleAccounts.map(item => {
               const isSel = item.config.id === active.config.id;
+              const goalPct = item.config.profitTarget > 0
+                ? Math.min(100, Math.max(0, (item.currentProfit / item.config.profitTarget) * 100))
+                : 100;
               return (
                 <button
                   key={item.config.id}
                   onClick={() => setSelectedId(item.config.id)}
-                  className={`flex flex-col items-start rounded-card border px-4 py-3 transition-all text-left min-w-[205px] ${
+                  className={`flex flex-col justify-between rounded-xl border p-3.5 transition-all text-left h-full ${
                     isSel
-                      ? "bg-green-primary/10 border-green-primary/40 shadow-green-glow"
-                      : "border-border-card bg-bg-card hover:bg-bg-section/60"
+                      ? "bg-green-primary/10 border-green-primary/50 shadow-green-glow"
+                      : "border-border-card bg-bg-section/40 hover:bg-bg-section/80 hover:border-border-card"
                   }`}
                 >
-                  <div className="flex items-center justify-between w-full gap-2 mb-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-                      {item.config.firm} · {item.stats.closedTrades} ops
-                    </span>
-                    <span className={`h-2 w-2 rounded-full ${
-                      !item.dailyLossBreached && !item.drawdownBreached ? "bg-green-primary" : "bg-red-loss"
-                    }`} />
+                  <div>
+                    <div className="flex items-center justify-between w-full gap-1.5 mb-1">
+                      <span className="text-[9.5px] font-bold uppercase tracking-wider text-text-muted truncate">
+                        {item.config.firm}
+                      </span>
+                      <span className="rounded-full bg-bg-card border border-border-card px-1.5 py-0.5 text-[9px] font-semibold text-text-muted shrink-0">
+                        {item.stats.closedTrades} ops
+                      </span>
+                    </div>
+                    <p className={`text-[13px] font-extrabold truncate ${isSel ? "text-green-primary" : "text-text-primary"}`}>
+                      {item.config.name}
+                    </p>
                   </div>
-                  <span className={`text-[13px] font-bold ${isSel ? "text-green-primary" : "text-text-primary"}`}>
-                    {item.config.name}
-                  </span>
-                  <div className="flex items-center gap-2 mt-1 text-[11px] tabular-nums">
-                    <span className="text-text-secondary font-semibold">
-                      ${item.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className={`font-bold ${item.currentProfit >= 0 ? "text-green-primary" : "text-red-loss"}`}>
-                      ({item.currentProfit >= 0 ? "+" : "-"}${Math.abs(item.currentProfit).toFixed(2)})
-                    </span>
+
+                  <div className="mt-3 pt-2 border-t border-border-card/40">
+                    <div className="flex items-baseline justify-between gap-1 text-[11.5px] tabular-nums mb-1.5">
+                      <span className="text-text-primary font-bold">
+                        ${item.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </span>
+                      <span className={`font-extrabold ${item.currentProfit >= 0 ? "text-green-primary" : "text-red-loss"}`}>
+                        {item.currentProfit >= 0 ? "+" : "-"}${Math.abs(item.currentProfit).toFixed(2)}
+                      </span>
+                    </div>
+                    <ProgressBar
+                      value={goalPct}
+                      max={100}
+                      height="h-1.5"
+                      color={isSel ? "bg-green-primary" : "bg-blue-accent/70"}
+                    />
                   </div>
                 </button>
               );
             })}
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => openEditModal(acc)}
-              className="flex items-center gap-2 rounded-btn border border-border-card bg-bg-card px-4 py-2.5 text-[12px] font-semibold text-text-secondary hover:text-text-primary hover:border-green-primary/40 transition-colors"
-            >
-              <Settings2 className="h-4 w-4 text-blue-accent" />
-              Editar Reglas
-            </button>
-            <button
-              onClick={openNewAccountModal}
-              className="flex items-center gap-2 rounded-btn bg-green-primary px-4 py-2.5 text-[12px] font-bold text-bg-main shadow-green-glow hover:bg-green-primary/90 transition-all"
-            >
-              <Plus className="h-4 w-4" />
-              Nueva Cuenta
-            </button>
-          </div>
         </div>
 
-        {/* ── KPIs Rápidos de la Cuenta Seleccionada ── */}
+        {/* ── BLOQUE 2: Cabecera Resumen de la Cuenta Activa (6 KPIs en fila limpia) ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             {
@@ -696,258 +825,239 @@ export default function AccountsPage() {
             {
               label: "Net P&L Acumulado",
               value: `${currentProfit >= 0 ? "+" : "-"}$${Math.abs(currentProfit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-              sub: `${stats.closedTrades} ops cerradas`,
+              sub: `Win Rate: ${stats.closedTrades > 0 ? `${stats.winRate.toFixed(1)}%` : "—"} · PF ${formatProfitFactor(stats)}`,
               color: currentProfit >= 0 ? "text-green-primary" : "text-red-loss",
             },
             {
-              label: "Piso de Liquidación EOD",
+              label: "Piso Liquidación EOD",
               value: acc.maxTotalLoss > 0 ? `$${eodLiquidationFloor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A",
-              sub: isTrailingLocked ? "🔒 Candado en Balance Inicial" : `Colchón: $${liveBufferAboveFloor.toFixed(2)}`,
+              sub: isTrailingLocked ? "🔒 Candado Fijo en Inicial" : `Colchón: +$${liveBufferAboveFloor.toFixed(2)}`,
               color: isTrailingLocked ? "text-green-primary" : "text-blue-accent",
             },
             {
-              label: "Max Drawdown Realizado",
+              label: "Max Drawdown Real",
               value: `-$${stats.maxDrawdown.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
               sub: acc.maxTotalLoss > 0 ? `Límite EOD: -$${acc.maxTotalLoss.toLocaleString()}` : "Sin límite fijo",
               color: drawdownBreached ? "text-red-loss" : "text-yellow-warn",
             },
             {
               label: "Días Operados",
-              value: `${daysTraded} días`,
-              sub: acc.minTradingDays > 0 ? `Mínimo requerido: ${acc.minTradingDays}` : "Sin mínimo de días",
+              value: `${daysTraded} ${acc.minTradingDays > 0 ? `/ ${acc.minTradingDays}` : ""} días`,
+              sub: minDaysMet ? "✓ Mínimo cumplido" : `Faltan ${acc.minTradingDays - daysTraded} día(s)`,
               color: minDaysMet ? "text-green-primary" : "text-blue-accent",
             },
             {
-              label: "Consistencia (Mejor Día)",
+              label: "Consistencia Mejor Día",
               value: currentProfit > 0 ? `${consistencyPctObserved}%` : "—",
               sub: `Mejor día: +$${bestDayPnl.toFixed(2)}`,
               color: consistencyOk ? "text-green-primary" : "text-yellow-warn",
             },
           ].map(k => (
-            <div key={k.label} className="rounded-card border border-border-card bg-bg-card p-4">
-              <p className="text-[10px] text-text-muted uppercase tracking-wider font-semibold mb-1">{k.label}</p>
-              <p className={`text-[18px] font-black tabular-nums ${k.color}`}>{k.value}</p>
-              <p className="text-[10px] text-text-muted mt-1">{k.sub}</p>
+            <div key={k.label} className="rounded-card border border-border-card bg-bg-card px-4 py-3.5">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider font-bold mb-1">{k.label}</p>
+              <p className={`text-[17px] font-black tabular-nums leading-tight ${k.color}`}>{k.value}</p>
+              <p className="text-[10px] text-text-muted mt-1 truncate">{k.sub}</p>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-5">
+        {/* ── BLOQUE 3: Panel Principal en Grid 2x3 de Reglas + Columna Derecha de Conciliación ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
 
-          {/* ── Panel Principal: Reglas y Límites de Prop Firm ── */}
-          <div className="rounded-card border border-border-card bg-bg-card p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3 mb-6 border-b border-border-card pb-4">
+          {/* Izquierda: Las 6 Reglas en Cuadrícula 2x3 ordenada */}
+          <div className="rounded-card border border-border-card bg-bg-card p-5 flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-card/60 pb-3.5">
               <div>
-                <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">{acc.accountType} · {acc.firm}</p>
-                <h2 className="text-[18px] font-bold text-text-primary mt-0.5">{acc.name}</h2>
-                <p className="text-[12px] text-text-secondary mt-0.5">
-                  Capital Inicial: <strong className="text-text-primary">${acc.initialBalance.toLocaleString()}</strong> ·{" "}
-                  Filtro Journal:{" "}
-                  <strong className="text-green-primary">
-                    {acc.filterMode === "funded"
-                      ? "Operaciones en Cuenta Fondeada"
-                      : acc.filterMode === "personal"
-                        ? "Operaciones en Cuenta Personal"
-                        : acc.filterMode === "broker"
-                          ? `Bróker / Prop Firm: ${acc.brokerFilter}`
-                          : "Todas las Operaciones del Journal"}
-                  </strong>
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-green-primary/15 border border-green-primary/30 px-2 py-0.5 text-[10px] font-bold uppercase text-green-primary">
+                    {acc.firm}
+                  </span>
+                  <span className="text-[11px] font-semibold text-text-muted">{acc.accountType}</span>
+                </div>
+                <h2 className="text-[17px] font-extrabold text-text-primary mt-1">{acc.name}</h2>
               </div>
+
               <div className="flex items-center gap-2">
                 {targetReached && allRulesOk ? (
-                  <span className="flex items-center gap-1.5 rounded-full bg-green-primary/15 border border-green-primary/30 px-3.5 py-1.5 text-[11px] font-bold text-green-primary">
-                    <Award className="h-4 w-4" /> Objetivo de Profit Alcanzado
+                  <span className="flex items-center gap-1.5 rounded-full bg-green-primary/15 border border-green-primary/30 px-3 py-1 text-[11px] font-bold text-green-primary">
+                    <Award className="h-3.5 w-3.5" /> Meta Alcanzada & En Regla
                   </span>
                 ) : allRulesOk ? (
-                  <span className="flex items-center gap-1.5 rounded-full bg-green-primary/15 border border-green-primary/30 px-3.5 py-1.5 text-[11px] font-bold text-green-primary">
-                    <CheckCircle className="h-3.5 w-3.5" /> Cuenta en Regla
+                  <span className="flex items-center gap-1.5 rounded-full bg-green-primary/15 border border-green-primary/30 px-3 py-1 text-[11px] font-bold text-green-primary">
+                    <CheckCircle className="h-3.5 w-3.5" /> Todas las Reglas en Orden
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 rounded-full bg-red-loss/15 border border-red-loss/30 px-3.5 py-1.5 text-[11px] font-bold text-red-loss">
-                    <AlertTriangle className="h-3.5 w-3.5" /> Revisar Parámetro de Regla
+                  <span className="flex items-center gap-1.5 rounded-full bg-yellow-warn/15 border border-yellow-warn/30 px-3 py-1 text-[11px] font-bold text-yellow-warn">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Revisar Consistencia / Regla
                   </span>
                 )}
                 {accounts.length > 1 && (
                   <button
                     onClick={() => handleDeleteAccount(acc.id)}
                     title="Eliminar esta cuenta"
-                    className="p-2 rounded-lg border border-border-card text-text-muted hover:text-red-loss hover:border-red-loss/40 transition-colors"
+                    className="p-1.5 rounded-lg border border-border-card text-text-muted hover:text-red-loss hover:border-red-loss/40 transition-colors"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="flex flex-col gap-6">
-              {acc.profitTarget > 0 && (
-                <RuleRow
-                  label="Objetivo de Profit (Profit Target)"
-                  current={Math.max(0, currentProfit)}
-                  limit={acc.profitTarget}
-                  format="dollar"
-                  isGoal={true}
-                  subText={
-                    remainingProfit !== null && remainingProfit > 0
-                      ? `Faltan $${remainingProfit.toFixed(2)} para alcanzar la meta`
-                      : `Meta superada por +$${Math.max(0, currentProfit - acc.profitTarget).toFixed(2)}`
-                  }
-                />
-              )}
+            {/* Cuadrícula 2x3 de Tarjetas de Reglas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {/* 1. Profit Target */}
+              <RuleCard
+                icon={Target}
+                title="1. Objetivo de Ganancia (Profit Target)"
+                badgeText={targetReached ? "Logrado" : `${targetPct.toFixed(1)}%`}
+                badgeStatus={targetReached ? "ok" : "info"}
+                currentLabel={`$${Math.max(0, currentProfit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                limitLabel={`$${acc.profitTarget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                pctUsed={targetPct}
+                isGoal={true}
+                footerLeft={remainingProfit > 0 ? `Faltan $${remainingProfit.toFixed(2)} para pasar` : `Superado por +$${Math.max(0, currentProfit - acc.profitTarget).toFixed(2)}`}
+                footerRight={`${stats.closedTrades} trades`}
+                disabledText={acc.profitTarget <= 0 ? "Sin objetivo fijo de ganancia" : undefined}
+              />
 
-              {acc.maxDailyLoss > 0 ? (
-                <RuleRow
-                  label="Pérdida Máxima Diaria Hoy (Daily Loss Limit — DLL)"
-                  current={dailyLossToday}
-                  limit={acc.maxDailyLoss}
-                  format="dollar"
-                  warn={60}
-                  subText={`P&L Hoy: ${todayPnl >= 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(2)} · Peor día histórico: -$${maxObservedDailyLoss.toFixed(2)}`}
-                />
-              ) : (
-                <div className="rounded-lg border border-border-card/60 bg-bg-section/40 px-4 py-2.5 flex items-center justify-between text-[12px]">
-                  <span className="text-text-secondary font-medium">Límite de Pérdida Diaria (Daily Loss Limit)</span>
-                  <span className="text-green-primary font-bold">Sin límite diario en este plan (ej. MFFU Expert/Pro / LucidFlex / Apex)</span>
-                </div>
-              )}
+              {/* 2. EOD Trailing Drawdown */}
+              <RuleCard
+                icon={ShieldCheck}
+                title="2. Drawdown Máximo EOD (Trailing)"
+                badgeText={drawdownBreached ? "Excedido" : isTrailingLocked ? "🔒 Candado Inicial" : `${ddPct.toFixed(1)}% usado`}
+                badgeStatus={drawdownBreached ? "danger" : ddPct >= 70 ? "warn" : "ok"}
+                currentLabel={`$${stats.maxDrawdown.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                limitLabel={`$${acc.maxTotalLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                pctUsed={ddPct}
+                warn={70}
+                footerLeft={`Piso EOD: $${eodLiquidationFloor.toLocaleString()}`}
+                footerRight={`Colchón: +$${liveBufferAboveFloor.toFixed(2)}`}
+                disabledText={acc.maxTotalLoss <= 0 ? "Sin límite de Drawdown configurado" : undefined}
+              />
 
-              {acc.maxTotalLoss > 0 && (
-                <RuleRow
-                  label="Drawdown Máximo Realizado vs Límite Total (EOD Trailing Drawdown)"
-                  current={stats.maxDrawdown}
-                  limit={acc.maxTotalLoss}
-                  format="dollar"
-                  warn={70}
-                  subText={`Piso de Liquidación EOD: $${eodLiquidationFloor.toLocaleString(undefined, { minimumFractionDigits: 2 })} · Colchón real actual: $${liveBufferAboveFloor.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-                />
-              )}
+              {/* 3. Daily Loss Limit */}
+              <RuleCard
+                icon={Activity}
+                title="3. Límite de Pérdida Diaria (DLL)"
+                badgeText={acc.maxDailyLoss <= 0 ? "Libre (Sin DLL)" : dailyLossBreached ? "Excedido" : `${dllPct.toFixed(1)}% hoy`}
+                badgeStatus={acc.maxDailyLoss <= 0 ? "ok" : dailyLossBreached ? "danger" : dllPct >= 60 ? "warn" : "ok"}
+                currentLabel={`$${dailyLossToday.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                limitLabel={`$${acc.maxDailyLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                pctUsed={dllPct}
+                warn={60}
+                footerLeft={`Peor día histórico: -$${maxObservedDailyLoss.toFixed(2)}`}
+                footerRight={`Hoy: ${todayPnl >= 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(2)}`}
+                disabledText={acc.maxDailyLoss <= 0 ? "Sin Límite de Pérdida Diaria (0 DLL)" : undefined}
+              />
 
-              {acc.maxMicros && acc.maxMicros > 0 ? (
-                <RuleRow
-                  label={`Tamaño Máximo de Posición (Límite ${Math.floor(acc.maxMicros / 10)} Minis / ${acc.maxMicros} Micros)`}
-                  current={maxContractsUsed}
-                  limit={acc.maxMicros}
-                  format="contracts"
-                  warn={80}
-                  subText={`Máximo operado en un trade: ${maxContractsUsed} contratos · Disponible: ${Math.max(0, acc.maxMicros - maxContractsUsed)} contratos`}
-                />
-              ) : null}
+              {/* 4. Regla de Consistencia */}
+              <RuleCard
+                icon={Scale}
+                title={`4. Regla de Consistencia (${acc.consistencyRulePct > 0 ? `≤ ${acc.consistencyRulePct}%` : "Libre"})`}
+                badgeText={acc.consistencyRulePct <= 0 ? "Libre (0%)" : consistencyOk ? "Cumplido" : `${consistencyPctObserved}% (> ${acc.consistencyRulePct}%)`}
+                badgeStatus={acc.consistencyRulePct <= 0 ? "ok" : consistencyOk ? "ok" : "warn"}
+                currentLabel={`+$${bestDayPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                limitLabel={`+$${consistencyDollarLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                pctUsed={consistencyBarPct}
+                warn={85}
+                footerLeft={
+                  acc.consistencyRulePct <= 0
+                    ? "Plan sin restricción de consistencia diaria"
+                    : consistencyOk
+                      ? `Mejor día equivale al ${consistencyPctObserved}% del profit`
+                      : `Meta para diluir: +$${(bestDayPnl / (acc.consistencyRulePct / 100)).toFixed(2)}`
+                }
+                footerRight={acc.consistencyRulePct > 0 ? `${consistencyPctObserved}% / ${acc.consistencyRulePct}%` : undefined}
+                disabledText={acc.consistencyRulePct <= 0 ? "Sin Regla de Consistencia (Plan Expert / Pro)" : undefined}
+              />
 
-              {acc.minTradingDays > 0 && (
-                <RuleRow
-                  label="Días Mínimos de Operativa"
-                  current={daysTraded}
-                  limit={acc.minTradingDays}
-                  format="days"
-                  isGoal={true}
-                  subText={
-                    daysTraded >= acc.minTradingDays
-                      ? "Requisito de días mínimos cumplido"
-                      : `Faltan ${acc.minTradingDays - daysTraded} día(s) operativo(s)`
-                  }
-                />
-              )}
+              {/* 5. Días Mínimos Operados */}
+              <RuleCard
+                icon={Calendar}
+                title="5. Días Mínimos Operados"
+                badgeText={minDaysMet ? "Cumplido" : `Faltan ${acc.minTradingDays - daysTraded}d`}
+                badgeStatus={minDaysMet ? "ok" : "info"}
+                currentLabel={`${daysTraded} días`}
+                limitLabel={`${acc.minTradingDays} días`}
+                pctUsed={daysPct}
+                isGoal={true}
+                footerLeft={minDaysMet ? "Requisito de días mínimos completado" : `Opera ${acc.minTradingDays - daysTraded} sesión(es) más`}
+                footerRight={`${stats.closedTrades} ops totales`}
+                disabledText={acc.minTradingDays <= 0 ? "Sin mínimo de días requerido" : undefined}
+              />
 
-              {acc.consistencyRulePct > 0 && currentProfit > 0 && (
-                <div>
-                  <RuleRow
-                    label={`Regla de Consistencia — Mejor día ≤ ${acc.consistencyRulePct}% del Profit Total`}
-                    current={bestDayPnl}
-                    limit={consistencyDollarLimit}
-                    format="dollar"
-                    warn={85}
-                    subText={`Tu mejor día (+$${bestDayPnl.toFixed(2)}) equivale al ${consistencyPctObserved}% del beneficio acumulado (+$${currentProfit.toFixed(2)})`}
-                  />
-                  {!consistencyOk && (
-                    <div className="mt-2.5 flex items-center justify-between gap-2 rounded-lg border border-yellow-warn/30 bg-yellow-warn/10 px-3.5 py-2.5 text-[11px] text-yellow-warn">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        <span>
-                          Tu mejor día (+${bestDayPnl.toFixed(2)}) representa el <strong>{consistencyPctObserved}%</strong> del profit total (límite {acc.consistencyRulePct}%).
-                        </span>
-                      </div>
-                      <span className="font-bold tabular-nums shrink-0">
-                        Profit requerido para diluir: +${((bestDayPnl / (acc.consistencyRulePct / 100))).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* 6. Límite de Contratos (Scaling / Micros) */}
+              <RuleCard
+                icon={Layers}
+                title="6. Tamaño Máximo de Posición"
+                badgeText={contractsOk ? "En Regla" : "Excedido"}
+                badgeStatus={contractsOk ? "ok" : "danger"}
+                currentLabel={`${maxContractsUsed} Micros`}
+                limitLabel={`${acc.maxMicros || 0} Micros (${Math.floor((acc.maxMicros || 0) / 10)} Minis)`}
+                pctUsed={contractsPct}
+                warn={80}
+                footerLeft={`Máximo lote abierto en un trade: ${maxContractsUsed}`}
+                footerRight={acc.maxMicros ? `Libre: ${Math.max(0, acc.maxMicros - maxContractsUsed)}` : undefined}
+                disabledText={!acc.maxMicros || acc.maxMicros <= 0 ? "Sin límite de contratos en cuenta personal" : undefined}
+              />
             </div>
           </div>
 
-          {/* ── Sidebar: Resumen Contable, Candado EOD y Checklist ── */}
+          {/* Derecha: Conciliación Contable & Estado del Candado EOD */}
           <div className="flex flex-col gap-4">
             <div className="rounded-card border border-border-card bg-bg-card p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-4 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-primary" /> Conciliación & Piso EOD
+              <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-3.5 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-primary" /> Conciliación Contable & EOD
               </p>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2">
                 {[
-                  { label: "Balance inicial", value: `$${acc.initialBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-text-secondary" },
+                  { label: "Capital Inicial", value: `$${acc.initialBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-text-secondary" },
                   { label: "Gross P&L Realizado", value: `${stats.totalGross >= 0 ? "+" : "-"}$${Math.abs(stats.totalGross).toFixed(2)}`, color: stats.totalGross >= 0 ? "text-green-primary" : "text-red-loss" },
-                  { label: "Comisiones Realizadas", value: `-$${stats.totalCommissions.toFixed(2)}`, color: "text-yellow-warn" },
+                  { label: "Comisiones Totales", value: `-$${stats.totalCommissions.toFixed(2)}`, color: "text-yellow-warn" },
                   { label: "Net P&L Realizado", value: `${currentProfit >= 0 ? "+" : "-"}$${Math.abs(currentProfit).toFixed(2)}`, color: currentProfit >= 0 ? "text-green-primary" : "text-red-loss" },
-                  { label: "Balance actual", value: `$${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-text-primary" },
+                  { label: "Balance Actual", value: `$${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-text-primary" },
                   { label: "High-Water Mark (EOD)", value: `$${eodHighWaterMark.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-blue-accent" },
                   { label: "Piso de Liquidación EOD", value: acc.maxTotalLoss > 0 ? `$${eodLiquidationFloor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A", color: isTrailingLocked ? "text-green-primary" : "text-red-loss" },
-                  { label: "Colchón sobre Liquidación", value: acc.maxTotalLoss > 0 ? `+$${liveBufferAboveFloor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A", color: "text-green-primary" },
-                  { label: "Mejor día", value: `+$${bestDayPnl.toFixed(2)}`, color: "text-green-primary" },
-                  { label: "Peor día", value: worstDayPnl < 0 ? `-$${Math.abs(worstDayPnl).toFixed(2)}` : "$0.00", color: worstDayPnl < 0 ? "text-red-loss" : "text-text-secondary" },
+                  { label: "Colchón Real Disponible", value: acc.maxTotalLoss > 0 ? `+$${liveBufferAboveFloor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A", color: "text-green-primary" },
                 ].map(r => (
-                  <div key={r.label} className="flex justify-between items-center border-b border-border-card/30 pb-2">
+                  <div key={r.label} className="flex justify-between items-center border-b border-border-card/30 pb-1.5">
                     <span className="text-[11px] text-text-muted">{r.label}</span>
-                    <span className={`text-[12.5px] font-bold tabular-nums ${r.color}`}>{r.value}</span>
+                    <span className={`text-[12px] font-bold tabular-nums ${r.color}`}>{r.value}</span>
                   </div>
                 ))}
               </div>
+
               {isTrailingLocked && (
-                <div className="mt-3 rounded-lg border border-green-primary/30 bg-green-primary/10 px-3 py-2 text-[11px] text-green-primary flex items-center gap-2">
-                  <Lock className="h-4 w-4 shrink-0" />
+                <div className="mt-3.5 rounded-lg border border-green-primary/30 bg-green-primary/10 px-3 py-2.5 text-[11px] text-green-primary flex items-start gap-2">
+                  <Lock className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>
-                    <strong>Candado EOD Activado:</strong> Tu ganancia acumulada superó el umbral de Drawdown, por lo que el piso de liquidación ya quedó fijo en <strong>${acc.initialBalance.toLocaleString()}</strong> y no sube más.
+                    <strong>Candado EOD Activado:</strong> El piso de liquidación ya quedó congelado en <strong>${acc.initialBalance.toLocaleString()}</strong> y no sube más.
                   </span>
                 </div>
               )}
             </div>
 
+            {/* Resumen de estado */}
             <div className="rounded-card border border-border-card bg-bg-card p-5">
               <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-3 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-blue-accent" /> Checklist de Reglas Prop Firm
+                <ShieldCheck className="h-4 w-4 text-blue-accent" /> Checklist Rápido de Pase
               </p>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2">
                 {[
-                  {
-                    ok: !dailyLossBreached,
-                    label: acc.maxDailyLoss > 0 ? `Dentro del Daily Loss Limit ($${acc.maxDailyLoss.toLocaleString()})` : "Sin límite de pérdida diaria (DLL libre)",
-                  },
-                  {
-                    ok: !drawdownBreached,
-                    label: acc.maxTotalLoss > 0 ? `Sobre Piso de Liquidación EOD ($${eodLiquidationFloor.toLocaleString()})` : "Sin límite de drawdown máximo",
-                  },
-                  {
-                    ok: contractsOk,
-                    label: acc.maxMicros && acc.maxMicros > 0 ? `Límite de Contratos respetado (${maxContractsUsed}/${acc.maxMicros} Micros)` : "Sin límite de contratos",
-                  },
-                  {
-                    ok: targetReached || acc.profitTarget === 0,
-                    label: acc.profitTarget > 0 ? `Objetivo de Profit ($${acc.profitTarget.toLocaleString()})` : "Sin objetivo fijo de profit",
-                  },
-                  {
-                    ok: minDaysMet,
-                    label: acc.minTradingDays > 0 ? `Días mínimos operados (${daysTraded}/${acc.minTradingDays})` : "Sin mínimo de días",
-                  },
-                  {
-                    ok: consistencyOk,
-                    label: acc.consistencyRulePct > 0 ? `Regla de Consistencia ≤ ${acc.consistencyRulePct}%` : "Sin regla de consistencia (MFFU Expert / LucidPro)",
-                  },
-                ].map((c, i) => (
-                  <div key={i} className="flex items-center gap-2.5 text-[12px]">
-                    {c.ok
-                      ? <CheckCircle className="h-4 w-4 text-green-primary flex-shrink-0" />
-                      : <AlertTriangle className="h-4 w-4 text-yellow-warn flex-shrink-0" />}
-                    <span className={c.ok ? "text-text-secondary" : "text-yellow-warn font-medium"}>{c.label}</span>
+                  { ok: !dailyLossBreached, text: acc.maxDailyLoss > 0 ? `Daily Loss Limit ≤ $${acc.maxDailyLoss.toLocaleString()}` : "Sin límite de pérdida diaria (DLL Libre)" },
+                  { ok: !drawdownBreached, text: acc.maxTotalLoss > 0 ? `Sobre Piso EOD ($${eodLiquidationFloor.toLocaleString()})` : "Sin límite de drawdown" },
+                  { ok: contractsOk, text: acc.maxMicros ? `Lotes dentro de límite (${maxContractsUsed}/${acc.maxMicros} Micros)` : "Tamaño de posición libre" },
+                  { ok: minDaysMet, text: acc.minTradingDays > 0 ? `Días mínimos (${daysTraded}/${acc.minTradingDays} días)` : "Sin mínimo de días" },
+                  { ok: consistencyOk, text: acc.consistencyRulePct > 0 ? `Consistencia ≤ ${acc.consistencyRulePct}% (${consistencyPctObserved}%)` : "Sin regla de consistencia (0%)" },
+                  { ok: targetReached || acc.profitTarget === 0, text: acc.profitTarget > 0 ? `Meta Profit ($${currentProfit.toFixed(0)} / $${acc.profitTarget.toLocaleString()})` : "Sin meta fija" },
+                ].map((c, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-[11.5px]">
+                    {c.ok ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-primary shrink-0" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-yellow-warn shrink-0" />
+                    )}
+                    <span className={c.ok ? "text-text-secondary" : "text-yellow-warn font-semibold"}>{c.text}</span>
                   </div>
                 ))}
               </div>
@@ -955,14 +1065,17 @@ export default function AccountsPage() {
           </div>
         </div>
 
-        {/* ── Modal de Creación / Edición de Cuenta ── */}
+        {/* ── MODAL ORGANIZADO POR PESTAÑAS DE EMPRESA DE FONDEO ── */}
         {isModalOpen && editingAccount && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
             <div className="w-full max-w-2xl rounded-2xl border border-border-card bg-bg-card p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-border-card pb-3 mb-4">
                 <div className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5 text-green-primary" />
-                  <h3 className="text-[15px] font-bold text-text-primary">Configurar Cuenta y Reglas de Fondeo</h3>
+                  <div>
+                    <h3 className="text-[15px] font-bold text-text-primary">Configurar Cuenta y Plantillas de Prop Firm</h3>
+                    <p className="text-[11px] text-text-muted">Selecciona la empresa para cargar sus reglas oficiales en 1 clic</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => { setIsModalOpen(false); setEditingAccount(null); }}
@@ -972,30 +1085,58 @@ export default function AccountsPage() {
                 </button>
               </div>
 
-              {/* Plantillas rápidas de Prop Firm */}
+              {/* Pestañas limpias por empresa */}
               <div className="mb-4">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-text-muted block mb-2">
-                  Cargar Plantilla Oficial (1 clic — incluye My Funded Futures MFFU y Lucy Trading / Lucid)
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {PROP_PRESETS.map(p => (
+                <div className="flex flex-wrap gap-1.5 mb-2.5 border-b border-border-card pb-2">
+                  {(
+                    [
+                      { id: "MFFU", label: "My Funded Futures (MFFU)" },
+                      { id: "Lucy", label: "Lucy Trading (Lucid)" },
+                      { id: "TopStep", label: "TopStep" },
+                      { id: "Otras", label: "Apex / TPT / FTMO" },
+                    ] as { id: PresetCategory; label: string }[]
+                  ).map(tab => (
                     <button
-                      key={p.name}
+                      key={tab.id}
                       type="button"
-                      onClick={() => setEditingAccount({ ...p, id: editingAccount.id })}
-                      className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                        p.firm.includes("My Funded") || p.firm.includes("Lucy")
-                          ? "border-green-primary/40 bg-green-primary/10 text-green-primary hover:bg-green-primary/20"
-                          : "border-border-card bg-bg-section text-text-secondary hover:border-green-primary/40 hover:text-green-primary"
+                      onClick={() => setPresetTab(tab.id)}
+                      className={`rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all ${
+                        presetTab === tab.id
+                          ? "bg-green-primary text-bg-main"
+                          : "bg-bg-section text-text-secondary hover:text-text-primary border border-border-card"
                       }`}
                     >
-                      {p.name}
+                      {tab.label}
                     </button>
                   ))}
                 </div>
+
+                {/* Grid limpio de planes de la empresa seleccionada */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {PROP_PRESETS.filter(p => p.category === presetTab).map(p => {
+                    const isSelectedPreset = editingAccount.name === p.name;
+                    const { category: _cat, badge, ...presetConfig } = p;
+                    return (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => setEditingAccount({ ...presetConfig, id: editingAccount.id })}
+                        className={`flex flex-col items-start rounded-xl border p-2.5 text-left transition-all ${
+                          isSelectedPreset
+                            ? "border-green-primary bg-green-primary/15 text-green-primary"
+                            : "border-border-card bg-bg-section/60 hover:border-green-primary/40 text-text-primary"
+                        }`}
+                      >
+                        <span className="text-[12px] font-bold">{p.name}</span>
+                        <span className="text-[10px] text-text-muted mt-0.5">{badge}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-[12px]">
+              {/* Formulario de parámetros exactos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px] pt-2 border-t border-border-card/60">
                 <div className="sm:col-span-2">
                   <label className="text-[11px] text-text-secondary font-medium block mb-1">Nombre de la Cuenta</label>
                   <input
@@ -1095,7 +1236,7 @@ export default function AccountsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Regla de Consistencia (% — 0 = Sin regla)</label>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Regla de Consistencia (% — 0 = Libre)</label>
                   <input
                     type="number"
                     value={editingAccount.consistencyRulePct}
@@ -1104,7 +1245,7 @@ export default function AccountsPage() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Límite de Contratos Micros (ej. 30/50 Micros en MFFU $50K, 40 en Lucy $50K)</label>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Límite de Contratos Micros (ej. 30/50 en MFFU $50K, 40 en Lucy $50K)</label>
                   <input
                     type="number"
                     value={editingAccount.maxMicros ?? 50}
@@ -1114,7 +1255,7 @@ export default function AccountsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-border-card">
+              <div className="flex items-center justify-end gap-2.5 mt-5 pt-4 border-t border-border-card">
                 <button
                   type="button"
                   onClick={() => { setIsModalOpen(false); setEditingAccount(null); }}
