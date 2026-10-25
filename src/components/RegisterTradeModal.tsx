@@ -1396,7 +1396,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                       <NumInput value={mae} onChange={setMae} placeholder="Ej. 5.5 (en puntos)" suffix="pts" />
                       <Hint>
                         {parseFloat(mae) > 0
-                          ? `Excursión adversa en puntos · Equiv.: -$${(parseFloat(mae) * getPointValue(instrument === "Custom" ? customInstrument : instrument, assetClass) * (contractsExited || totalContracts || 1)).toFixed(2)} USD`
+                          ? `Excursión adversa en puntos · Equiv.: -$${(parseFloat(mae) * getPointValue(assetClass, instrument === "Custom" ? customInstrument : instrument) * (contractsExited || totalContracts || 1)).toFixed(2)} USD`
                           : "Cuánto fue el precio en tu contra en puntos del instrumento"}
                       </Hint>
                     </div>
@@ -1405,7 +1405,7 @@ export function RegisterTradeModal({ open, onClose, onSave, initialData }: Regis
                       <NumInput value={mfe} onChange={setMfe} placeholder="Ej. 15.0 (en puntos)" suffix="pts" />
                       <Hint>
                         {parseFloat(mfe) > 0
-                          ? `Excursión favorable en puntos · Equiv.: +$${(parseFloat(mfe) * getPointValue(instrument === "Custom" ? customInstrument : instrument, assetClass) * (contractsExited || totalContracts || 1)).toFixed(2)} USD`
+                          ? `Excursión favorable en puntos · Equiv.: +$${(parseFloat(mfe) * getPointValue(assetClass, instrument === "Custom" ? customInstrument : instrument) * (contractsExited || totalContracts || 1)).toFixed(2)} USD`
                           : "Máximo recorrido a favor en puntos del instrumento"}
                       </Hint>
                     </div>
