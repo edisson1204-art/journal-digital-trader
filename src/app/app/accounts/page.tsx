@@ -22,6 +22,9 @@ import {
   Table2,
   Copy,
   FolderKanban,
+  Wallet,
+  Sparkles,
+  RotateCcw,
   X,
 } from "lucide-react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -41,6 +44,7 @@ export interface PropAccountConfig {
   filterMode: "funded" | "personal" | "all" | "broker" | "tag";
   brokerFilter?: string;
   tagFilter?: string;
+  payoutSplitPct?: number; // ej. 90% split para el trader
   initialBalance: number;
   profitTarget: number;
   maxDailyLoss: number;
@@ -59,6 +63,7 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1200,
@@ -75,6 +80,7 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "lucid_trading",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1200,
@@ -91,6 +97,7 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
     accountType: "Cuenta Fondeada (PA / XFA)",
     filterMode: "funded",
     brokerFilter: "topstep",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1000,
@@ -106,6 +113,7 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
     firm: "Capital Propio",
     accountType: "Cuenta Personal",
     filterMode: "personal",
+    payoutSplitPct: 100,
     initialBalance: 25000,
     profitTarget: 2500,
     maxDailyLoss: 750,
@@ -121,6 +129,7 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
     firm: "Consolidado Total",
     accountType: "Portafolio Global",
     filterMode: "all",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 5000,
     maxDailyLoss: 1500,
@@ -131,6 +140,91 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
     status: "Active",
   },
 ];
+
+/** Genera el esquema de 13 cuentas fondeadas (5 Lucy + 5 MFFU + 3 TopStep) + 1 Personal */
+function build13AccountEmpirePreset(): PropAccountConfig[] {
+  const list: PropAccountConfig[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const seq = String(i).padStart(2, "0");
+    list.push({
+      id: `empire-lucy-${seq}`,
+      name: `Lucy / LucidPro $50K #${seq}`,
+      firm: "Lucy Trading (Lucid)",
+      accountType: "Evaluación / Challenge",
+      filterMode: "funded",
+      brokerFilter: "lucid_trading",
+      tagFilter: `lucy-${seq}`,
+      payoutSplitPct: 90,
+      initialBalance: 50000,
+      profitTarget: 3000,
+      maxDailyLoss: 1200,
+      maxTotalLoss: 2000,
+      minTradingDays: 3,
+      consistencyRulePct: 0,
+      maxMicros: 40,
+      status: "Active",
+    });
+  }
+  for (let i = 1; i <= 5; i++) {
+    const seq = String(i).padStart(2, "0");
+    list.push({
+      id: `empire-mffu-${seq}`,
+      name: `MFFU Starter/Pro $50K #${seq}`,
+      firm: "My Funded Futures",
+      accountType: "Evaluación / Challenge",
+      filterMode: "funded",
+      brokerFilter: "my_funded_futures",
+      tagFilter: `mffu-${seq}`,
+      payoutSplitPct: 90,
+      initialBalance: 50000,
+      profitTarget: 3000,
+      maxDailyLoss: 1200,
+      maxTotalLoss: 2000,
+      minTradingDays: 2,
+      consistencyRulePct: 40,
+      maxMicros: 50,
+      status: "Active",
+    });
+  }
+  for (let i = 1; i <= 3; i++) {
+    const seq = String(i).padStart(2, "0");
+    list.push({
+      id: `empire-topstep-${seq}`,
+      name: `TopStep $50K XFA #${seq}`,
+      firm: "TopStep",
+      accountType: "Cuenta Fondeada (PA / XFA)",
+      filterMode: "funded",
+      brokerFilter: "topstep",
+      tagFilter: `topstep-${seq}`,
+      payoutSplitPct: 90,
+      initialBalance: 50000,
+      profitTarget: 3000,
+      maxDailyLoss: 1000,
+      maxTotalLoss: 2000,
+      minTradingDays: 5,
+      consistencyRulePct: 50,
+      maxMicros: 50,
+      status: "Active",
+    });
+  }
+  list.push({
+    id: "empire-personal-01",
+    name: "Cuenta Personal Directa",
+    firm: "Capital Propio",
+    accountType: "Cuenta Personal",
+    filterMode: "personal",
+    payoutSplitPct: 100,
+    initialBalance: 25000,
+    profitTarget: 2500,
+    maxDailyLoss: 750,
+    maxTotalLoss: 2500,
+    minTradingDays: 0,
+    consistencyRulePct: 0,
+    maxMicros: 0,
+    status: "Active",
+  });
+  return list;
+}
 
 type PresetCategory = "MFFU" | "Lucy" | "TopStep" | "Otras";
 
@@ -143,6 +237,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1200,
@@ -160,6 +255,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 0,
@@ -177,6 +273,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
+    payoutSplitPct: 90,
     initialBalance: 100000,
     profitTarget: 6000,
     maxDailyLoss: 2400,
@@ -194,6 +291,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
+    payoutSplitPct: 90,
     initialBalance: 100000,
     profitTarget: 6000,
     maxDailyLoss: 0,
@@ -211,6 +309,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "my_funded_futures",
+    payoutSplitPct: 90,
     initialBalance: 150000,
     profitTarget: 9000,
     maxDailyLoss: 0,
@@ -228,6 +327,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "lucid_trading",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1200,
@@ -245,6 +345,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "lucid_trading",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 0,
@@ -262,6 +363,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "lucid_trading",
+    payoutSplitPct: 90,
     initialBalance: 100000,
     profitTarget: 6000,
     maxDailyLoss: 1800,
@@ -279,6 +381,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "lucid_trading",
+    payoutSplitPct: 90,
     initialBalance: 100000,
     profitTarget: 6000,
     maxDailyLoss: 0,
@@ -296,6 +399,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Cuenta Fondeada (PA / XFA)",
     filterMode: "funded",
     brokerFilter: "topstep",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1000,
@@ -313,6 +417,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Cuenta Fondeada (PA / XFA)",
     filterMode: "funded",
     brokerFilter: "topstep",
+    payoutSplitPct: 90,
     initialBalance: 100000,
     profitTarget: 6000,
     maxDailyLoss: 2000,
@@ -330,6 +435,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Cuenta Fondeada (PA / XFA)",
     filterMode: "funded",
     brokerFilter: "topstep",
+    payoutSplitPct: 90,
     initialBalance: 150000,
     profitTarget: 9000,
     maxDailyLoss: 3000,
@@ -347,6 +453,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "apex",
+    payoutSplitPct: 90,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 0,
@@ -364,6 +471,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "take_profit_trader",
+    payoutSplitPct: 80,
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1100,
@@ -381,6 +489,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
     brokerFilter: "ftmo",
+    payoutSplitPct: 80,
     initialBalance: 100000,
     profitTarget: 10000,
     maxDailyLoss: 5000,
@@ -592,6 +701,11 @@ export default function AccountsPage() {
       const consistencyOk = acc.consistencyRulePct <= 0 || currentProfit <= 0 || bestDayPnl <= consistencyDollarLimit + 0.01;
       const contractsOk = !acc.maxMicros || acc.maxMicros <= 0 || maxContractsUsed <= acc.maxMicros;
 
+      const splitPct = acc.payoutSplitPct ?? 90;
+      const netPayoutAfterSplit = currentProfit > 0
+        ? parseFloat(((currentProfit * splitPct) / 100).toFixed(2))
+        : 0;
+
       return {
         config: acc,
         stats,
@@ -616,9 +730,36 @@ export default function AccountsPage() {
         minDaysMet,
         consistencyOk,
         contractsOk,
+        splitPct,
+        netPayoutAfterSplit,
       };
     });
   }, [accounts, trades]);
+
+  // Resumen Consolidado de Imperio Prop Firm (suma todas las cuentas de fondeo individuales, excluyendo la tarjeta "Portafolio Global" para no duplicar)
+  const empireSummary = useMemo(() => {
+    const propItems = computedAccounts.filter(
+      a => a.config.accountType !== "Portafolio Global" && a.config.accountType !== "Cuenta Personal"
+    );
+    const items = propItems.length > 0 ? propItems : computedAccounts;
+
+    const totalAum = items.reduce((s, a) => s + a.config.initialBalance, 0);
+    const totalMultipliedProfit = parseFloat(items.reduce((s, a) => s + a.currentProfit, 0).toFixed(2));
+    const totalNetPayout90 = parseFloat(items.reduce((s, a) => s + a.netPayoutAfterSplit, 0).toFixed(2));
+    const totalDrawdownBuffer = parseFloat(items.reduce((s, a) => s + a.liveBufferAboveFloor, 0).toFixed(2));
+    const lockedCount = items.filter(a => a.isTrailingLocked).length;
+    const healthyCount = items.filter(a => !a.dailyLossBreached && !a.drawdownBreached).length;
+
+    return {
+      propCount: items.length,
+      totalAum,
+      totalMultipliedProfit,
+      totalNetPayout90,
+      totalDrawdownBuffer,
+      lockedCount,
+      healthyCount,
+    };
+  }, [computedAccounts]);
 
   // Agrupación dinámica por Empresa ("Carpetas de Prop Firm")
   const firmGroups = useMemo(() => {
@@ -660,6 +801,21 @@ export default function AccountsPage() {
 
   const active = computedAccounts.find(a => a.config.id === selectedId) ?? visibleAccounts[0] ?? computedAccounts[0];
 
+  const handleLoad13AccountEmpire = () => {
+    const preset13 = build13AccountEmpirePreset();
+    saveAccounts(preset13);
+    setFirmFilter("ALL");
+    setSelectedId(preset13[0].id);
+    setViewMode("matrix");
+  };
+
+  const handleResetDefault5 = () => {
+    saveAccounts(DEFAULT_ACCOUNTS);
+    setFirmFilter("ALL");
+    setSelectedId(DEFAULT_ACCOUNTS[0].id);
+    setViewMode("cards");
+  };
+
   const openNewAccountModal = () => {
     setEditingAccount({
       id: `acc-${Date.now()}`,
@@ -668,6 +824,7 @@ export default function AccountsPage() {
       accountType: "Evaluación / Challenge",
       filterMode: "funded",
       brokerFilter: "lucid_trading",
+      payoutSplitPct: 90,
       initialBalance: 50000,
       profitTarget: 3000,
       maxDailyLoss: 1200,
@@ -720,7 +877,6 @@ export default function AccountsPage() {
       saveAccounts(next);
       setSelectedId(editingAccount.id);
     } else {
-      // Creación individual o en LOTE (ej. 5 cuentas de Lucy o 5 de MFFU en 1 clic)
       const count = Math.min(Math.max(1, batchCount), 20);
       const baseName = editingAccount.name.replace(/\s*#\d+$/, "");
       const existingSameFirm = accounts.filter(a => a.firm === editingAccount.firm).length;
@@ -777,6 +933,8 @@ export default function AccountsPage() {
     minDaysMet,
     consistencyOk,
     contractsOk,
+    splitPct,
+    netPayoutAfterSplit,
   } = active;
 
   const remainingProfit = acc.profitTarget > 0 ? Math.max(0, acc.profitTarget - currentProfit) : 0;
@@ -792,14 +950,101 @@ export default function AccountsPage() {
   return (
     <AppShell
       title="Cuentas de Trading & Prop Firms"
-      subtitle="Arquitectura Multi-Cuenta escalable por Empresa (MFFU, Lucy Trading, TopStep y Capital Propio)"
+      subtitle="Centro de Control Multi-Cuenta: Multiplicador Copy-Trading, Candado EOD y Simulador de Retiros (MFFU · Lucy · TopStep)"
     >
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
+
+        {/* ── BLOQUE 0: BARRA EJECUTIVA DE IMPERIO MULTI-CUENTA (CAPITAL TOTAL + MULTIPLICADOR + PAYOUT 90%) ── */}
+        <div className="rounded-card border border-green-primary/30 bg-gradient-to-r from-bg-card via-green-primary/[0.05] to-bg-card p-4 shadow-green-glow/20">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-border-card/60">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-primary/15 border border-green-primary/40 text-green-primary">
+                <Wallet className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-[13.5px] font-extrabold text-text-primary flex items-center gap-2">
+                  Consolidado de Portafolio Multi-Cuenta (Efecto Multiplicador Copy-Trading)
+                  <span className="rounded-full bg-green-primary/15 border border-green-primary/30 px-2 py-0.5 text-[10px] font-bold text-green-primary">
+                    {empireSummary.propCount} Cuentas Fondeadas Activas
+                  </span>
+                </h2>
+                <p className="text-[11px] text-text-muted">
+                  Suma automática del poder nominal, P&amp;L replicado y retiro neto estimado (Split 90/10) en tus cuentas Prop Firm
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleLoad13AccountEmpire}
+                className="flex items-center gap-1.5 rounded-lg border border-green-primary/40 bg-green-primary/15 px-3 py-1.5 text-[11px] font-bold text-green-primary hover:bg-green-primary/25 transition-all"
+                title="Cargar esquema de ejemplo con 5 Lucy + 5 MFFU + 3 TopStep"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Simular Esquema 13 Cuentas (5 Lucy · 5 MFFU · 3 TopStep)
+              </button>
+              {accounts.length > 5 && (
+                <button
+                  type="button"
+                  onClick={handleResetDefault5}
+                  className="flex items-center gap-1 rounded-lg border border-border-card bg-bg-section px-2.5 py-1.5 text-[11px] font-semibold text-text-muted hover:text-text-primary transition-colors"
+                  title="Volver a las 5 tarjetas base"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Base (5)
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-border-card/80 bg-bg-section/50 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Poder Nominal Bajo Gestión (AUM)</p>
+              <p className="text-[20px] font-black tabular-nums text-text-primary mt-0.5">
+                ${empireSummary.totalAum.toLocaleString()}
+              </p>
+              <p className="text-[10.5px] text-text-muted mt-0.5">
+                En {empireSummary.propCount} cuentas de fondeo ({firmGroups.map(g => `${g.count} ${g.firm.split(" ")[0]}`).join(" · ")})
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border-card/80 bg-bg-section/50 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">P&amp;L Bruto Multiplicado (Flota)</p>
+              <p className={`text-[20px] font-black tabular-nums mt-0.5 ${empireSummary.totalMultipliedProfit >= 0 ? "text-green-primary" : "text-red-loss"}`}>
+                {empireSummary.totalMultipliedProfit >= 0 ? "+" : "-"}$
+                {Math.abs(empireSummary.totalMultipliedProfit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-[10.5px] text-text-muted mt-0.5">
+                Resultado acumulado replicando tu operativa
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-green-primary/30 bg-green-primary/[0.07] px-4 py-3">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-green-primary">Retiro Neto Estimado (90% Split)</p>
+              <p className="text-[20px] font-black tabular-nums text-green-primary mt-0.5">
+                +${empireSummary.totalNetPayout90.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-[10.5px] text-text-secondary mt-0.5">
+                Libre al banco tras el 10% de comisión de Prop Firm
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border-card/80 bg-bg-section/50 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Blindaje EOD &amp; Colchón Total</p>
+              <p className="text-[20px] font-black tabular-nums text-blue-accent mt-0.5">
+                🔒 {empireSummary.lockedCount}/{empireSummary.propCount} Blindadas
+              </p>
+              <p className="text-[10.5px] text-text-muted mt-0.5">
+                Colchón combinado: +${empireSummary.totalDrawdownBuffer.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* ── BLOQUE 1: Carpetas por Empresa + Conmutador Vista Tarjetas / Vista Matriz Multi-Cuenta ── */}
         <div className="rounded-card border border-border-card bg-bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-border-card/60">
-            {/* Carpetas / Filtros por Prop Firm con contador */}
             <div className="flex flex-wrap items-center gap-1.5">
               <button
                 onClick={() => setFirmFilter("ALL")}
@@ -834,7 +1079,6 @@ export default function AccountsPage() {
               })}
             </div>
 
-            {/* Conmutador Tarjetas vs Matriz + Botones de Acción */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center rounded-lg bg-bg-section p-0.5 border border-border-card">
                 <button
@@ -844,7 +1088,6 @@ export default function AccountsPage() {
                       ? "bg-bg-card text-green-primary shadow-sm border border-border-card"
                       : "text-text-muted hover:text-text-primary"
                   }`}
-                  title="Vista en Cuadrícula de Tarjetas"
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
                   Tarjetas
@@ -856,7 +1099,6 @@ export default function AccountsPage() {
                       ? "bg-bg-card text-green-primary shadow-sm border border-border-card"
                       : "text-text-muted hover:text-text-primary"
                   }`}
-                  title="Vista Tabla Matriz para 10+ Cuentas"
                 >
                   <Table2 className="h-3.5 w-3.5" />
                   Matriz ({visibleAccounts.length})
@@ -957,8 +1199,9 @@ export default function AccountsPage() {
                     <th className="py-2.5 px-3">Cuenta / ID</th>
                     <th className="py-2.5 px-3">Prop Firm</th>
                     <th className="py-2.5 px-3 text-right">Balance Actual</th>
-                    <th className="py-2.5 px-3 text-right">Net P&L</th>
-                    <th className="py-2.5 px-3 min-w-[150px]">Progreso Meta (Target)</th>
+                    <th className="py-2.5 px-3 text-right">Net P&amp;L</th>
+                    <th className="py-2.5 px-3 text-right">Payout (90%)</th>
+                    <th className="py-2.5 px-3 min-w-[140px]">Meta Target</th>
                     <th className="py-2.5 px-3 text-right">Piso EOD</th>
                     <th className="py-2.5 px-3 text-right">Colchón DD</th>
                     <th className="py-2.5 px-3 text-center">Días</th>
@@ -998,6 +1241,9 @@ export default function AccountsPage() {
                         }`}>
                           {item.currentProfit >= 0 ? "+" : "-"}${Math.abs(item.currentProfit).toFixed(2)}
                         </td>
+                        <td className="py-2.5 px-3 text-right font-bold tabular-nums text-green-primary whitespace-nowrap">
+                          +${item.netPayoutAfterSplit.toFixed(2)}
+                        </td>
                         <td className="py-2.5 px-3">
                           <div className="flex items-center gap-2">
                             <div className="flex-1">
@@ -1008,7 +1254,7 @@ export default function AccountsPage() {
                                 color={tPct >= 100 ? "bg-green-primary" : "bg-blue-accent"}
                               />
                             </div>
-                            <span className="text-[10.5px] font-bold tabular-nums text-text-secondary w-11 text-right">
+                            <span className="text-[10.5px] font-bold tabular-nums text-text-secondary w-10 text-right">
                               {tPct.toFixed(0)}%
                             </span>
                           </div>
@@ -1090,7 +1336,7 @@ export default function AccountsPage() {
             {
               label: "Net P&L Acumulado",
               value: `${currentProfit >= 0 ? "+" : "-"}$${Math.abs(currentProfit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-              sub: `Win Rate: ${stats.closedTrades > 0 ? `${stats.winRate.toFixed(1)}%` : "—"} · PF ${formatProfitFactor(stats)}`,
+              sub: `Retiro (${splitPct}%): +$${netPayoutAfterSplit.toFixed(2)}`,
               color: currentProfit >= 0 ? "text-green-primary" : "text-red-loss",
             },
             {
@@ -1138,6 +1384,11 @@ export default function AccountsPage() {
                     {acc.firm}
                   </span>
                   <span className="text-[11px] font-semibold text-text-muted">{acc.accountType}</span>
+                  {acc.filterMode === "tag" && acc.tagFilter && (
+                    <span className="rounded-md bg-blue-accent/15 border border-blue-accent/30 px-2 py-0.5 text-[10px] font-bold text-blue-accent">
+                      Tag: #{acc.tagFilter.replace(/^#/, "")}
+                    </span>
+                  )}
                 </div>
                 <h2 className="text-[17px] font-extrabold text-text-primary mt-1">{acc.name}</h2>
               </div>
@@ -1153,7 +1404,7 @@ export default function AccountsPage() {
                 </button>
                 {targetReached && allRulesOk ? (
                   <span className="flex items-center gap-1.5 rounded-full bg-green-primary/15 border border-green-primary/30 px-3 py-1 text-[11px] font-bold text-green-primary">
-                    <Award className="h-3.5 w-3.5" /> Meta Alcanzada & En Regla
+                    <Award className="h-3.5 w-3.5" /> Meta Alcanzada &amp; En Regla
                   </span>
                 ) : allRulesOk ? (
                   <span className="flex items-center gap-1.5 rounded-full bg-green-primary/15 border border-green-primary/30 px-3 py-1 text-[11px] font-bold text-green-primary">
@@ -1176,9 +1427,7 @@ export default function AccountsPage() {
               </div>
             </div>
 
-            {/* Cuadrícula 2x3 de Tarjetas de Reglas */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {/* 1. Profit Target */}
               <RuleCard
                 icon={Target}
                 title="1. Objetivo de Ganancia (Profit Target)"
@@ -1193,7 +1442,6 @@ export default function AccountsPage() {
                 disabledText={acc.profitTarget <= 0 ? "Sin objetivo fijo de ganancia" : undefined}
               />
 
-              {/* 2. EOD Trailing Drawdown */}
               <RuleCard
                 icon={ShieldCheck}
                 title="2. Drawdown Máximo EOD (Trailing)"
@@ -1208,7 +1456,6 @@ export default function AccountsPage() {
                 disabledText={acc.maxTotalLoss <= 0 ? "Sin límite de Drawdown configurado" : undefined}
               />
 
-              {/* 3. Daily Loss Limit */}
               <RuleCard
                 icon={Activity}
                 title="3. Límite de Pérdida Diaria (DLL)"
@@ -1223,7 +1470,6 @@ export default function AccountsPage() {
                 disabledText={acc.maxDailyLoss <= 0 ? "Sin Límite de Pérdida Diaria (0 DLL)" : undefined}
               />
 
-              {/* 4. Regla de Consistencia */}
               <RuleCard
                 icon={Scale}
                 title={`4. Regla de Consistencia (${acc.consistencyRulePct > 0 ? `≤ ${acc.consistencyRulePct}%` : "Libre"})`}
@@ -1244,7 +1490,6 @@ export default function AccountsPage() {
                 disabledText={acc.consistencyRulePct <= 0 ? "Sin Regla de Consistencia (Plan Expert / Pro)" : undefined}
               />
 
-              {/* 5. Días Mínimos Operados */}
               <RuleCard
                 icon={Calendar}
                 title="5. Días Mínimos Operados"
@@ -1259,7 +1504,6 @@ export default function AccountsPage() {
                 disabledText={acc.minTradingDays <= 0 ? "Sin mínimo de días requerido" : undefined}
               />
 
-              {/* 6. Límite de Contratos (Scaling / Micros) */}
               <RuleCard
                 icon={Layers}
                 title="6. Tamaño Máximo de Posición"
@@ -1280,7 +1524,7 @@ export default function AccountsPage() {
           <div className="flex flex-col gap-4">
             <div className="rounded-card border border-border-card bg-bg-card p-5">
               <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-3.5 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-primary" /> Conciliación Contable & EOD
+                <TrendingUp className="h-4 w-4 text-green-primary" /> Conciliación Contable &amp; Retiro
               </p>
               <div className="flex flex-col gap-2">
                 {[
@@ -1288,6 +1532,7 @@ export default function AccountsPage() {
                   { label: "Gross P&L Realizado", value: `${stats.totalGross >= 0 ? "+" : "-"}$${Math.abs(stats.totalGross).toFixed(2)}`, color: stats.totalGross >= 0 ? "text-green-primary" : "text-red-loss" },
                   { label: "Comisiones Totales", value: `-$${stats.totalCommissions.toFixed(2)}`, color: "text-yellow-warn" },
                   { label: "Net P&L Realizado", value: `${currentProfit >= 0 ? "+" : "-"}$${Math.abs(currentProfit).toFixed(2)}`, color: currentProfit >= 0 ? "text-green-primary" : "text-red-loss" },
+                  { label: `Retiro Neto (${splitPct}% Split)`, value: `+$${netPayoutAfterSplit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-green-primary" },
                   { label: "Balance Actual", value: `$${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-text-primary" },
                   { label: "High-Water Mark (EOD)", value: `$${eodHighWaterMark.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-blue-accent" },
                   { label: "Piso de Liquidación EOD", value: acc.maxTotalLoss > 0 ? `$${eodLiquidationFloor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A", color: isTrailingLocked ? "text-green-primary" : "text-red-loss" },
@@ -1310,7 +1555,6 @@ export default function AccountsPage() {
               )}
             </div>
 
-            {/* Resumen de estado */}
             <div className="rounded-card border border-border-card bg-bg-card p-5">
               <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-3 flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-blue-accent" /> Checklist Rápido de Pase
@@ -1338,7 +1582,7 @@ export default function AccountsPage() {
           </div>
         </div>
 
-        {/* ── MODAL CON CREACIÓN EN LOTE (1 A 20 CUENTAS) Y PESTAÑAS POR EMPRESA ── */}
+        {/* ── MODAL CON CREACIÓN EN LOTE (1 A 20 CUENTAS), TAG INDIVIDUAL Y PESTAÑAS POR EMPRESA ── */}
         {isModalOpen && editingAccount && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
             <div className="w-full max-w-2xl rounded-2xl border border-border-card bg-bg-card p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1358,7 +1602,6 @@ export default function AccountsPage() {
                 </button>
               </div>
 
-              {/* Pestañas limpias por empresa */}
               <div className="mb-4">
                 <div className="flex flex-wrap gap-1.5 mb-2.5 border-b border-border-card pb-2">
                   {(
@@ -1384,7 +1627,6 @@ export default function AccountsPage() {
                   ))}
                 </div>
 
-                {/* Grid limpio de planes de la empresa seleccionada */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {PROP_PRESETS.filter(p => p.category === presetTab).map(p => {
                     const isSelectedPreset = editingAccount.name.startsWith(p.name);
@@ -1408,7 +1650,6 @@ export default function AccountsPage() {
                 </div>
               </div>
 
-              {/* Selector de Creación en Lote (1, 2, 3, 5, 10 cuentas iguales) — Solo al crear nuevas */}
               {!accounts.some(a => a.id === editingAccount.id) && (
                 <div className="mb-4 rounded-xl border border-green-primary/30 bg-green-primary/5 p-3.5 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -1436,7 +1677,6 @@ export default function AccountsPage() {
                 </div>
               )}
 
-              {/* Formulario de parámetros exactos */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px] pt-2 border-t border-border-card/60">
                 <div className="sm:col-span-2">
                   <label className="text-[11px] text-text-secondary font-medium block mb-1">Nombre Base de la Cuenta</label>
@@ -1457,7 +1697,7 @@ export default function AccountsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Vincular con Operaciones del Journal</label>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Modo de Operativa / Vínculo Journal</label>
                   <select
                     value={
                       editingAccount.filterMode === "broker"
@@ -1482,6 +1722,7 @@ export default function AccountsPage() {
                     className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
                   >
                     <option value="funded">Copy-Trading: Todas las Operaciones Funded</option>
+                    <option value="tag">Rotación Individual por Tag (ej. #lucy-01)</option>
                     <option value="broker:lucid_trading">Solo Bróker: Lucy Trading / Lucid Trading</option>
                     <option value="broker:my_funded_futures">Solo Bróker: My Funded Futures (MFFU)</option>
                     <option value="broker:topstep">Solo Bróker: TopStep</option>
@@ -1491,6 +1732,22 @@ export default function AccountsPage() {
                     <option value="all">Todas las Operaciones (Global)</option>
                   </select>
                 </div>
+
+                {editingAccount.filterMode === "tag" && (
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] text-blue-accent font-bold block mb-1">
+                      Tag Individual en el Journal (sin #, ej. lucy-01 o mffu-02)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ej. lucy-01"
+                      value={editingAccount.tagFilter || ""}
+                      onChange={e => setEditingAccount({ ...editingAccount, tagFilter: e.target.value })}
+                      className="w-full rounded-lg bg-bg-section border border-blue-accent/40 px-3 py-2 text-text-primary focus:outline-none focus:border-blue-accent"
+                    />
+                  </div>
+                )}
+
                 <div>
                   <label className="text-[11px] text-text-secondary font-medium block mb-1">Capital Inicial ($ USD)</label>
                   <input
@@ -1545,12 +1802,21 @@ export default function AccountsPage() {
                     className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
                   />
                 </div>
-                <div className="sm:col-span-2">
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Límite de Contratos Micros (ej. 30/50 en MFFU $50K, 40 en Lucy $50K)</label>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Límite de Contratos Micros</label>
                   <input
                     type="number"
                     value={editingAccount.maxMicros ?? 50}
                     onChange={e => setEditingAccount({ ...editingAccount, maxMicros: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Profit Split para el Trader (% — ej. 90%)</label>
+                  <input
+                    type="number"
+                    value={editingAccount.payoutSplitPct ?? 90}
+                    onChange={e => setEditingAccount({ ...editingAccount, payoutSplitPct: Number(e.target.value) || 90 })}
                     className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
                   />
                 </div>
