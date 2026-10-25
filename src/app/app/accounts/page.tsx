@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   TrendingUp,
   Award,
+  Lock,
+  Layers,
   X,
 } from "lucide-react";
 import { useTradeStore } from "@/store/tradeStore";
@@ -21,7 +23,6 @@ import {
   formatProfitFactor,
   isStrictlyClosed,
   localDateKey,
-  type TradeRecord,
 } from "@/lib/tradeTypes";
 
 export interface PropAccountConfig {
@@ -36,23 +37,42 @@ export interface PropAccountConfig {
   maxDailyLoss: number;
   maxTotalLoss: number;
   minTradingDays: number;
-  consistencyRulePct: number; // ej. 50% en Topstep Combine
+  consistencyRulePct: number; // ej. 40% en LucidFlex, 50% en TopStep, 0% en LucidPro
+  maxMicros?: number;         // ej. 40 Micros (4 Minis) en Lucy Trading $50K
   status: "Active" | "Passed" | "Breached";
 }
 
 const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
+  {
+    id: "default-lucy-50k",
+    name: "Lucy Trading / LucidPro $50K",
+    firm: "Lucy Trading (Lucid)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "lucid_trading",
+    initialBalance: 50000,
+    profitTarget: 3000,
+    maxDailyLoss: 1200,
+    maxTotalLoss: 2000,
+    minTradingDays: 3,
+    consistencyRulePct: 40,
+    maxMicros: 40,
+    status: "Active",
+  },
   {
     id: "default-funded-topstep",
     name: "TopStep $50K — Cuenta Fondeada",
     firm: "TopStep / Prop Firm",
     accountType: "Cuenta Fondeada (PA / XFA)",
     filterMode: "funded",
+    brokerFilter: "topstep",
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1000,
     maxTotalLoss: 2000,
     minTradingDays: 5,
     consistencyRulePct: 50,
+    maxMicros: 50,
     status: "Active",
   },
   {
@@ -67,6 +87,7 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
     maxTotalLoss: 2500,
     minTradingDays: 0,
     consistencyRulePct: 0,
+    maxMicros: 0,
     status: "Active",
   },
   {
@@ -81,22 +102,85 @@ const DEFAULT_ACCOUNTS: PropAccountConfig[] = [
     maxTotalLoss: 3500,
     minTradingDays: 5,
     consistencyRulePct: 50,
+    maxMicros: 50,
     status: "Active",
   },
 ];
 
 const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
   {
+    name: "Lucy Trading / LucidPro $50K",
+    firm: "Lucy Trading (Lucid)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "lucid_trading",
+    initialBalance: 50000,
+    profitTarget: 3000,
+    maxDailyLoss: 1200,
+    maxTotalLoss: 2000,
+    minTradingDays: 3,
+    consistencyRulePct: 0,
+    maxMicros: 40,
+    status: "Active",
+  },
+  {
+    name: "Lucy Trading / LucidFlex $50K",
+    firm: "Lucy Trading (Lucid)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "lucid_trading",
+    initialBalance: 50000,
+    profitTarget: 3000,
+    maxDailyLoss: 0,
+    maxTotalLoss: 2000,
+    minTradingDays: 1,
+    consistencyRulePct: 40,
+    maxMicros: 40,
+    status: "Active",
+  },
+  {
+    name: "Lucy Trading / LucidPro $100K",
+    firm: "Lucy Trading (Lucid)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "lucid_trading",
+    initialBalance: 100000,
+    profitTarget: 6000,
+    maxDailyLoss: 1800,
+    maxTotalLoss: 3000,
+    minTradingDays: 3,
+    consistencyRulePct: 0,
+    maxMicros: 60,
+    status: "Active",
+  },
+  {
+    name: "Lucy Trading / LucidFlex $100K",
+    firm: "Lucy Trading (Lucid)",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "lucid_trading",
+    initialBalance: 100000,
+    profitTarget: 6000,
+    maxDailyLoss: 0,
+    maxTotalLoss: 3000,
+    minTradingDays: 1,
+    consistencyRulePct: 40,
+    maxMicros: 60,
+    status: "Active",
+  },
+  {
     name: "TopStep $50K Combine / XFA",
     firm: "TopStep",
     accountType: "Cuenta Fondeada (PA / XFA)",
     filterMode: "funded",
+    brokerFilter: "topstep",
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 1000,
     maxTotalLoss: 2000,
     minTradingDays: 5,
     consistencyRulePct: 50,
+    maxMicros: 50,
     status: "Active",
   },
   {
@@ -104,25 +188,14 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     firm: "TopStep",
     accountType: "Cuenta Fondeada (PA / XFA)",
     filterMode: "funded",
+    brokerFilter: "topstep",
     initialBalance: 100000,
     profitTarget: 6000,
     maxDailyLoss: 2000,
     maxTotalLoss: 3000,
     minTradingDays: 5,
     consistencyRulePct: 50,
-    status: "Active",
-  },
-  {
-    name: "TopStep $150K Combine / XFA",
-    firm: "TopStep",
-    accountType: "Cuenta Fondeada (PA / XFA)",
-    filterMode: "funded",
-    initialBalance: 150000,
-    profitTarget: 9000,
-    maxDailyLoss: 3000,
-    maxTotalLoss: 4500,
-    minTradingDays: 5,
-    consistencyRulePct: 50,
+    maxMicros: 100,
     status: "Active",
   },
   {
@@ -130,12 +203,44 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     firm: "Apex",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
+    brokerFilter: "apex",
     initialBalance: 50000,
     profitTarget: 3000,
     maxDailyLoss: 0,
     maxTotalLoss: 2500,
     minTradingDays: 7,
     consistencyRulePct: 30,
+    maxMicros: 100,
+    status: "Active",
+  },
+  {
+    name: "My Funded Futures (MFFU) $50K",
+    firm: "My Funded Futures",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "my_funded_futures",
+    initialBalance: 50000,
+    profitTarget: 3000,
+    maxDailyLoss: 1200,
+    maxTotalLoss: 2000,
+    minTradingDays: 2,
+    consistencyRulePct: 40,
+    maxMicros: 50,
+    status: "Active",
+  },
+  {
+    name: "Take Profit Trader $50K",
+    firm: "Take Profit Trader",
+    accountType: "Evaluación / Challenge",
+    filterMode: "funded",
+    brokerFilter: "take_profit_trader",
+    initialBalance: 50000,
+    profitTarget: 3000,
+    maxDailyLoss: 1100,
+    maxTotalLoss: 2000,
+    minTradingDays: 5,
+    consistencyRulePct: 50,
+    maxMicros: 60,
     status: "Active",
   },
   {
@@ -143,17 +248,19 @@ const PROP_PRESETS: Omit<PropAccountConfig, "id">[] = [
     firm: "FTMO",
     accountType: "Evaluación / Challenge",
     filterMode: "funded",
+    brokerFilter: "ftmo",
     initialBalance: 100000,
     profitTarget: 10000,
     maxDailyLoss: 5000,
     maxTotalLoss: 10000,
     minTradingDays: 4,
     consistencyRulePct: 0,
+    maxMicros: 0,
     status: "Active",
   },
 ];
 
-const STORAGE_KEY = "tdi_prop_accounts_v1";
+const STORAGE_KEY = "tdi_prop_accounts_v2";
 
 function ProgressBar({ value, max, color = "bg-green-primary" }: {
   value: number; max: number; color?: string;
@@ -178,7 +285,7 @@ function RuleRow({
   label: string;
   current: number;
   limit: number;
-  format?: "dollar" | "percent" | "days" | "number";
+  format?: "dollar" | "percent" | "days" | "contracts";
   warn?: number;
   isGoal?: boolean;
   subText?: string;
@@ -206,7 +313,7 @@ function RuleRow({
         ? `${v.toFixed(1)}%`
         : format === "days"
           ? `${v} días`
-          : String(v);
+          : `${v} contratos`;
 
   return (
     <div>
@@ -278,20 +385,42 @@ export default function AccountsPage() {
       const stats = computeStats(matchingTrades);
       const closed = matchingTrades.filter(isStrictlyClosed);
 
-      // P&L por día efectivo
+      // P&L por día efectivo ordenado cronológicamente para calcular EOD Trailing Floor
       const dayMap: Record<string, number> = {};
       for (const t of closed) {
         const d = effectiveTradeDate(t);
         dayMap[d] = parseFloat(((dayMap[d] || 0) + (t.netPnl ?? 0)).toFixed(2));
       }
+      const sortedDays = Object.keys(dayMap).sort();
       const dayValues = Object.values(dayMap);
-      const daysTraded = Object.keys(dayMap).length;
+      const daysTraded = sortedDays.length;
       const bestDayPnl = dayValues.length > 0 ? Math.max(...dayValues, 0) : 0;
       const worstDayPnl = dayValues.length > 0 ? Math.min(...dayValues, 0) : 0;
       const todayPnl = dayMap[todayKey] ?? 0;
 
       const currentProfit = stats.totalNet;
       const currentBalance = parseFloat((acc.initialBalance + currentProfit).toFixed(2));
+
+      // EOD High-Water Mark y Piso de Liquidación EOD (con candado en Balance Inicial como Lucy Trading / TopStep)
+      let runningBalance = acc.initialBalance;
+      let eodHighWaterMark = acc.initialBalance;
+      for (const d of sortedDays) {
+        runningBalance = parseFloat((runningBalance + dayMap[d]).toFixed(2));
+        if (runningBalance > eodHighWaterMark) {
+          eodHighWaterMark = runningBalance;
+        }
+      }
+      const rawTrailingFloor = acc.maxTotalLoss > 0 ? eodHighWaterMark - acc.maxTotalLoss : 0;
+      const isTrailingLocked = acc.maxTotalLoss > 0 && rawTrailingFloor >= acc.initialBalance;
+      const eodLiquidationFloor = acc.maxTotalLoss > 0
+        ? parseFloat(Math.min(acc.initialBalance, rawTrailingFloor).toFixed(2))
+        : 0;
+      const liveBufferAboveFloor = acc.maxTotalLoss > 0
+        ? parseFloat(Math.max(0, currentBalance - eodLiquidationFloor).toFixed(2))
+        : 0;
+
+      // Máximo tamaño de posición observado (contratos)
+      const maxContractsUsed = closed.reduce((mx, t) => Math.max(mx, t.totalContracts || 0), 0);
 
       // Pérdida consumida hoy (si hoy es negativo) y en el peor día histórico
       const dailyLossToday = todayPnl < 0 ? Math.abs(todayPnl) : 0;
@@ -306,10 +435,11 @@ export default function AccountsPage() {
         : 0;
 
       const dailyLossBreached = acc.maxDailyLoss > 0 && (dailyLossToday >= acc.maxDailyLoss || maxObservedDailyLoss >= acc.maxDailyLoss);
-      const drawdownBreached = acc.maxTotalLoss > 0 && stats.maxDrawdown >= acc.maxTotalLoss;
+      const drawdownBreached = acc.maxTotalLoss > 0 && (stats.maxDrawdown >= acc.maxTotalLoss || currentBalance <= eodLiquidationFloor);
       const targetReached = acc.profitTarget > 0 && currentProfit >= acc.profitTarget;
       const minDaysMet = acc.minTradingDays <= 0 || daysTraded >= acc.minTradingDays;
       const consistencyOk = acc.consistencyRulePct <= 0 || currentProfit <= 0 || bestDayPnl <= consistencyDollarLimit + 0.01;
+      const contractsOk = !acc.maxMicros || acc.maxMicros <= 0 || maxContractsUsed <= acc.maxMicros;
 
       return {
         config: acc,
@@ -320,6 +450,11 @@ export default function AccountsPage() {
         todayPnl,
         currentProfit,
         currentBalance,
+        eodHighWaterMark,
+        eodLiquidationFloor,
+        isTrailingLocked,
+        liveBufferAboveFloor,
+        maxContractsUsed,
         dailyLossToday,
         maxObservedDailyLoss,
         consistencyPctObserved,
@@ -329,6 +464,7 @@ export default function AccountsPage() {
         targetReached,
         minDaysMet,
         consistencyOk,
+        contractsOk,
       };
     });
   }, [accounts, trades]);
@@ -338,16 +474,18 @@ export default function AccountsPage() {
   const openNewAccountModal = () => {
     setEditingAccount({
       id: `acc-${Date.now()}`,
-      name: "TopStep $50K — Nueva Cuenta",
-      firm: "TopStep",
-      accountType: "Cuenta Fondeada (PA / XFA)",
+      name: "Lucy Trading / LucidPro $50K",
+      firm: "Lucy Trading (Lucid)",
+      accountType: "Evaluación / Challenge",
       filterMode: "funded",
+      brokerFilter: "lucid_trading",
       initialBalance: 50000,
       profitTarget: 3000,
-      maxDailyLoss: 1000,
+      maxDailyLoss: 1200,
       maxTotalLoss: 2000,
-      minTradingDays: 5,
-      consistencyRulePct: 50,
+      minTradingDays: 3,
+      consistencyRulePct: 40,
+      maxMicros: 40,
       status: "Active",
     });
     setIsModalOpen(true);
@@ -388,6 +526,11 @@ export default function AccountsPage() {
     todayPnl,
     currentProfit,
     currentBalance,
+    eodHighWaterMark,
+    eodLiquidationFloor,
+    isTrailingLocked,
+    liveBufferAboveFloor,
+    maxContractsUsed,
     dailyLossToday,
     maxObservedDailyLoss,
     consistencyPctObserved,
@@ -397,15 +540,16 @@ export default function AccountsPage() {
     targetReached,
     minDaysMet,
     consistencyOk,
+    contractsOk,
   } = active;
 
   const remainingProfit = acc.profitTarget > 0 ? Math.max(0, acc.profitTarget - currentProfit) : null;
-  const allRulesOk = !dailyLossBreached && !drawdownBreached && consistencyOk;
+  const allRulesOk = !dailyLossBreached && !drawdownBreached && consistencyOk && contractsOk;
 
   return (
     <AppShell
       title="Cuentas de Trading & Prop Firms"
-      subtitle="Monitoreo en tiempo real conectado 1:1 con las operaciones de tu Journal"
+      subtitle="Monitoreo en tiempo real conectado 1:1 con las operaciones de tu Journal (Lucy Trading / Lucid, TopStep, Apex, MFFU, FTMO)"
     >
       <div className="flex flex-col gap-5 w-full max-w-[1800px] mx-auto">
 
@@ -418,7 +562,7 @@ export default function AccountsPage() {
                 <button
                   key={item.config.id}
                   onClick={() => setSelectedId(item.config.id)}
-                  className={`flex flex-col items-start rounded-card border px-5 py-3.5 transition-all text-left min-w-[220px] ${
+                  className={`flex flex-col items-start rounded-card border px-4 py-3 transition-all text-left min-w-[215px] ${
                     isSel
                       ? "bg-green-primary/10 border-green-primary/40 shadow-green-glow"
                       : "border-border-card bg-bg-card hover:bg-bg-section/60"
@@ -482,15 +626,15 @@ export default function AccountsPage() {
               color: currentProfit >= 0 ? "text-green-primary" : "text-red-loss",
             },
             {
-              label: "Win Rate / PF",
-              value: stats.closedTrades > 0 ? `${stats.winRate.toFixed(1)}%` : "—",
-              sub: `Profit Factor: ${formatProfitFactor(stats)}`,
-              color: "text-blue-accent",
+              label: "Piso de Liquidación EOD",
+              value: acc.maxTotalLoss > 0 ? `$${eodLiquidationFloor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A",
+              sub: isTrailingLocked ? "🔒 Candado en Balance Inicial" : `Colchón: $${liveBufferAboveFloor.toFixed(2)}`,
+              color: isTrailingLocked ? "text-green-primary" : "text-blue-accent",
             },
             {
               label: "Max Drawdown Realizado",
               value: `-$${stats.maxDrawdown.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-              sub: acc.maxTotalLoss > 0 ? `Límite: -$${acc.maxTotalLoss.toLocaleString()}` : "Sin límite fijo",
+              sub: acc.maxTotalLoss > 0 ? `Límite EOD: -$${acc.maxTotalLoss.toLocaleString()}` : "Sin límite fijo",
               color: drawdownBreached ? "text-red-loss" : "text-yellow-warn",
             },
             {
@@ -514,13 +658,13 @@ export default function AccountsPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-5">
 
           {/* ── Panel Principal: Reglas y Límites de Prop Firm ── */}
           <div className="rounded-card border border-border-card bg-bg-card p-6">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-6 border-b border-border-card pb-4">
               <div>
-                <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">{acc.accountType}</p>
+                <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">{acc.accountType} · {acc.firm}</p>
                 <h2 className="text-[18px] font-bold text-text-primary mt-0.5">{acc.name}</h2>
                 <p className="text-[12px] text-text-secondary mt-0.5">
                   Capital Inicial: <strong className="text-text-primary">${acc.initialBalance.toLocaleString()}</strong> ·{" "}
@@ -531,7 +675,7 @@ export default function AccountsPage() {
                       : acc.filterMode === "personal"
                         ? "Operaciones en Cuenta Personal"
                         : acc.filterMode === "broker"
-                          ? `Broker: ${acc.brokerFilter}`
+                          ? `Bróker / Prop Firm: ${acc.brokerFilter}`
                           : "Todas las Operaciones del Journal"}
                   </strong>
                 </p>
@@ -578,27 +722,43 @@ export default function AccountsPage() {
                 />
               )}
 
-              {acc.maxDailyLoss > 0 && (
+              {acc.maxDailyLoss > 0 ? (
                 <RuleRow
-                  label="Pérdida Máxima Diaria Hoy (Daily Loss Limit)"
+                  label="Pérdida Máxima Diaria Hoy (Daily Loss Limit — DLL)"
                   current={dailyLossToday}
                   limit={acc.maxDailyLoss}
                   format="dollar"
                   warn={60}
                   subText={`P&L Hoy: ${todayPnl >= 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(2)} · Peor día histórico: -$${maxObservedDailyLoss.toFixed(2)}`}
                 />
+              ) : (
+                <div className="rounded-lg border border-border-card/60 bg-bg-section/40 px-4 py-2.5 flex items-center justify-between text-[12px]">
+                  <span className="text-text-secondary font-medium">Límite de Pérdida Diaria (Daily Loss Limit)</span>
+                  <span className="text-green-primary font-bold">Sin límite diario en este plan (ej. LucidFlex / Apex)</span>
+                </div>
               )}
 
               {acc.maxTotalLoss > 0 && (
                 <RuleRow
-                  label="Drawdown Máximo Realizado vs Límite Total (Trailing / Max Loss)"
+                  label="Drawdown Máximo Realizado vs Límite Total (EOD Trailing Drawdown)"
                   current={stats.maxDrawdown}
                   limit={acc.maxTotalLoss}
                   format="dollar"
                   warn={70}
-                  subText={`Colchón disponible antes de límite: $${Math.max(0, acc.maxTotalLoss - stats.maxDrawdown).toFixed(2)}`}
+                  subText={`Piso de Liquidación EOD: $${eodLiquidationFloor.toLocaleString(undefined, { minimumFractionDigits: 2 })} · Colchón real actual: $${liveBufferAboveFloor.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                 />
               )}
+
+              {acc.maxMicros && acc.maxMicros > 0 ? (
+                <RuleRow
+                  label={`Tamaño Máximo de Posición (Límite ${Math.floor(acc.maxMicros / 10)} Minis / ${acc.maxMicros} Micros)`}
+                  current={maxContractsUsed}
+                  limit={acc.maxMicros}
+                  format="contracts"
+                  warn={80}
+                  subText={`Máximo operado en un trade: ${maxContractsUsed} contratos · Disponible: ${Math.max(0, acc.maxMicros - maxContractsUsed)} contratos`}
+                />
+              ) : null}
 
               {acc.minTradingDays > 0 && (
                 <RuleRow
@@ -643,11 +803,11 @@ export default function AccountsPage() {
             </div>
           </div>
 
-          {/* ── Sidebar: Resumen Contable y Checklist de Cumplimiento ── */}
+          {/* ── Sidebar: Resumen Contable, Candado EOD y Checklist ── */}
           <div className="flex flex-col gap-4">
             <div className="rounded-card border border-border-card bg-bg-card p-5">
               <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-4 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-primary" /> Conciliación de Cuenta
+                <TrendingUp className="h-4 w-4 text-green-primary" /> Conciliación & Piso EOD
               </p>
               <div className="flex flex-col gap-2.5">
                 {[
@@ -656,13 +816,11 @@ export default function AccountsPage() {
                   { label: "Comisiones Realizadas", value: `-$${stats.totalCommissions.toFixed(2)}`, color: "text-yellow-warn" },
                   { label: "Net P&L Realizado", value: `${currentProfit >= 0 ? "+" : "-"}$${Math.abs(currentProfit).toFixed(2)}`, color: currentProfit >= 0 ? "text-green-primary" : "text-red-loss" },
                   { label: "Balance actual", value: `$${currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-text-primary" },
+                  { label: "High-Water Mark (EOD)", value: `$${eodHighWaterMark.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "text-blue-accent" },
+                  { label: "Piso de Liquidación EOD", value: acc.maxTotalLoss > 0 ? `$${eodLiquidationFloor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A", color: isTrailingLocked ? "text-green-primary" : "text-red-loss" },
+                  { label: "Colchón sobre Liquidación", value: acc.maxTotalLoss > 0 ? `+$${liveBufferAboveFloor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A", color: "text-green-primary" },
                   { label: "Mejor día", value: `+$${bestDayPnl.toFixed(2)}`, color: "text-green-primary" },
                   { label: "Peor día", value: worstDayPnl < 0 ? `-$${Math.abs(worstDayPnl).toFixed(2)}` : "$0.00", color: worstDayPnl < 0 ? "text-red-loss" : "text-text-secondary" },
-                  {
-                    label: "P&L hoy",
-                    value: todayPnl === 0 ? "$0.00 (sin cierres hoy)" : `${todayPnl > 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(2)}`,
-                    color: todayPnl >= 0 ? "text-green-primary" : "text-red-loss",
-                  },
                 ].map(r => (
                   <div key={r.label} className="flex justify-between items-center border-b border-border-card/30 pb-2">
                     <span className="text-[11px] text-text-muted">{r.label}</span>
@@ -670,6 +828,14 @@ export default function AccountsPage() {
                   </div>
                 ))}
               </div>
+              {isTrailingLocked && (
+                <div className="mt-3 rounded-lg border border-green-primary/30 bg-green-primary/10 px-3 py-2 text-[11px] text-green-primary flex items-center gap-2">
+                  <Lock className="h-4 w-4 shrink-0" />
+                  <span>
+                    <strong>Candado EOD Activado:</strong> Tu ganancia acumulada superó el umbral de Drawdown, por lo que el piso de liquidación ya quedó fijo en <strong>${acc.initialBalance.toLocaleString()}</strong> y no sube más.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="rounded-card border border-border-card bg-bg-card p-5">
@@ -680,11 +846,15 @@ export default function AccountsPage() {
                 {[
                   {
                     ok: !dailyLossBreached,
-                    label: acc.maxDailyLoss > 0 ? `Dentro del Daily Loss Limit ($${acc.maxDailyLoss.toLocaleString()})` : "Sin límite de pérdida diaria",
+                    label: acc.maxDailyLoss > 0 ? `Dentro del Daily Loss Limit ($${acc.maxDailyLoss.toLocaleString()})` : "Sin límite de pérdida diaria (DLL libre)",
                   },
                   {
                     ok: !drawdownBreached,
-                    label: acc.maxTotalLoss > 0 ? `Drawdown dentro del límite ($${acc.maxTotalLoss.toLocaleString()})` : "Sin límite de drawdown máximo",
+                    label: acc.maxTotalLoss > 0 ? `Sobre Piso de Liquidación EOD ($${eodLiquidationFloor.toLocaleString()})` : "Sin límite de drawdown máximo",
+                  },
+                  {
+                    ok: contractsOk,
+                    label: acc.maxMicros && acc.maxMicros > 0 ? `Límite de Contratos respetado (${maxContractsUsed}/${acc.maxMicros} Micros)` : "Sin límite de contratos",
                   },
                   {
                     ok: targetReached || acc.profitTarget === 0,
@@ -696,7 +866,7 @@ export default function AccountsPage() {
                   },
                   {
                     ok: consistencyOk,
-                    label: acc.consistencyRulePct > 0 ? `Regla de Consistencia ≤ ${acc.consistencyRulePct}%` : "Sin regla de consistencia",
+                    label: acc.consistencyRulePct > 0 ? `Regla de Consistencia ≤ ${acc.consistencyRulePct}%` : "Sin regla de consistencia (LucidPro / Libre)",
                   },
                 ].map((c, i) => (
                   <div key={i} className="flex items-center gap-2.5 text-[12px]">
@@ -714,7 +884,7 @@ export default function AccountsPage() {
         {/* ── Modal de Creación / Edición de Cuenta ── */}
         {isModalOpen && editingAccount && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="w-full max-w-xl rounded-2xl border border-border-card bg-bg-card p-6 shadow-2xl">
+            <div className="w-full max-w-2xl rounded-2xl border border-border-card bg-bg-card p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-border-card pb-3 mb-4">
                 <div className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5 text-green-primary" />
@@ -731,7 +901,7 @@ export default function AccountsPage() {
               {/* Plantillas rápidas de Prop Firm */}
               <div className="mb-4">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-text-muted block mb-2">
-                  Cargar Plantilla Oficial (1 clic)
+                  Cargar Plantilla Oficial (1 clic — incluye Lucy Trading / LucidPro & LucidFlex)
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {PROP_PRESETS.map(p => (
@@ -739,7 +909,11 @@ export default function AccountsPage() {
                       key={p.name}
                       type="button"
                       onClick={() => setEditingAccount({ ...p, id: editingAccount.id })}
-                      className="rounded-lg border border-border-card bg-bg-section px-2.5 py-1.5 text-[11px] font-medium text-text-secondary hover:border-green-primary/40 hover:text-green-primary transition-colors"
+                      className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                        p.firm.includes("Lucy")
+                          ? "border-green-primary/40 bg-green-primary/10 text-green-primary hover:bg-green-primary/20"
+                          : "border-border-card bg-bg-section text-text-secondary hover:border-green-primary/40 hover:text-green-primary"
+                      }`}
                     >
                       {p.name}
                     </button>
@@ -769,11 +943,34 @@ export default function AccountsPage() {
                 <div>
                   <label className="text-[11px] text-text-secondary font-medium block mb-1">Vincular con Operaciones del Journal</label>
                   <select
-                    value={editingAccount.filterMode}
-                    onChange={e => setEditingAccount({ ...editingAccount, filterMode: e.target.value as PropAccountConfig["filterMode"] })}
+                    value={
+                      editingAccount.filterMode === "broker"
+                        ? `broker:${editingAccount.brokerFilter || "lucid_trading"}`
+                        : editingAccount.filterMode
+                    }
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val.startsWith("broker:")) {
+                        setEditingAccount({
+                          ...editingAccount,
+                          filterMode: "broker",
+                          brokerFilter: val.replace("broker:", ""),
+                        });
+                      } else {
+                        setEditingAccount({
+                          ...editingAccount,
+                          filterMode: val as PropAccountConfig["filterMode"],
+                        });
+                      }
+                    }}
                     className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
                   >
-                    <option value="funded">Cuentas Fondeadas / Prop Firm</option>
+                    <option value="funded">Todas las Cuentas Fondeadas / Prop Firm</option>
+                    <option value="broker:lucid_trading">Solo Bróker: Lucy Trading / Lucid Trading</option>
+                    <option value="broker:topstep">Solo Bróker: TopStep</option>
+                    <option value="broker:apex">Solo Bróker: Apex Trader Funding</option>
+                    <option value="broker:my_funded_futures">Solo Bróker: My Funded Futures (MFFU)</option>
+                    <option value="broker:take_profit_trader">Solo Bróker: Take Profit Trader</option>
                     <option value="personal">Cuenta Personal</option>
                     <option value="all">Todas las Operaciones (Global)</option>
                   </select>
@@ -797,7 +994,7 @@ export default function AccountsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Pérdida Máx. Diaria / Daily Loss ($)</label>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Pérdida Máx. Diaria / DLL ($ — 0 = Sin límite)</label>
                   <input
                     type="number"
                     value={editingAccount.maxDailyLoss}
@@ -806,7 +1003,7 @@ export default function AccountsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Drawdown Máximo Total ($ USD)</label>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Drawdown Máximo EOD ($ USD)</label>
                   <input
                     type="number"
                     value={editingAccount.maxTotalLoss}
@@ -824,11 +1021,20 @@ export default function AccountsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Regla de Consistencia (% máx. mejor día)</label>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Regla de Consistencia (% — 0 = Sin regla)</label>
                   <input
                     type="number"
                     value={editingAccount.consistencyRulePct}
                     onChange={e => setEditingAccount({ ...editingAccount, consistencyRulePct: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Límite de Contratos Micros (ej. 40 Micros = 4 Minis en Lucy $50K, 60 en $100K)</label>
+                  <input
+                    type="number"
+                    value={editingAccount.maxMicros ?? 40}
+                    onChange={e => setEditingAccount({ ...editingAccount, maxMicros: Number(e.target.value) || 0 })}
                     className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
                   />
                 </div>
