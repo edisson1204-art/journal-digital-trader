@@ -3,28 +3,43 @@
 import { Logo } from "@/components/Logo";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [pastedUrl, setPastedUrl] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     setLoading(true);
-    // Respuesta SIEMPRE neutral: no se revela si el correo existe (anti-enumeración).
-    // El error real, si lo hay, no se muestra al usuario.
     try {
       await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
       });
     } catch {
-      /* se ignora a propósito */
+      /* respuesta neutral */
     }
     setSent(true);
     setLoading(false);
+  };
+
+  const handleConvertLocalhostLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = pastedUrl.trim();
+    if (!raw) return;
+    const match = raw.match(/[?&]code=([^&#\s]+)/i);
+    if (match?.[1]) {
+      router.push(`/reset-password?code=${encodeURIComponent(match[1].trim())}`);
+      return;
+    }
+    if (/^[0-9a-fA-F-]{20,}$/.test(raw)) {
+      router.push(`/reset-password?code=${encodeURIComponent(raw)}`);
+    }
   };
 
   return (
@@ -36,9 +51,35 @@ export default function ForgotPasswordPage() {
         <div className="bg-bg-card border border-border-card rounded-card p-8 shadow-card">
           <h1 className="text-2xl font-bold text-text-primary text-center mb-2">Recuperar contraseña</h1>
           {sent ? (
-            <div role="status" className="text-sm text-text-secondary text-center mt-4 leading-relaxed">
-              Si existe una cuenta con ese correo, te enviamos un enlace para restablecer la contraseña.
-              El enlace es de un solo uso y caduca en poco tiempo. Revisa también la carpeta de spam.
+            <div className="flex flex-col gap-4 mt-4">
+              <div role="status" className="text-sm text-text-secondary text-center leading-relaxed">
+                Si existe una cuenta con ese correo, te enviamos un enlace para restablecer la contraseña.
+                Revisa tu bandeja de entrada o spam.
+              </div>
+
+              <div className="rounded-lg border border-border-card bg-bg-section p-3.5 text-xs text-text-secondary flex flex-col gap-2.5">
+                <p className="font-bold text-text-primary">
+                  💡 ¿Al abrir el enlace del correo te salió <code className="text-green-primary">localhost:3000/?code=...</code>?
+                </p>
+                <p>
+                  Copia esa URL de la barra de direcciones y pégala aquí para ir directo a cambiar tu contraseña:
+                </p>
+                <form onSubmit={handleConvertLocalhostLink} className="flex flex-col gap-2">
+                  <input
+                    type="text"
+                    value={pastedUrl}
+                    onChange={e => setPastedUrl(e.target.value)}
+                    placeholder="http://localhost:3000/?code=..."
+                    className="w-full px-3 py-2 rounded-btn bg-bg-card border border-border-card text-text-primary text-xs focus:outline-none focus:border-green-primary"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 font-bold text-bg-main bg-green-primary rounded-btn hover:bg-green-primary/90 transition-all text-xs"
+                  >
+                    Ir a crear nueva contraseña →
+                  </button>
+                </form>
+              </div>
             </div>
           ) : (
             <>

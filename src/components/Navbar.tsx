@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Logo } from "./Logo";
@@ -17,6 +17,14 @@ const NAV_LINKS = [
 export function Navbar() {
   const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code && window.location.pathname === "/") {
+      window.location.replace(`/reset-password?code=${encodeURIComponent(code)}`);
+    }
+  }, []);
 
   return (
     <header
