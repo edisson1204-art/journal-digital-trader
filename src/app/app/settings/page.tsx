@@ -21,13 +21,15 @@ export default function SettingsPage() {
     setTimeout(() => setIsSaved(false), 3000); // Hide success message after 3s
   };
 
-  const handleResetTrades = () => {
+  const handleResetTrades = async () => {
     const isConfirmed = window.confirm(
       "🛑 ATENCIÓN: Estás a punto de BORRAR TODAS TUS OPERACIONES.\n\nEsta acción es irreversible. Todos tus reportes, estadísticas y balances regresarán a 0.\n\n¿Estás absolutamente seguro de querer empezar desde cero?"
     );
     if (isConfirmed) {
-      clearTrades();
-      alert("✅ Historial borrado exitosamente. Tu cuenta ahora está limpia.");
+      const ok = await clearTrades();
+      if (!ok) { alert("⚠️ No se pudo borrar en la nube. No se eliminó nada. Revisa tu conexión e inténtalo de nuevo."); return; }
+      window.location.href = "/app";
+      alert("✅ Historial y cuentas borrados (nube y navegador). Tu aplicación ahora está limpia.");
     }
   };
 

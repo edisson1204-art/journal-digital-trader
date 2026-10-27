@@ -113,7 +113,7 @@ export interface TradeStore {
   addTrade: (trade: TradeRecord) => Promise<void>;
   updateTrade: (id: string, updates: Partial<TradeRecord>) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
-  clearTrades: () => void;
+  clearTrades: () => Promise<boolean>;
   clearSyncError: () => void;
   setHydrated: (state: boolean) => void;
   updateSettings: (settings: Partial<TradeStore["settings"]>) => void;
@@ -281,7 +281,32 @@ export const useTradeStore = create<TradeStore>()(
         }
       },
 
-      clearTrades: () => set({ trades: [], stats: computeStats([]), loadError: null, syncError: null, syncStatus: "idle" }),
+      /* Reset REAL: borra los trades en la nube (Supabase) y luego el estado local.
+         Si la nube falla, NO se vacía lo local (para que no reaparezcan al recargar sin avisar). */
+      clearTrades: async () => {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const user = sessionData.session?.user;
+          if (user) {
+            const { error } = await supabase.from("trades").delete().eq("user_id", user.id);
+            if (error) {
+              set({ syncError: `No se pudo borrar el historial en la nube: ${error.message}`, syncStatus: "error" });
+              return false;
+            }
+          }
+        } catch {
+          set({ syncError: "Error de conexión al borrar el historial en la nube.", syncStatus: "error" });
+          return false;
+        }
+        set({ trades: [], stats: computeStats([]), loadError: null, syncError: null, syncStatus: "synced" });
+        if (typeof window !== "undefined") {
+          // Configuración local de cuentas Prop Firm (todas las versiones guardadas)
+          ["tdi_prop_accounts_v1", "tdi_prop_accounts_v2", "tdi_prop_accounts_v3", "tdi_prop_accounts_v4"].forEach(k => {
+            try { window.localStorage.removeItem(k); } catch { /* ignore */ }
+          });
+        }
+        return true;
+      },
       clearSyncError: () => set({ syncError: null, loadError: null }),
 
       setHydrated: (state) => set({ isHydrated: state }),
