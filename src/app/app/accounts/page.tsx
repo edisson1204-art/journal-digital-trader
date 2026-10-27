@@ -598,14 +598,15 @@ function RuleCard({
 
 export default function AccountsPage() {
   const { trades, isHydrated } = useTradeStore();
-  const [accounts, setAccounts] = useState<PropAccountConfig[]>(DEFAULT_ACCOUNTS);
-  const [selectedId, setSelectedId] = useState<string>(DEFAULT_ACCOUNTS[0].id);
+  const [accounts, setAccounts] = useState<PropAccountConfig[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
   const [firmFilter, setFirmFilter] = useState<string>("ALL");
   const [viewMode, setViewMode] = useState<"cards" | "matrix">("cards");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<PropAccountConfig | null>(null);
   const [batchCount, setBatchCount] = useState<number>(1);
   const [presetTab, setPresetTab] = useState<PresetCategory>("MFFU");
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
 
   useEffect(() => {
     try {
@@ -619,8 +620,9 @@ export default function AccountsPage() {
         }
       }
     } catch {
-      // Fallback a DEFAULT_ACCOUNTS
+      // Sin cuentas guardadas: la pantalla arranca vacía
     }
+    setAccountsLoaded(true);
   }, []);
 
   const saveAccounts = (next: PropAccountConfig[]) => {
@@ -801,19 +803,21 @@ export default function AccountsPage() {
 
   const active = computedAccounts.find(a => a.config.id === selectedId) ?? visibleAccounts[0] ?? computedAccounts[0];
 
-  const handleLoad13AccountEmpire = () => {
-    const preset13 = build13AccountEmpirePreset();
-    saveAccounts(preset13);
+  const handleClearAllAccounts = () => {
+    if (!window.confirm("¿Quitar todas las cuentas de fondeo configuradas? (No borra tus trades)")) return;
+    saveAccounts([]);
     setFirmFilter("ALL");
-    setSelectedId(preset13[0].id);
-    setViewMode("matrix");
+    setSelectedId("");
   };
 
-  const handleResetDefault5 = () => {
-    saveAccounts(DEFAULT_ACCOUNTS);
-    setFirmFilter("ALL");
-    setSelectedId(DEFAULT_ACCOUNTS[0].id);
-    setViewMode("cards");
+  const openNewForFirm = (category: PresetCategory) => {
+    const first = PROP_PRESETS.find(p => p.category === category);
+    if (!first) return;
+    const { category: _c, badge: _b, ...cfg } = first;
+    setEditingAccount({ ...cfg, id: `acc-${Date.now()}` });
+    setBatchCount(1);
+    setPresetTab(category);
+    setIsModalOpen(true);
   };
 
   const openNewAccountModal = () => {
@@ -901,13 +905,326 @@ export default function AccountsPage() {
   };
 
   const handleDeleteAccount = (id: string) => {
-    if (accounts.length <= 1) return;
+    if (accounts.length < 1) return;
     const next = accounts.filter(a => a.id !== id);
     saveAccounts(next);
-    if (selectedId === id) setSelectedId(next[0].id);
+    if (selectedId === id) setSelectedId(next[0]?.id ?? "");
   };
 
-  if (!isHydrated || !active) return null;
+  const renderAccountModal = () => (
+    <>
+        {/* ΓöÇΓöÇ MODAL CON CREACI├ôN EN LOTE (1 A 20 CUENTAS), TAG INDIVIDUAL Y PESTA├æAS POR EMPRESA ΓöÇΓöÇ */}
+        {isModalOpen && editingAccount && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+            <div className="w-full max-w-2xl rounded-2xl border border-border-card bg-bg-card p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-border-card pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-green-primary" />
+                  <div>
+                    <h3 className="text-[15px] font-bold text-text-primary">Configurar Cuenta o Lote Multi-Cuenta</h3>
+                    <p className="text-[11px] text-text-muted">Crea 1 o m├║ltiples cuentas id├⌐nticas (ej. 5 Lucy, 3 TopStep, 5 MFFU) en un solo paso</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setIsModalOpen(false); setEditingAccount(null); }}
+                  className="text-text-muted hover:text-text-primary"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <div className="flex flex-wrap gap-1.5 mb-2.5 border-b border-border-card pb-2">
+                  {(
+                    [
+                      { id: "Lucy", label: "Lucy Trading (Lucid)" },
+                      { id: "MFFU", label: "My Funded Futures (MFFU)" },
+                      { id: "TopStep", label: "TopStep" },
+                      { id: "Otras", label: "Apex / TPT / FTMO" },
+                    ] as { id: PresetCategory; label: string }[]
+                  ).map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setPresetTab(tab.id)}
+                      className={`rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all ${
+                        presetTab === tab.id
+                          ? "bg-green-primary text-bg-main"
+                          : "bg-bg-section text-text-secondary hover:text-text-primary border border-border-card"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {PROP_PRESETS.filter(p => p.category === presetTab).map(p => {
+                    const isSelectedPreset = editingAccount.name.startsWith(p.name);
+                    const { category: _cat, badge, ...presetConfig } = p;
+                    return (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => setEditingAccount({ ...presetConfig, id: editingAccount.id })}
+                        className={`flex flex-col items-start rounded-xl border p-2.5 text-left transition-all ${
+                          isSelectedPreset
+                            ? "border-green-primary bg-green-primary/15 text-green-primary"
+                            : "border-border-card bg-bg-section/60 hover:border-green-primary/40 text-text-primary"
+                        }`}
+                      >
+                        <span className="text-[12px] font-bold">{p.name}</span>
+                        <span className="text-[10px] text-text-muted mt-0.5">{badge}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {!accounts.some(a => a.id === editingAccount.id) && (
+                <div className="mb-4 rounded-xl border border-green-primary/30 bg-green-primary/5 p-3.5 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[12px] font-bold text-green-primary">┬┐Cu├íntas cuentas iguales deseas crear en este lote?</p>
+                    <p className="text-[10.5px] text-text-muted">
+                      Se numerar├ín autom├íticamente (#01, #02, #03...) dentro de la carpeta {editingAccount.firm}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {[1, 2, 3, 5, 10].map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setBatchCount(n)}
+                        className={`rounded-lg px-3 py-1.5 text-[12px] font-extrabold transition-all ${
+                          batchCount === n
+                            ? "bg-green-primary text-bg-main shadow-sm"
+                            : "bg-bg-card border border-border-card text-text-secondary hover:text-text-primary"
+                        }`}
+                      >
+                        x{n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px] pt-2 border-t border-border-card/60">
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Nombre Base de la Cuenta</label>
+                  <input
+                    type="text"
+                    value={editingAccount.name}
+                    onChange={e => setEditingAccount({ ...editingAccount, name: e.target.value })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Prop Firm / Carpeta</label>
+                  <input
+                    type="text"
+                    value={editingAccount.firm}
+                    onChange={e => setEditingAccount({ ...editingAccount, firm: e.target.value })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Modo de Operativa / V├¡nculo Journal</label>
+                  <select
+                    value={
+                      editingAccount.filterMode === "broker"
+                        ? `broker:${editingAccount.brokerFilter || "my_funded_futures"}`
+                        : editingAccount.filterMode
+                    }
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val.startsWith("broker:")) {
+                        setEditingAccount({
+                          ...editingAccount,
+                          filterMode: "broker",
+                          brokerFilter: val.replace("broker:", ""),
+                        });
+                      } else {
+                        setEditingAccount({
+                          ...editingAccount,
+                          filterMode: val as PropAccountConfig["filterMode"],
+                        });
+                      }
+                    }}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
+                  >
+                    <option value="funded">Copy-Trading: Todas las Operaciones Funded</option>
+                    <option value="tag">Rotaci├│n Individual por Tag (ej. #lucy-01)</option>
+                    <option value="broker:lucid_trading">Solo Br├│ker: Lucy Trading / Lucid Trading</option>
+                    <option value="broker:my_funded_futures">Solo Br├│ker: My Funded Futures (MFFU)</option>
+                    <option value="broker:topstep">Solo Br├│ker: TopStep</option>
+                    <option value="broker:apex">Solo Br├│ker: Apex Trader Funding</option>
+                    <option value="broker:take_profit_trader">Solo Br├│ker: Take Profit Trader</option>
+                    <option value="personal">Cuenta Personal</option>
+                    <option value="all">Todas las Operaciones (Global)</option>
+                  </select>
+                </div>
+
+                {editingAccount.filterMode === "tag" && (
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] text-blue-accent font-bold block mb-1">
+                      Tag Individual en el Journal (sin #, ej. lucy-01 o mffu-02)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ej. lucy-01"
+                      value={editingAccount.tagFilter || ""}
+                      onChange={e => setEditingAccount({ ...editingAccount, tagFilter: e.target.value })}
+                      className="w-full rounded-lg bg-bg-section border border-blue-accent/40 px-3 py-2 text-text-primary focus:outline-none focus:border-blue-accent"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Capital Inicial ($ USD)</label>
+                  <input
+                    type="number"
+                    value={editingAccount.initialBalance}
+                    onChange={e => setEditingAccount({ ...editingAccount, initialBalance: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Objetivo de Profit ($ USD)</label>
+                  <input
+                    type="number"
+                    value={editingAccount.profitTarget}
+                    onChange={e => setEditingAccount({ ...editingAccount, profitTarget: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">P├⌐rdida M├íx. Diaria / DLL ($ ΓÇö 0 = Sin l├¡mite)</label>
+                  <input
+                    type="number"
+                    value={editingAccount.maxDailyLoss}
+                    onChange={e => setEditingAccount({ ...editingAccount, maxDailyLoss: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Drawdown M├íximo EOD ($ USD)</label>
+                  <input
+                    type="number"
+                    value={editingAccount.maxTotalLoss}
+                    onChange={e => setEditingAccount({ ...editingAccount, maxTotalLoss: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">D├¡as M├¡nimos de Operativa</label>
+                  <input
+                    type="number"
+                    value={editingAccount.minTradingDays}
+                    onChange={e => setEditingAccount({ ...editingAccount, minTradingDays: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Regla de Consistencia (% ΓÇö 0 = Libre)</label>
+                  <input
+                    type="number"
+                    value={editingAccount.consistencyRulePct}
+                    onChange={e => setEditingAccount({ ...editingAccount, consistencyRulePct: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">L├¡mite de Contratos Micros</label>
+                  <input
+                    type="number"
+                    value={editingAccount.maxMicros ?? 50}
+                    onChange={e => setEditingAccount({ ...editingAccount, maxMicros: Number(e.target.value) || 0 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Profit Split para el Trader (% ΓÇö ej. 90%)</label>
+                  <input
+                    type="number"
+                    value={editingAccount.payoutSplitPct ?? 90}
+                    onChange={e => setEditingAccount({ ...editingAccount, payoutSplitPct: Number(e.target.value) || 90 })}
+                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 mt-5 pt-4 border-t border-border-card">
+                <button
+                  type="button"
+                  onClick={() => { setIsModalOpen(false); setEditingAccount(null); }}
+                  className="rounded-btn border border-border-card px-4 py-2 text-[12px] font-semibold text-text-secondary hover:text-text-primary"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveModal}
+                  className="rounded-btn bg-green-primary px-5 py-2 text-[12px] font-bold text-bg-main shadow-green-glow hover:bg-green-primary/90"
+                >
+                  {batchCount > 1 && !accounts.some(a => a.id === editingAccount.id)
+                    ? `Crear ${batchCount} Cuentas (${editingAccount.firm})`
+                    : "Guardar Cuenta"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+    </>
+  );
+
+  if (!isHydrated || !accountsLoaded) return null;
+
+  if (!active) {
+    const FIRM_CHOICES: { cat: PresetCategory; name: string; desc: string }[] = [
+      { cat: "MFFU", name: "My Funded Futures", desc: "Starter · Expert · Pro ($50K–$150K)" },
+      { cat: "Lucy", name: "Lucy Trading (Lucid)", desc: "LucidPro · LucidFlex ($50K–$100K)" },
+      { cat: "TopStep", name: "TopStep", desc: "Combine / XFA ($50K–$150K)" },
+      { cat: "Otras", name: "Apex · Take Profit Trader · FTMO", desc: "Otras empresas de fondeo" },
+    ];
+    return (
+      <AppShell
+        title="Cuentas de Trading & Prop Firms"
+        subtitle="Selecciona tus empresas de fondeo para comenzar a monitorear tus cuentas"
+      >
+        <div className="max-w-[900px] mx-auto w-full mt-6 flex flex-col gap-5">
+          <div className="rounded-card border border-border-card bg-bg-card p-8 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-green-primary/15 border border-green-primary/30 text-green-primary">
+              <Briefcase className="h-6 w-6" />
+            </div>
+            <h2 className="text-[18px] font-extrabold text-text-primary">Aún no has agregado cuentas de fondeo</h2>
+            <p className="text-[12.5px] text-text-muted mt-1.5 max-w-lg mx-auto">
+              Elige la empresa con la que operas, escoge el plan (y cuántas cuentas iguales tienes) y aparecerán aquí con sus reglas y estadísticas conectadas a tu Journal.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {FIRM_CHOICES.map(f => (
+              <button
+                key={f.cat}
+                type="button"
+                onClick={() => openNewForFirm(f.cat)}
+                className="flex items-start justify-between gap-3 rounded-xl border border-border-card bg-bg-card p-4 text-left hover:border-green-primary/50 hover:bg-green-primary/5 transition-all"
+              >
+                <div>
+                  <p className="text-[14px] font-extrabold text-text-primary">{f.name}</p>
+                  <p className="text-[11.5px] text-text-muted mt-0.5">{f.desc}</p>
+                </div>
+                <span className="flex items-center gap-1 rounded-lg bg-green-primary px-2.5 py-1.5 text-[11px] font-bold text-bg-main shrink-0">
+                  <Plus className="h-3.5 w-3.5" /> Agregar
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {renderAccountModal()}
+      </AppShell>
+    );
+  }
 
   const {
     config: acc,
@@ -977,24 +1294,13 @@ export default function AccountsPage() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={handleLoad13AccountEmpire}
-                className="flex items-center gap-1.5 rounded-lg border border-green-primary/40 bg-green-primary/15 px-3 py-1.5 text-[11px] font-bold text-green-primary hover:bg-green-primary/25 transition-all"
-                title="Cargar esquema de ejemplo con 5 Lucy + 5 MFFU + 3 TopStep"
+                onClick={handleClearAllAccounts}
+                className="flex items-center gap-1 rounded-lg border border-border-card bg-bg-section px-2.5 py-1.5 text-[11px] font-semibold text-text-muted hover:text-red-loss transition-colors"
+                title="Quitar todas las cuentas configuradas (no borra trades)"
               >
-                <Sparkles className="h-3.5 w-3.5" />
-                Simular Esquema 13 Cuentas (5 Lucy · 5 MFFU · 3 TopStep)
+                <RotateCcw className="h-3 w-3" />
+                Vaciar cuentas
               </button>
-              {accounts.length > 5 && (
-                <button
-                  type="button"
-                  onClick={handleResetDefault5}
-                  className="flex items-center gap-1 rounded-lg border border-border-card bg-bg-section px-2.5 py-1.5 text-[11px] font-semibold text-text-muted hover:text-text-primary transition-colors"
-                  title="Volver a las 5 tarjetas base"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  Base (5)
-                </button>
-              )}
             </div>
           </div>
 
@@ -1582,267 +1888,7 @@ export default function AccountsPage() {
           </div>
         </div>
 
-        {/* ── MODAL CON CREACIÓN EN LOTE (1 A 20 CUENTAS), TAG INDIVIDUAL Y PESTAÑAS POR EMPRESA ── */}
-        {isModalOpen && editingAccount && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-            <div className="w-full max-w-2xl rounded-2xl border border-border-card bg-bg-card p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-border-card pb-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5 text-green-primary" />
-                  <div>
-                    <h3 className="text-[15px] font-bold text-text-primary">Configurar Cuenta o Lote Multi-Cuenta</h3>
-                    <p className="text-[11px] text-text-muted">Crea 1 o múltiples cuentas idénticas (ej. 5 Lucy, 3 TopStep, 5 MFFU) en un solo paso</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setIsModalOpen(false); setEditingAccount(null); }}
-                  className="text-text-muted hover:text-text-primary"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mb-4">
-                <div className="flex flex-wrap gap-1.5 mb-2.5 border-b border-border-card pb-2">
-                  {(
-                    [
-                      { id: "Lucy", label: "Lucy Trading (Lucid)" },
-                      { id: "MFFU", label: "My Funded Futures (MFFU)" },
-                      { id: "TopStep", label: "TopStep" },
-                      { id: "Otras", label: "Apex / TPT / FTMO" },
-                    ] as { id: PresetCategory; label: string }[]
-                  ).map(tab => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setPresetTab(tab.id)}
-                      className={`rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all ${
-                        presetTab === tab.id
-                          ? "bg-green-primary text-bg-main"
-                          : "bg-bg-section text-text-secondary hover:text-text-primary border border-border-card"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {PROP_PRESETS.filter(p => p.category === presetTab).map(p => {
-                    const isSelectedPreset = editingAccount.name.startsWith(p.name);
-                    const { category: _cat, badge, ...presetConfig } = p;
-                    return (
-                      <button
-                        key={p.name}
-                        type="button"
-                        onClick={() => setEditingAccount({ ...presetConfig, id: editingAccount.id })}
-                        className={`flex flex-col items-start rounded-xl border p-2.5 text-left transition-all ${
-                          isSelectedPreset
-                            ? "border-green-primary bg-green-primary/15 text-green-primary"
-                            : "border-border-card bg-bg-section/60 hover:border-green-primary/40 text-text-primary"
-                        }`}
-                      >
-                        <span className="text-[12px] font-bold">{p.name}</span>
-                        <span className="text-[10px] text-text-muted mt-0.5">{badge}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {!accounts.some(a => a.id === editingAccount.id) && (
-                <div className="mb-4 rounded-xl border border-green-primary/30 bg-green-primary/5 p-3.5 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[12px] font-bold text-green-primary">¿Cuántas cuentas iguales deseas crear en este lote?</p>
-                    <p className="text-[10.5px] text-text-muted">
-                      Se numerarán automáticamente (#01, #02, #03...) dentro de la carpeta {editingAccount.firm}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {[1, 2, 3, 5, 10].map(n => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setBatchCount(n)}
-                        className={`rounded-lg px-3 py-1.5 text-[12px] font-extrabold transition-all ${
-                          batchCount === n
-                            ? "bg-green-primary text-bg-main shadow-sm"
-                            : "bg-bg-card border border-border-card text-text-secondary hover:text-text-primary"
-                        }`}
-                      >
-                        x{n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px] pt-2 border-t border-border-card/60">
-                <div className="sm:col-span-2">
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Nombre Base de la Cuenta</label>
-                  <input
-                    type="text"
-                    value={editingAccount.name}
-                    onChange={e => setEditingAccount({ ...editingAccount, name: e.target.value })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Prop Firm / Carpeta</label>
-                  <input
-                    type="text"
-                    value={editingAccount.firm}
-                    onChange={e => setEditingAccount({ ...editingAccount, firm: e.target.value })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Modo de Operativa / Vínculo Journal</label>
-                  <select
-                    value={
-                      editingAccount.filterMode === "broker"
-                        ? `broker:${editingAccount.brokerFilter || "my_funded_futures"}`
-                        : editingAccount.filterMode
-                    }
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val.startsWith("broker:")) {
-                        setEditingAccount({
-                          ...editingAccount,
-                          filterMode: "broker",
-                          brokerFilter: val.replace("broker:", ""),
-                        });
-                      } else {
-                        setEditingAccount({
-                          ...editingAccount,
-                          filterMode: val as PropAccountConfig["filterMode"],
-                        });
-                      }
-                    }}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary focus:outline-none focus:border-green-primary"
-                  >
-                    <option value="funded">Copy-Trading: Todas las Operaciones Funded</option>
-                    <option value="tag">Rotación Individual por Tag (ej. #lucy-01)</option>
-                    <option value="broker:lucid_trading">Solo Bróker: Lucy Trading / Lucid Trading</option>
-                    <option value="broker:my_funded_futures">Solo Bróker: My Funded Futures (MFFU)</option>
-                    <option value="broker:topstep">Solo Bróker: TopStep</option>
-                    <option value="broker:apex">Solo Bróker: Apex Trader Funding</option>
-                    <option value="broker:take_profit_trader">Solo Bróker: Take Profit Trader</option>
-                    <option value="personal">Cuenta Personal</option>
-                    <option value="all">Todas las Operaciones (Global)</option>
-                  </select>
-                </div>
-
-                {editingAccount.filterMode === "tag" && (
-                  <div className="sm:col-span-2">
-                    <label className="text-[11px] text-blue-accent font-bold block mb-1">
-                      Tag Individual en el Journal (sin #, ej. lucy-01 o mffu-02)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="ej. lucy-01"
-                      value={editingAccount.tagFilter || ""}
-                      onChange={e => setEditingAccount({ ...editingAccount, tagFilter: e.target.value })}
-                      className="w-full rounded-lg bg-bg-section border border-blue-accent/40 px-3 py-2 text-text-primary focus:outline-none focus:border-blue-accent"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Capital Inicial ($ USD)</label>
-                  <input
-                    type="number"
-                    value={editingAccount.initialBalance}
-                    onChange={e => setEditingAccount({ ...editingAccount, initialBalance: Number(e.target.value) || 0 })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Objetivo de Profit ($ USD)</label>
-                  <input
-                    type="number"
-                    value={editingAccount.profitTarget}
-                    onChange={e => setEditingAccount({ ...editingAccount, profitTarget: Number(e.target.value) || 0 })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Pérdida Máx. Diaria / DLL ($ — 0 = Sin límite)</label>
-                  <input
-                    type="number"
-                    value={editingAccount.maxDailyLoss}
-                    onChange={e => setEditingAccount({ ...editingAccount, maxDailyLoss: Number(e.target.value) || 0 })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Drawdown Máximo EOD ($ USD)</label>
-                  <input
-                    type="number"
-                    value={editingAccount.maxTotalLoss}
-                    onChange={e => setEditingAccount({ ...editingAccount, maxTotalLoss: Number(e.target.value) || 0 })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Días Mínimos de Operativa</label>
-                  <input
-                    type="number"
-                    value={editingAccount.minTradingDays}
-                    onChange={e => setEditingAccount({ ...editingAccount, minTradingDays: Number(e.target.value) || 0 })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Regla de Consistencia (% — 0 = Libre)</label>
-                  <input
-                    type="number"
-                    value={editingAccount.consistencyRulePct}
-                    onChange={e => setEditingAccount({ ...editingAccount, consistencyRulePct: Number(e.target.value) || 0 })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Límite de Contratos Micros</label>
-                  <input
-                    type="number"
-                    value={editingAccount.maxMicros ?? 50}
-                    onChange={e => setEditingAccount({ ...editingAccount, maxMicros: Number(e.target.value) || 0 })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-secondary font-medium block mb-1">Profit Split para el Trader (% — ej. 90%)</label>
-                  <input
-                    type="number"
-                    value={editingAccount.payoutSplitPct ?? 90}
-                    onChange={e => setEditingAccount({ ...editingAccount, payoutSplitPct: Number(e.target.value) || 90 })}
-                    className="w-full rounded-lg bg-bg-section border border-border-card px-3 py-2 text-text-primary tabular-nums focus:outline-none focus:border-green-primary"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 mt-5 pt-4 border-t border-border-card">
-                <button
-                  type="button"
-                  onClick={() => { setIsModalOpen(false); setEditingAccount(null); }}
-                  className="rounded-btn border border-border-card px-4 py-2 text-[12px] font-semibold text-text-secondary hover:text-text-primary"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveModal}
-                  className="rounded-btn bg-green-primary px-5 py-2 text-[12px] font-bold text-bg-main shadow-green-glow hover:bg-green-primary/90"
-                >
-                  {batchCount > 1 && !accounts.some(a => a.id === editingAccount.id)
-                    ? `Crear ${batchCount} Cuentas (${editingAccount.firm})`
-                    : "Guardar Cuenta"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {renderAccountModal()}
       </div>
     </AppShell>
   );
