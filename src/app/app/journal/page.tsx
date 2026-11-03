@@ -16,9 +16,17 @@ import {
 
 import { useTradeStore } from "@/store/tradeStore";
 
+const RESULT_LABELS_ES: Record<string, string> = {
+  All: "Todas",
+  Win: "Ganadora",
+  Loss: "Perdedora",
+  Breakeven: "Breakeven",
+  Open: "Abierta",
+};
+
 /* ─── Result badge ─── */
 function ResultBadge({ result, isPartial }: { result: TradeResult; isPartial?: boolean }) {
-  const label = isPartial ? "Partial" : result;
+  const label = isPartial ? "Parcial" : (RESULT_LABELS_ES[result] ?? result);
   const c = isPartial ? "bg-amber-500/15 text-amber-400" :
             result === "Win" ? "bg-green-primary/15 text-green-primary" :
             result === "Loss" ? "bg-red-loss/15 text-red-loss" :
@@ -117,7 +125,7 @@ export default function JournalPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm("Delete this trade? This cannot be undone.")) {
+    if (window.confirm("¿Eliminar esta operación? Esta acción no se puede deshacer.")) {
       deleteTrade(id);
     }
   };
@@ -137,7 +145,7 @@ export default function JournalPage() {
   );
 
   return (
-    <AppShell title="Trade Journal" subtitle="Full record of your operativas">
+    <AppShell title="Diario de Operaciones" subtitle="Registro contable completo de tus operativas (Ledger FIFO)">
 
       <RegisterTradeModal
         open={modalOpen || editTrade !== null}
@@ -174,7 +182,7 @@ export default function JournalPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
               <input
                 type="search" value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Instrument, strategy, tag, note…"
+                placeholder="Instrumento, estrategia, etiqueta, nota…"
                 className="w-full rounded-btn bg-bg-card border border-border-card pl-9 pr-4 py-2 text-[12px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-green-primary focus:ring-1 focus:ring-green-primary transition-colors"
               />
             </div>
@@ -190,13 +198,13 @@ export default function JournalPage() {
                     : f==="Open"      ? "bg-blue-accent/15 text-blue-accent border border-blue-accent/30"
                     :                   "bg-white/10 text-text-primary border border-border-card"
                     : "bg-bg-card border border-border-card text-text-muted hover:text-text-secondary"
-                }`}>{f}</button>
+                }`}>{RESULT_LABELS_ES[f] ?? f}</button>
             ))}
 
             {/* Asset filter */}
             <select value={filterAsset} onChange={e => setFilterAsset(e.target.value)}
               className="rounded-btn bg-bg-card border border-border-card px-3 py-1.5 text-[11px] text-text-secondary focus:outline-none focus:border-green-primary transition-colors">
-              {assetClasses.map(a => <option key={a} value={a}>{a}</option>)}
+              {assetClasses.map(a => <option key={a} value={a}>{a === "All" ? "Todos los Activos" : a}</option>)}
             </select>
           </div>
 
@@ -205,11 +213,11 @@ export default function JournalPage() {
             <div className="flex rounded-btn border border-border-card overflow-hidden">
               <button onClick={() => setView("table")}
                 className={`px-3 py-2 text-[11px] font-medium transition-colors ${view==="table" ? "bg-green-primary/15 text-green-primary" : "text-text-muted hover:text-text-secondary"}`}>
-                Table
+                Tabla
               </button>
               <button onClick={() => setView("stats")}
                 className={`px-3 py-2 text-[11px] font-medium transition-colors ${view==="stats" ? "bg-green-primary/15 text-green-primary" : "text-text-muted hover:text-text-secondary"}`}>
-                <BarChart2 className="h-3.5 w-3.5 inline mr-1" />Stats
+                <BarChart2 className="h-3.5 w-3.5 inline mr-1" />Estadísticas
               </button>
             </div>
 
@@ -227,14 +235,14 @@ export default function JournalPage() {
 
         {/* ─── KPI strip (always visible) ─── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-          <StatCard label="Total Trades"    value={String(stats.totalTrades)}        icon={BarChart2} />
-          <StatCard label="Net P&L"         value={`${stats.totalNet>=0?"+":"-"}$${Math.abs(stats.totalNet).toFixed(2)}`}   color={stats.totalNet>=0?"text-green-primary":"text-red-loss"} icon={stats.totalNet>=0?TrendingUp:TrendingDown} />
-          <StatCard label="Win Rate"        value={stats.closedTrades > 0 ? `${stats.winRate}%` : "—"}              color="text-blue-accent"   sub={`${stats.wins}W / ${stats.losses}L / ${stats.breakevenCount}BE`} />
-          <StatCard label="Profit Factor"   value={formatProfitFactor(stats)}       color={(stats.profitFactor ?? 0) >=1.5?"text-green-primary":"text-yellow-warn"} />
-          <StatCard label="Expectancy"      value={stats.closedTrades > 0 ? `${stats.expectancy>=0?"+":"-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—"} sub="avg net per trade" color={stats.expectancy>=0?"text-green-primary":"text-red-loss"} />
-          <StatCard label="Total Commission" value={`-$${stats.totalCommissions.toFixed(2)}`} color="text-yellow-warn" icon={AlertTriangle} />
-          <StatCard label="Max Drawdown"    value={stats.closedTrades > 0 ? `-$${stats.maxDrawdown.toFixed(2)}` : "$0.00"} color="text-red-loss" />
-          <StatCard label="Plan Follow %"   value={stats.closedTrades > 0 ? `${stats.planFollowRate}%` : "—"}       color={stats.planFollowRate>=80?"text-green-primary":"text-yellow-warn"} sub={stats.closedTrades > 0 ? `Avg hold: ${stats.avgHoldTime}m` : "Avg hold: —"} icon={Clock} />
+          <StatCard label="Total Operaciones" value={String(stats.totalTrades)}        icon={BarChart2} />
+          <StatCard label="P&L Neto"          value={`${stats.totalNet>=0?"+":"-"}$${Math.abs(stats.totalNet).toFixed(2)}`}   color={stats.totalNet>=0?"text-green-primary":"text-red-loss"} icon={stats.totalNet>=0?TrendingUp:TrendingDown} />
+          <StatCard label="Tasa de Acierto"   value={stats.closedTrades > 0 ? `${stats.winRate}%` : "—"}              color="text-blue-accent"   sub={`${stats.wins}G / ${stats.losses}P / ${stats.breakevenCount}BE`} />
+          <StatCard label="Factor de Beneficio" value={formatProfitFactor(stats)}       color={(stats.profitFactor ?? 0) >=1.5?"text-green-primary":"text-yellow-warn"} />
+          <StatCard label="Esperanza Mat."    value={stats.closedTrades > 0 ? `${stats.expectancy>=0?"+":"-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—"} sub="neto prom. por trade" color={stats.expectancy>=0?"text-green-primary":"text-red-loss"} />
+          <StatCard label="Comisiones Tot."   value={`-$${stats.totalCommissions.toFixed(2)}`} color="text-yellow-warn" icon={AlertTriangle} />
+          <StatCard label="Drawdown Máx."     value={stats.closedTrades > 0 ? `-$${stats.maxDrawdown.toFixed(2)}` : "$0.00"} color="text-red-loss" />
+          <StatCard label="Cumplimiento Plan" value={stats.closedTrades > 0 ? `${stats.planFollowRate}%` : "—"}       color={stats.planFollowRate>=80?"text-green-primary":"text-yellow-warn"} sub={stats.closedTrades > 0 ? `Duración prom: ${stats.avgHoldTime}m` : "Duración prom: —"} icon={Clock} />
         </div>
 
         {/* ════ TABLE VIEW ════ */}
@@ -243,10 +251,10 @@ export default function JournalPage() {
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <p className="text-4xl">📋</p>
-                <p className="text-sm text-text-secondary">No trades found.</p>
+                <p className="text-sm text-text-secondary">No se encontraron operaciones registradas.</p>
                 <button onClick={() => setModal(true)}
                   className="flex items-center gap-2 rounded-btn bg-green-primary px-5 py-2.5 text-[13px] font-bold text-bg-main">
-                  <Plus className="h-4 w-4" /> Register your first trade
+                  <Plus className="h-4 w-4" /> Registrar mi primera operación
                 </button>
               </div>
             ) : (
@@ -254,28 +262,28 @@ export default function JournalPage() {
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="border-b border-border-card/60 bg-bg-section/50">
-                      <TH label="Date"        field="dateOpen"      className="pl-5" />
-                      <TH label="Time"        field="timeOpen" />
-                      <TH label="Asset"       field="assetClass" />
-                      <TH label="Instrument"  field="instrument" />
+                      <TH label="Fecha"       field="dateOpen"      className="pl-5" />
+                      <TH label="Hora"        field="timeOpen" />
+                      <TH label="Activo"      field="assetClass" />
+                      <TH label="Instrumento" field="instrument" />
                       <TH label="Dir"         field="side" />
-                      <TH label="Contracts"   field="totalContracts" />
-                      <TH label="Avg Entry"   field="avgEntryPrice" />
+                      <TH label="Contratos"   field="totalContracts" />
+                      <TH label="Entrada Prom" field="avgEntryPrice" />
                       <TH label="SL"          field="stopLoss" />
                       <TH label="TP"          field="takeProfit" />
-                      <TH label="Avg Exit"    field="avgExitPrice" />
-                      <TH label="Hold"        field="holdTimeMinutes" />
+                      <TH label="Salida Prom" field="avgExitPrice" />
+                      <TH label="Duración"    field="holdTimeMinutes" />
                       <TH label="Broker"      field="brokerId" />
-                      <TH label="Commission"  field="totalCommission" />
-                      <TH label="Gross P&L"   field="grossPnl" />
-                      <TH label="Net P&L"     field="netPnl" />
+                      <TH label="Comisión"    field="totalCommission" />
+                      <TH label="P&L Bruto"   field="grossPnl" />
+                      <TH label="P&L Neto"    field="netPnl" />
                       <TH label="R"           field="rMultiple" />
-                      <TH label="Result" />
-                      <TH label="Strategy"    field="strategy" />
-                      <TH label="Grade"       field="setupGrade" />
-                      <TH label="Plan?" />
-                      <TH label="Emotion" />
-                      <TH label="Tags"        className="pr-5" />
+                      <TH label="Resultado" />
+                      <TH label="Estrategia"  field="strategy" />
+                      <TH label="Grado"       field="setupGrade" />
+                      <TH label="¿Plan?" />
+                      <TH label="Emoción" />
+                      <TH label="Etiquetas"   className="pr-5" />
                       <TH label="" />
                     </tr>
                   </thead>
@@ -298,7 +306,7 @@ export default function JournalPage() {
                           )}
                         </td>
                         <td className={`px-3 py-2.5 font-bold ${t.side==="Buy"?"text-green-primary":"text-red-loss"}`}>
-                          {t.side==="Buy"?"▲":"▼"} {t.side}
+                          {t.side==="Buy"?"▲ Compra":"▼ Venta"}
                         </td>
                         <td className="px-3 py-2.5 tabular-nums text-text-primary font-semibold">{t.totalContracts}</td>
                         <td className="px-3 py-2.5 tabular-nums text-text-secondary">{t.avgEntryPrice}</td>
@@ -359,7 +367,7 @@ export default function JournalPage() {
                   <tfoot>
                     <tr className="border-t border-border-card bg-bg-section/40">
                       <td colSpan={12} className="px-3 py-3 pl-5 text-[11px] font-semibold text-text-secondary">
-                        {filtered.length} trades shown
+                        {filtered.length} operaciones mostradas
                       </td>
                       <td className="px-3 py-3 tabular-nums text-yellow-warn font-bold text-[12px]">
                         -${stats.totalCommissions.toFixed(2)}
@@ -387,7 +395,7 @@ export default function JournalPage() {
                       </td>
                       <td className="px-3 py-3 tabular-nums font-bold text-[12px]">
                         <span className={stats.avgRMultiple>=0?"text-blue-accent":"text-red-loss"}>
-                          avg {stats.avgRMultiple>=0?"+":""}{stats.avgRMultiple}R
+                          prom {stats.avgRMultiple>=0?"+":""}{stats.avgRMultiple}R
                         </span>
                       </td>
                       <td colSpan={7} />
@@ -405,12 +413,12 @@ export default function JournalPage() {
 
             {/* Win/Loss breakdown */}
             <div className="rounded-card border border-border-card bg-bg-card p-5">
-              <p className="text-sm font-semibold text-text-primary mb-4">Win / Loss / Breakeven</p>
+              <p className="text-sm font-semibold text-text-primary mb-4">Desglose Ganadoras / Perdedoras / Breakeven</p>
               {[
-                { label:"Wins",       count:stats.wins,            pct:stats.closedTrades ? (stats.wins/stats.closedTrades*100) : 0,                           color:"bg-green-primary", tc:"text-green-primary" },
-                { label:"Losses",     count:stats.losses,          pct:stats.closedTrades ? (stats.losses/stats.closedTrades*100) : 0, color:"bg-red-loss",    tc:"text-red-loss"   },
-                { label:"Breakeven",  count:stats.breakevenCount,  pct:stats.closedTrades ? (stats.breakevenCount/stats.closedTrades*100) : 0, color:"bg-yellow-warn", tc:"text-yellow-warn"},
-                { label:"Open",       count:stats.openTrades,      pct:stats.totalTrades ? (stats.openTrades/stats.totalTrades*100) : 0,     color:"bg-blue-accent", tc:"text-blue-accent" },
+                { label:"Ganadoras (Wins)",   count:stats.wins,            pct:stats.closedTrades ? (stats.wins/stats.closedTrades*100) : 0,           color:"bg-green-primary", tc:"text-green-primary" },
+                { label:"Perdedoras (Losses)",count:stats.losses,          pct:stats.closedTrades ? (stats.losses/stats.closedTrades*100) : 0,         color:"bg-red-loss",      tc:"text-red-loss"   },
+                { label:"Breakeven",          count:stats.breakevenCount,  pct:stats.closedTrades ? (stats.breakevenCount/stats.closedTrades*100) : 0, color:"bg-yellow-warn",   tc:"text-yellow-warn"},
+                { label:"Abiertas / Parciales", count:stats.openTrades,    pct:stats.totalTrades ? (stats.openTrades/stats.totalTrades*100) : 0,       color:"bg-blue-accent",   tc:"text-blue-accent" },
               ].map(r => (
                 <div key={r.label} className="mb-3">
                   <div className="flex justify-between mb-1">
@@ -426,21 +434,21 @@ export default function JournalPage() {
 
             {/* Financial summary */}
             <div className="rounded-card border border-border-card bg-bg-card p-5">
-              <p className="text-sm font-semibold text-text-primary mb-4">Financial Summary</p>
+              <p className="text-sm font-semibold text-text-primary mb-4">Resumen Financiero</p>
               <div className="flex flex-col gap-2 text-[13px]">
                 {[
-                  { label:"Gross P&L",          v:`${stats.totalGross>=0?"+":"-"}$${Math.abs(stats.totalGross).toFixed(2)}`,   c:stats.totalGross>=0?"text-green-primary":"text-red-loss" },
-                  { label:"Total Commissions",   v:`-$${stats.totalCommissions.toFixed(2)}`,                                  c:"text-yellow-warn" },
-                  { label:"Net P&L",             v:`${stats.totalNet>=0?"+":"-"}$${Math.abs(stats.totalNet).toFixed(2)}`,     c:stats.totalNet>=0?"text-green-primary":"text-red-loss", bold:true },
-                  { label:"Avg Win",             v: stats.wins > 0 ? `+$${stats.avgWin.toFixed(2)}` : "—",                                            c:"text-green-primary" },
-                  { label:"Avg Loss",            v: stats.losses > 0 ? `-$${Math.abs(stats.avgLoss).toFixed(2)}` : "—",                                            c:"text-red-loss" },
-                  { label:"Expectancy / trade",  v: stats.closedTrades > 0 ? `${stats.expectancy>=0?"+":"-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—", c:stats.expectancy>=0?"text-green-primary":"text-red-loss", bold:true },
-                  { label:"Profit Factor",       v:formatProfitFactor(stats),                                                c:(stats.profitFactor ?? 0) >=1.5?"text-green-primary":"text-yellow-warn" },
-                  { label:"Max Drawdown",        v: stats.closedTrades > 0 ? `-$${stats.maxDrawdown.toFixed(2)}` : "$0.00",                                       c:"text-red-loss" },
-                  { label:"Max Consec. Wins",    v:String(stats.maxConsecWins),                                               c:"text-green-primary" },
-                  { label:"Max Consec. Losses",  v:String(stats.maxConsecLosses),                                             c:"text-red-loss" },
-                  { label:"Avg Hold Time",       v: stats.closedTrades > 0 ? `${stats.avgHoldTime} min` : "—",                                                c:"text-text-primary" },
-                  { label:"Plan Follow Rate",    v: stats.closedTrades > 0 ? `${stats.planFollowRate}%` : "—",                                                c:stats.planFollowRate>=80?"text-green-primary":"text-yellow-warn" },
+                  { label:"P&L Bruto",               v:`${stats.totalGross>=0?"+":"-"}$${Math.abs(stats.totalGross).toFixed(2)}`,   c:stats.totalGross>=0?"text-green-primary":"text-red-loss" },
+                  { label:"Comisiones Totales",      v:`-$${stats.totalCommissions.toFixed(2)}`,                                  c:"text-yellow-warn" },
+                  { label:"P&L Neto Realizado",      v:`${stats.totalNet>=0?"+":"-"}$${Math.abs(stats.totalNet).toFixed(2)}`,     c:stats.totalNet>=0?"text-green-primary":"text-red-loss", bold:true },
+                  { label:"Ganancia Promedio",       v: stats.wins > 0 ? `+$${stats.avgWin.toFixed(2)}` : "—",                    c:"text-green-primary" },
+                  { label:"Pérdida Promedio",        v: stats.losses > 0 ? `-$${Math.abs(stats.avgLoss).toFixed(2)}` : "—",       c:"text-red-loss" },
+                  { label:"Esperanza / operación",   v: stats.closedTrades > 0 ? `${stats.expectancy>=0?"+":"-"}$${Math.abs(stats.expectancy).toFixed(2)}` : "—", c:stats.expectancy>=0?"text-green-primary":"text-red-loss", bold:true },
+                  { label:"Factor de Beneficio",     v:formatProfitFactor(stats),                                                 c:(stats.profitFactor ?? 0) >=1.5?"text-green-primary":"text-yellow-warn" },
+                  { label:"Drawdown Máximo",         v: stats.closedTrades > 0 ? `-$${stats.maxDrawdown.toFixed(2)}` : "$0.00",   c:"text-red-loss" },
+                  { label:"Racha Máx. Ganadora",     v:String(stats.maxConsecWins),                                               c:"text-green-primary" },
+                  { label:"Racha Máx. Perdedora",    v:String(stats.maxConsecLosses),                                             c:"text-red-loss" },
+                  { label:"Duración Promedio",       v: stats.closedTrades > 0 ? `${stats.avgHoldTime} min` : "—",                c:"text-text-primary" },
+                  { label:"Tasa Cumplimiento Plan",  v: stats.closedTrades > 0 ? `${stats.planFollowRate}%` : "—",                c:stats.planFollowRate>=80?"text-green-primary":"text-yellow-warn" },
                 ].map(r => (
                   <div key={r.label} className={`flex justify-between py-1.5 border-b border-border-card/30 ${(r as any).bold ? "mt-1 pt-2 border-t border-border-card" : ""}`}>
                     <span className="text-text-muted">{r.label}</span>
@@ -452,10 +460,10 @@ export default function JournalPage() {
 
             {/* By asset class */}
             <div className="rounded-card border border-border-card bg-bg-card p-5">
-              <p className="text-sm font-semibold text-text-primary mb-4">Performance by Asset Class</p>
+              <p className="text-sm font-semibold text-text-primary mb-4">Rendimiento por Clase de Activo</p>
               <table className="w-full text-[12px]">
                 <thead><tr className="border-b border-border-card/40">
-                  {["Asset","Trades","Win%","Net P&L","Commissions"].map(h=>(
+                  {["Activo","Operaciones","Acierto %","P&L Neto","Comisiones"].map(h=>(
                     <th key={h} className="pb-2 text-left text-[10px] text-text-muted uppercase tracking-wide">{h}</th>
                   ))}
                 </tr></thead>
@@ -479,10 +487,10 @@ export default function JournalPage() {
 
             {/* By strategy */}
             <div className="rounded-card border border-border-card bg-bg-card p-5">
-              <p className="text-sm font-semibold text-text-primary mb-4">Performance by Strategy</p>
+              <p className="text-sm font-semibold text-text-primary mb-4">Rendimiento por Estrategia</p>
               <table className="w-full text-[12px]">
                 <thead><tr className="border-b border-border-card/40">
-                  {["Strategy","Trades","Win%","Avg R","Net P&L"].map(h=>(
+                  {["Estrategia","Operaciones","Acierto %","R Prom.","P&L Neto"].map(h=>(
                     <th key={h} className="pb-2 text-left text-[10px] text-text-muted uppercase tracking-wide">{h}</th>
                   ))}
                 </tr></thead>
@@ -509,7 +517,7 @@ export default function JournalPage() {
           </div>
         )}
 
-        {/* Demo notice */}
+        {/* Cloud sync notice */}
         <p className="text-[10px] text-text-muted italic text-center pb-1">
           ☁️ Tus operaciones se sincronizan automáticamente con la nube (Supabase). Tus datos están seguros y disponibles en cualquier dispositivo.
         </p>
@@ -528,7 +536,7 @@ export default function JournalPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={previewImage} 
-              alt="Trade Screenshot" 
+              alt="Captura de la operación" 
               className="w-auto h-auto max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/10"
             />
           </div>

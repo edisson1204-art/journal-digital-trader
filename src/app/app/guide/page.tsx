@@ -2,36 +2,76 @@
 
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { 
-  BookOpen, PlayCircle, Cpu, Brain, FileText, 
-  CheckCircle2, ArrowRight, Lightbulb, Key, 
-  Target, BarChart2 
+import {
+  BookOpen, PlayCircle, Cpu, Brain, FileText,
+  CheckCircle2, ArrowRight, Lightbulb, Key,
+  Briefcase, ShieldCheck, RotateCcw, Layers, Lock
 } from "lucide-react";
 
 const GUIDE_MODULES = [
   {
     id: "journal",
-    title: "1. Registrar Operaciones (Diario)",
+    title: "1. Diario de Trading & Ledger FIFO",
     icon: BookOpen,
     color: "text-emerald-400",
     bgColor: "bg-emerald-400/10",
     content: (
       <div className="space-y-4">
         <p className="text-[14px] text-text-secondary leading-relaxed">
-          El Diario (Journal) es el corazón de tu progreso. Aquí debes registrar cada operación que realizas en el mercado para que la Inteligencia artificial pueda analizarte.
+          El <b>Diario de Operaciones (Journal)</b> es el epicentro contable de la plataforma. Utiliza un motor <b>Ledger FIFO con aritmética exacta Decimal (`ROUND_HALF_UP`)</b> que calcula automáticamente tu P&amp;L Bruto, Comisiones por Lado, P&amp;L Neto y Múltiplo R sin errores de punto flotante.
         </p>
         <ul className="space-y-3 mt-4">
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <span>Ve a la sección <b>Diario</b> y haz clic en "Añadir Trade".</span>
+            <span>Haz clic en <b>&ldquo;Añadir Trade&rdquo;</b> e ingresa tu instrumento (`NQ`, `MNQ`, `ES`, `MES`, Forex, Acciones o Cripto), dirección (`Compra / Long` o `Venta / Short`), entradas y salidas.</span>
           </li>
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <span>Llena los datos matemáticos: P&L (Ganancia o Pérdida), Riesgo asumido e Instrumento operado.</span>
+            <span><b>Soporte Multi-Ejecución (Scale-In / Scale-Out):</b> Puedes registrar salidas parciales (`Parcial`) o dejar posiciones abiertas (`Abierta`). Las métricas cerradas y parciales se reconcilian por separado al centavo.</span>
           </li>
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <span><b>Paso Clave:</b> Sube una captura de pantalla de tu gráfico (TradingView/NinjaTrader) para que el Mentor IA pueda ver tu análisis técnico visualmente.</span>
+            <span><b>Brokers &amp; Prop Firms Preconfigurados:</b> Selecciona entre `My Funded Futures (MFFU)`, `Lucy Trading / Lucid Trading`, `TopStep`, `Apex`, `Take Profit Trader`, `FTMO`, `NinjaTrader` o `Tradovate`, y vincula la operación a una cuenta específica mediante etiquetas (`tags`).</span>
+          </li>
+          <li className="flex gap-3 text-[13px] text-text-primary items-start">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+            <span><b>Evidencia Gráfica &amp; MAE/MFE:</b> Adjunta la captura de tu gráfico y registra excursión máxima adversa (`MAE`) y favorable (`MFE`) en puntos para alimentar los informes técnicos y el Mentor IA.</span>
+          </li>
+        </ul>
+      </div>
+    )
+  },
+  {
+    id: "accounts",
+    title: "2. Cuentas de Fondeo & Prop Firms",
+    icon: Briefcase,
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-400/10",
+    content: (
+      <div className="space-y-4">
+        <p className="text-[14px] text-text-secondary leading-relaxed">
+          El módulo <b>Cuentas / Prop Firms</b> fue diseñado para operadores que gestionan desde una evaluación individual hasta un portafolio multi-cuenta (`x1` a `x20+` cuentas en paralelo).
+        </p>
+        <div className="bg-bg-section border border-border-card p-4 rounded-lg my-2">
+          <p className="text-[12px] font-bold text-cyan-400 flex items-center gap-2 mb-1.5">
+            <Layers className="h-4 w-4" /> ARRANQUE EN CERO — TÚ ELIGES TUS EMPRESAS
+          </p>
+          <p className="text-[12px] text-text-secondary leading-relaxed">
+            Al iniciar o tras resetear tu cuenta, el módulo comienza completamente limpio (`0 cuentas`). Primero seleccionas la empresa de fondeo que deseas operar (<b>My Funded Futures</b>, <b>Lucy Trading / Lucid</b>, <b>TopStep</b>, <b>Apex</b>, <b>Take Profit Trader</b> o <b>FTMO</b>) y eliges cuántas cuentas crear en lote (`x1`, `x3`, `x5`, `x10`).
+          </p>
+        </div>
+        <ul className="space-y-3 mt-4">
+          <li className="flex gap-3 text-[13px] text-text-primary items-start">
+            <CheckCircle2 className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+            <span><b>Piso de Liquidación EOD con Candado (<Lock className="h-3.5 w-3.5 inline text-emerald-400" />):</b> Calcula tu High-Water Mark al cierre del día (`EOD`) y bloquea automáticamente el piso de liquidación en tu balance inicial cuando tu colchón supera el drawdown máximo.</span>
+          </li>
+          <li className="flex gap-3 text-[13px] text-text-primary items-start">
+            <CheckCircle2 className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+            <span><b>6 Reglas Modulares en Tiempo Real:</b> Monitorea Objetivo de Ganancia (`Profit Target`), Límite de Pérdida Diaria (`DLL`), Drawdown EOD, Regla de Consistencia (`30% / 40% / 50%`), Días Mínimos Operados y Límite de Contratos/Micros.</span>
+          </li>
+          <li className="flex gap-3 text-[13px] text-text-primary items-start">
+            <CheckCircle2 className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+            <span><b>Vista Tarjetas vs. Vista Matriz &amp; Split 90%:</b> Alterna entre tarjetas detalladas o tabla ejecutiva densa, filtra por carpetas de empresa y visualiza tu retiro neto estimado tras el `Split` (`80% / 90% / 100%`).</span>
           </li>
         </ul>
       </div>
@@ -39,27 +79,27 @@ const GUIDE_MODULES = [
   },
   {
     id: "simulator",
-    title: "2. Utilizar el Simulador de Riesgo",
+    title: "3. Calculadora de Riesgo & Monte Carlo",
     icon: Cpu,
     color: "text-blue-400",
     bgColor: "bg-blue-400/10",
     content: (
       <div className="space-y-4">
         <p className="text-[14px] text-text-secondary leading-relaxed">
-          Antes de fondear una cuenta real, debes comprobar matemáticamente si tu estrategia funciona a largo plazo. Para eso sirve el Simulador Monte Carlo.
+          Protege tu cuenta antes de abrir una orden y proyecta la viabilidad matemática de tu sistema con herramientas cuantitativas de grado institucional.
         </p>
         <ul className="space-y-3 mt-4">
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-            <span>Ve al <b>Simulador</b> e ingresa el tamaño de la cuenta que quieres fondear (Ej. $100,000).</span>
+            <span><b>Calculadora de Riesgo con Comisiones Round-Trip:</b> En la sección <b>Riesgo</b>, ingresa tu balance, porcentaje de riesgo, precio de entrada y Stop Loss. El motor integra el valor por punto del contrato y la comisión ida y vuelta para darte el número exacto de contratos sin exceder tu riesgo máximo.</span>
           </li>
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-            <span>Coloca tu Win Rate (Tasa de Acierto) y tu Riesgo:Beneficio promedio.</span>
+            <span><b>Simulador Monte Carlo Trinomial (`Win / Loss / Breakeven`):</b> En <b>Simulador</b>, carga automáticamente las estadísticas reales de tu Diario (`Usar mis datos del Journal`) o simula escenarios personalizados.</span>
           </li>
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-            <span>Haz clic en "Correr Simulación". El algoritmo proyectará 1,000 operaciones futuras y te dirá tu <b>Riesgo de Ruina</b> (Probabilidad de quemar la cuenta).</span>
+            <span><b>Cono de Probabilidad (`FanChart`):</b> Visualiza las bandas percentiles `P5–P95`, `P25–P75`, la trayectoria mediana (`P50`), la mejor/peor simulación y tu <b>Probabilidad de Ruina</b> exacta en hasta 1,000 trayectorias estocásticas.</span>
           </li>
         </ul>
       </div>
@@ -67,31 +107,31 @@ const GUIDE_MODULES = [
   },
   {
     id: "mentor",
-    title: "3. Conversar con el Mentor IA",
+    title: "4. Psicología & Mentor IA (Visión GPT-4o)",
     icon: Brain,
     color: "text-violet-400",
     bgColor: "bg-violet-400/10",
     content: (
       <div className="space-y-4">
         <p className="text-[14px] text-text-secondary leading-relaxed">
-          Tu Mentor IA es un analista de Wall Street en tu bolsillo. Está entrenado con conceptos institucionales (ICT, SMC, Wyckoff).
+          Combina el diagnóstico algorítmico de tus emociones en la pestaña <b>Psicología</b> con tu <b>Mentor IA</b> entrenado en estructura institucional (`ICT`, `SMC`, `Wyckoff`, `Order Flow`) y conectado en vivo a las métricas de tu Diario.
         </p>
         <div className="bg-bg-section border border-border-card p-4 rounded-lg my-2">
           <p className="text-[12px] font-bold text-amber-500 flex items-center gap-2 mb-2">
-            <Key className="h-4 w-4" /> REQUISITO PREVIO (BYOK)
+            <Key className="h-4 w-4" /> ARQUITECTURA SEGURA BYOK (BRING YOUR OWN KEY)
           </p>
           <p className="text-[12px] text-text-secondary">
-            Para que la IA funcione, debes ir a <b>Settings (Configuración)</b> y pegar tu propia API Key de OpenAI. Esto asegura privacidad total y costos ultra bajos.
+            Ve a <b>Configuración (Settings)</b> o al ícono de candado en <b>Mentor IA</b> e ingresa tu API Key de OpenAI (`sk-...`). Tu clave se almacena ofuscada localmente en tu navegador y nunca se guarda en texto plano en servidores externos.
           </p>
         </div>
         <ul className="space-y-3 mt-4">
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-violet-500 mt-0.5 flex-shrink-0" />
-            <span>Pídele al Mentor que analice tu último trade. Él leerá la captura de pantalla que subiste en el Diario.</span>
+            <span><b>Auditoría Visual de Gráficos:</b> Adjunta una imagen de tu entrada en el chat para que el Mentor IA evalúe liquidez, zonas de oferta/demanda y ubicación del Stop Loss.</span>
           </li>
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-violet-500 mt-0.5 flex-shrink-0" />
-            <span>Pídele que te "regañe" si rompiste tus reglas. La IA conoce tu perfil psicológico.</span>
+            <span><b>Detección de Revenge Trading y Sesgos:</b> El sistema identifica caídas de disciplina tras rachas perdedoras y te entrega reglas accionables para corregirlas.</span>
           </li>
         </ul>
       </div>
@@ -99,27 +139,51 @@ const GUIDE_MODULES = [
   },
   {
     id: "reports",
-    title: "4. Generar Reportes y Auditorías",
+    title: "5. Centro de 5 Informes Institucionales",
     icon: FileText,
     color: "text-amber-400",
     bgColor: "bg-amber-400/10",
     content: (
       <div className="space-y-4">
         <p className="text-[14px] text-text-secondary leading-relaxed">
-          Cuando termine el mes, debes exportar tus resultados para compartirlos con inversores, empresas de fondeo o para tu propia declaración de impuestos.
+          Genera auditorías ejecutivas 100% en español y reconciliadas matemáticamente con el Diario, listas para imprimir o exportar en PDF para inversores o firmas de fondeo.
         </p>
         <ul className="space-y-3 mt-4">
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-            <span>Ve a la sección de <b>Reportes</b>.</span>
+            <span><b>5 Informes Especializados:</b> `1. Rendimiento Ejecutivo`, `2. Auditoría de Estrategias`, `3. Gestión de Riesgo y Capital`, `4. Psicología y Disciplina` y `5. Eficiencia Técnica (MAE / MFE en puntos y USD)`.</span>
           </li>
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-            <span>Elige el periodo (Mensual, Semestral o Anual).</span>
+            <span><b>Filtrado por Fecha Efectiva de Cierre:</b> Filtra por Mes, Año o Histórico Total y por tipo de cuenta (`Todas`, `Fondeadas` o `Personales`), garantizando conciliación 1:1 con tu Ledger.</span>
           </li>
           <li className="flex gap-3 text-[13px] text-text-primary items-start">
             <CheckCircle2 className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-            <span>Elige el tipo de Reporte (El "Quant" es el más profundo, revela tu edge matemático). Haz clic en Generar e <b>Imprímelo como PDF</b>.</span>
+            <span><b>Narrativa Trazable Automática:</b> Cada informe redacta conclusiones cuantitativas verificables a partir de tu Win Rate, Profit Factor, Expectancy y sesiones operadas.</span>
+          </li>
+        </ul>
+      </div>
+    )
+  },
+  {
+    id: "settings",
+    title: "6. Sincronización Cloud & Reseteo Total",
+    icon: ShieldCheck,
+    color: "text-rose-400",
+    bgColor: "bg-rose-400/10",
+    content: (
+      <div className="space-y-4">
+        <p className="text-[14px] text-text-secondary leading-relaxed">
+          Tus operaciones están protegidas mediante políticas <b>Row-Level Security (RLS)</b> en Supabase y respaldadas localmente para una experiencia instantánea.
+        </p>
+        <ul className="space-y-3 mt-4">
+          <li className="flex gap-3 text-[13px] text-text-primary items-start">
+            <CheckCircle2 className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+            <span><b>Sincronización Automática:</b> Cada operación creada, editada o eliminada en tu Diario se sincroniza automáticamente con tu cuenta privada en la nube.</span>
+          </li>
+          <li className="flex gap-3 text-[13px] text-text-primary items-start">
+            <RotateCcw className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+            <span><b>Botón &ldquo;Resetear Cuenta&rdquo; (Limpieza Total en Cero):</b> Ubicado en <b>Configuración → Zona de Peligro</b>. Al confirmarlo, elimina todas tus operaciones tanto en la nube (`Supabase`) como en el dispositivo local y limpia todas las cuentas de fondeo configuradas, dejando la aplicación 100% en cero lista para una nueva etapa operativa.</span>
           </li>
         </ul>
       </div>
@@ -133,11 +197,11 @@ export default function GuidePage() {
   return (
     <AppShell 
       title="Centro de Entrenamiento" 
-      subtitle="Guía inteligente para dominar Journal Digital Trader Invest SaaS"
+      subtitle="Guía interactiva actualizada con todas las herramientas cuantitativas y de fondeo"
     >
       <div className="flex flex-col lg:flex-row gap-8 max-w-[1200px] mx-auto w-full">
         
-        {/* Left Column: Navigation / Video Placeholder */}
+        {/* Left Column: Navigation */}
         <div className="w-full lg:w-[400px] flex flex-col gap-6">
           {/* Welcome Card */}
           <div className="rounded-card border border-border-card bg-bg-card p-6 relative overflow-hidden">
@@ -145,14 +209,14 @@ export default function GuidePage() {
             <Lightbulb className="h-8 w-8 text-green-primary mb-4" />
             <h2 className="text-[18px] font-bold text-text-primary mb-2">Bienvenido a Bordo</h2>
             <p className="text-[13px] text-text-secondary leading-relaxed">
-              Esta plataforma fue diseñada por y para traders institucionales. Sigue esta guía paso a paso para sacarle el máximo provecho a tus algoritmos.
+              Esta plataforma fue diseñada por y para operadores institucionales y gestores de cuentas de fondeo. Explora los 6 módulos para dominar cada algoritmo.
             </p>
           </div>
 
           {/* Module Selector */}
           <div className="rounded-card border border-border-card bg-bg-card flex flex-col overflow-hidden">
             <div className="p-4 border-b border-border-card bg-bg-section/50">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Temario Interactivo</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Temario Interactivo (6 Módulos)</p>
             </div>
             <div className="flex flex-col p-2 gap-1">
               {GUIDE_MODULES.map((mod) => (
@@ -200,23 +264,23 @@ export default function GuidePage() {
                 {mod.content}
               </div>
 
-              {/* Video Placeholder */}
-              <div className="mt-10 rounded-xl border border-border-card bg-bg-section aspect-video flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer hover:border-green-primary/50 transition-colors">
-                <div className="absolute inset-0 bg-gradient-to-t from-bg-main/80 to-transparent z-10" />
-                <div className="absolute inset-0 flex items-center justify-center z-20">
-                  <div className="h-16 w-16 rounded-full bg-green-primary/20 flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform">
-                    <PlayCircle className="h-8 w-8 text-green-primary ml-1" />
+              {/* Resumen de Flujo Operativo Recomendado */}
+              <div className="mt-10 rounded-xl border border-border-card bg-bg-section p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-green-primary/40 transition-colors">
+                <div className="flex items-center gap-3.5">
+                  <div className="h-12 w-12 rounded-full bg-green-primary/15 flex items-center justify-center flex-shrink-0">
+                    <PlayCircle className="h-6 w-6 text-green-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-white">Flujo Institucional Recomendado</p>
+                    <p className="text-[11px] text-text-muted">
+                      1. Elige tus empresas en Cuentas → 2. Calcula lotes en Riesgo → 3. Registra en Diario → 4. Audita en Informes y Mentor IA
+                    </p>
                   </div>
                 </div>
-                <div className="absolute bottom-4 left-4 z-20">
-                  <p className="text-[13px] font-bold text-white">Ver Tutorial en Video</p>
-                  <p className="text-[11px] text-text-muted">Duración: 2:30 min</p>
-                </div>
-                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
               </div>
 
               {/* Navigation Arrows */}
-              <div className="mt-10 flex justify-end">
+              <div className="mt-8 flex justify-end">
                 {GUIDE_MODULES.findIndex(m => m.id === mod.id) < GUIDE_MODULES.length - 1 && (
                   <button 
                     onClick={() => setActiveModule(GUIDE_MODULES[GUIDE_MODULES.findIndex(m => m.id === mod.id) + 1].id)}

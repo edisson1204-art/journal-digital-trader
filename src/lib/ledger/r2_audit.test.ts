@@ -289,8 +289,8 @@ describe("R2-01 — Dataset Original vs Dataset Alternativo y Conciliación de A
 });
 
 describe("R2-02 — Pruebas de Integración de Flujo, Persistencia, Concurrencia y Propagación entre Vistas", () => {
-  beforeEach(() => {
-    useTradeStore.getState().clearTrades();
+  beforeEach(async () => {
+    await useTradeStore.getState().clearTrades();
   });
 
   it("R2-02-A: Ciclo completo OPEN -> recarga -> cierre parcial 1@20010 -> cierre segundo lote 1@20020 -> CLOSED con bruto $600, comisión $0.36 y neto $599.64", async () => {
