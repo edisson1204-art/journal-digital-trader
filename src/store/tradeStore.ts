@@ -111,6 +111,7 @@ export interface TradeStore {
 
   fetchTradesFromCloud: () => Promise<void>;
   addTrade: (trade: TradeRecord) => Promise<void>;
+  addTradesBatch: (trades: TradeRecord[]) => Promise<void>;
   updateTrade: (id: string, updates: Partial<TradeRecord>) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
   clearTrades: () => Promise<boolean>;
@@ -223,6 +224,34 @@ export const useTradeStore = create<TradeStore>()(
         }
       },
 
+      addTradesBatch: async (incomingList) => {
+        if (!incomingList || incomingList.length === 0) return;
+        const normalizedList = incomingList.map(t => validateAndNormalizeTrade(withUuid(t)));
+        const newTrades = sortByDateDesc([...normalizedList, ...get().trades]);
+        set({ trades: newTrades, stats: computeStats(newTrades), syncStatus: "syncing" });
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData.session?.user;
+        if (!user) {
+          set({ syncStatus: "idle" });
+          return;
+        }
+
+        const rows = normalizedList.map(t => ({ id: t.id, user_id: user.id, data: t }));
+        const { error } = await supabase
+          .from("trades")
+          .upsert(rows, { onConflict: "id" });
+        if (error) {
+          console.error("Supabase batch insert error:", error);
+          set({
+            syncError: `Se importaron ${normalizedList.length} operaciones localmente pero falló la subida a la nube: ${error.message}`,
+            syncStatus: "error",
+          });
+        } else {
+          set({ ownerId: user.id, syncError: null, syncStatus: "synced" });
+        }
+      },
+
       updateTrade: async (id, updates) => {
         const prevLock = tradeMutationLocks.get(id) ?? Promise.resolve();
         const nextTask = prevLock.then(async () => {
@@ -292,6 +321,11 @@ export const useTradeStore = create<TradeStore>()(
             if (error) {
               set({ syncError: `No se pudo borrar el historial en la nube: ${error.message}`, syncStatus: "error" });
               return false;
+            }
+            if (typeof supabase.auth.updateUser === "function") {
+              await supabase.auth.updateUser({
+                data: { prop_accounts: [], prop_accounts_updated_at: new Date().toISOString() },
+              }).catch(() => {});
             }
           }
         } catch {

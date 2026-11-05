@@ -3,6 +3,7 @@
 import { formatProfitFactor } from "@/lib/tradeTypes";
 import { AppShell } from "@/components/AppShell";
 import { RegisterTradeModal } from "@/components/RegisterTradeModal";
+import { ImportCsvModal } from "@/components/ImportCsvModal";
 import {
   type TradeRecord, type TradeResult,
   computeStats, BROKER_PRESETS,
@@ -11,7 +12,7 @@ import { useState, useMemo } from "react";
 import {
   Plus, Search, Tag, Trash2, BarChart2,
   ChevronUp, ChevronDown, TrendingUp, TrendingDown,
-  AlertTriangle, Clock, Camera, X, Pencil
+  AlertTriangle, Clock, Camera, X, Pencil, Upload
 } from "lucide-react";
 
 import { useTradeStore } from "@/store/tradeStore";
@@ -65,12 +66,14 @@ function StatCard({ label, value, sub, color = "text-text-primary", icon: Icon }
 export default function JournalPage() {
   const trades = useTradeStore(s => s.trades);
   const addTrade = useTradeStore(s => s.addTrade);
+  const addTradesBatch = useTradeStore(s => s.addTradesBatch);
   const deleteTrade = useTradeStore(s => s.deleteTrade);
   const updateTrade = useTradeStore(s => s.updateTrade);
   const syncError = useTradeStore(s => s.syncError);
   const clearSyncError = useTradeStore(s => s.clearSyncError);
 
   const [modalOpen, setModal]         = useState(false);
+  const [csvModalOpen, setCsvModal]   = useState(false);
   const [editTrade, setEditTrade]     = useState<TradeRecord | null>(null);
   const [search, setSearch]           = useState("");
   const [filterResult, setFilter]     = useState("All");
@@ -147,6 +150,14 @@ export default function JournalPage() {
   return (
     <AppShell title="Diario de Operaciones" subtitle="Registro contable completo de tus operativas (Ledger FIFO)">
 
+      <ImportCsvModal
+        open={csvModalOpen}
+        onClose={() => setCsvModal(false)}
+        onImport={async (list) => {
+          await addTradesBatch(list);
+        }}
+      />
+
       <RegisterTradeModal
         open={modalOpen || editTrade !== null}
         onClose={() => { setModal(false); setEditTrade(null); }}
@@ -220,6 +231,15 @@ export default function JournalPage() {
                 <BarChart2 className="h-3.5 w-3.5 inline mr-1" />Estadísticas
               </button>
             </div>
+
+            {/* Import CSV */}
+            <button
+              onClick={() => setCsvModal(true)}
+              className="flex items-center gap-1.5 rounded-btn border border-border-card bg-bg-card px-3.5 py-2.5 text-[12px] font-semibold text-text-secondary hover:text-green-primary hover:border-green-primary/40 transition-colors"
+              title="Importar ejecuciones desde archivo CSV (NinjaTrader 8 / Tradovate)"
+            >
+              <Upload className="h-3.5 w-3.5 text-green-primary" /> Importar CSV
+            </button>
 
             {/* Add trade */}
             <div className="relative group">

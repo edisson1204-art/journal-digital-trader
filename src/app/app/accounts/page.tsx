@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { useTradeStore } from "@/store/tradeStore";
+import { supabase } from "@/lib/supabase/client";
 import {
   computeStats,
   effectiveTradeDate,
@@ -623,6 +624,25 @@ export default function AccountsPage() {
       // Sin cuentas guardadas: la pantalla arranca vacía
     }
     setAccountsLoaded(true);
+    if (typeof supabase.auth.getUser === "function") {
+      supabase.auth.getUser().then(({ data }) => {
+        const user = data?.user;
+        if (!user) return;
+        const cloudAccounts = user.user_metadata?.prop_accounts;
+        const rawLocal = localStorage.getItem(STORAGE_KEY);
+        const localList: PropAccountConfig[] = rawLocal ? JSON.parse(rawLocal) : [];
+        if (Array.isArray(cloudAccounts) && cloudAccounts.length > 0 && localList.length === 0) {
+          setAccounts(cloudAccounts);
+          setSelectedId(cloudAccounts[0].id);
+          if (cloudAccounts.length >= 7) setViewMode("matrix");
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudAccounts)); } catch { /* ignore */ }
+        } else if (localList.length > 0 && (!Array.isArray(cloudAccounts) || cloudAccounts.length === 0)) {
+          supabase.auth.updateUser({
+            data: { prop_accounts: localList, prop_accounts_updated_at: new Date().toISOString() },
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
   }, []);
 
   const saveAccounts = (next: PropAccountConfig[]) => {
@@ -632,8 +652,23 @@ export default function AccountsPage() {
     } catch {
       // ignore storage quota errors
     }
+    if (typeof supabase.auth.updateUser === "function") {
+      supabase.auth.updateUser({
+        data: { prop_accounts: next, prop_accounts_updated_at: new Date().toISOString() },
+      }).catch(() => {});
+    }
+  };
+  /*
+    setAccounts(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    /*
+    }
   };
 
+  */
   const computedAccounts = useMemo(() => {
     const todayKey = localDateKey();
     return accounts.map(acc => {
