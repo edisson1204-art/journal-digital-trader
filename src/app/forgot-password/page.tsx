@@ -15,12 +15,20 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) return;
     setLoading(true);
     try {
-      await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      await Promise.allSettled([
+        fetch("/api/auth/recover-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail }),
+        }),
+        supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        }),
+      ]);
     } catch {
       /* respuesta neutral */
     }
@@ -52,9 +60,21 @@ export default function ForgotPasswordPage() {
           <h1 className="text-2xl font-bold text-text-primary text-center mb-2">Recuperar contraseña</h1>
           {sent ? (
             <div className="flex flex-col gap-4 mt-4">
-              <div role="status" className="text-sm text-text-secondary text-center leading-relaxed">
-                Si existe una cuenta con ese correo, te enviamos un enlace para restablecer la contraseña.
-                Revisa tu bandeja de entrada o spam.
+              <div className="rounded-xl overflow-hidden border border-border-card shadow-lg">
+                <img
+                  src="/emails/email-recuperacion.png"
+                  alt="Recuperación de Acceso Segura — Journal Digital Trader Invest"
+                  className="w-full h-auto block"
+                />
+              </div>
+
+              <div role="status" className="text-sm text-text-secondary text-center leading-relaxed bg-green-primary/10 border border-green-primary/30 rounded-lg p-3.5">
+                <p className="font-bold text-green-primary mb-1">
+                  🔐 ¡Enlace de recuperación enviado!
+                </p>
+                <p className="text-xs text-text-secondary">
+                  Tranquilo, trader: tus cuentas de fondeo y tu bitácora están 100% a salvo. Revisa tu bandeja de entrada o carpeta de spam.
+                </p>
               </div>
 
               <div className="rounded-lg border border-border-card bg-bg-section p-3.5 text-xs text-text-secondary flex flex-col gap-2.5">
@@ -83,8 +103,8 @@ export default function ForgotPasswordPage() {
             </div>
           ) : (
             <>
-              <p className="text-sm text-text-muted text-center mb-8">
-                Escribe tu correo y te enviaremos un enlace para crear una contraseña nueva.
+              <p className="text-sm text-text-muted text-center mb-6">
+                Tranquilo, trader: tus operaciones están 100% a salvo. Escribe tu correo y te enviaremos tu llave de acceso.
               </p>
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div>
@@ -99,7 +119,7 @@ export default function ForgotPasswordPage() {
                   type="submit" disabled={loading}
                   className="w-full py-3.5 font-bold text-bg-main bg-green-primary rounded-btn hover:bg-green-primary/90 transition-all text-sm focus:outline-none focus:ring-2 focus:ring-green-primary focus:ring-offset-2 focus:ring-offset-bg-card disabled:opacity-50"
                 >
-                  {loading ? "Enviando..." : "Enviar enlace"}
+                  {loading ? "Enviando..." : "Enviar enlace de recuperación"}
                 </button>
               </form>
             </>
