@@ -7,13 +7,15 @@ const PRIVATE_KEY_PREFIXES = ["trading-intelligence-storage", "ai-mentor-chat-"]
 
 /**
  * Cierra la sesión de forma real:
- *  1. Invalida la sesión en Supabase (revoca el refresh token). Nota: el access token (JWT) ya emitido
- *     sigue siendo técnicamente válido hasta su expiración (por defecto 1 h); la ventana no se puede
- *     acortar desde el cliente.
- *  2. Vacía los stores en memoria y los datos privados persistidos (trades, chats, clave OpenAI).
- *  3. Navega con recarga completa para destruir cualquier estado en memoria.
+ *  1. Invalida la sesión en Supabase y la cookie de sesión del propietario (`/api/auth/owner-login`).
+ *  2. Vacía el estado en memoria sin borrar los trades almacenados en la nube.
+ *  3. Navega con recarga completa a `/login`.
  */
 export async function logout(): Promise<void> {
+  try {
+    await fetch("/api/auth/owner-login", { method: "DELETE" });
+  } catch { /* ignore */ }
+
   try {
     await supabase.auth.signOut();
   } catch (err) {
@@ -21,7 +23,6 @@ export async function logout(): Promise<void> {
   }
 
   useTradeStore.setState({ trades: [], ownerId: null, syncError: null });
-  useTradeStore.getState().clearTrades();
   useSettingsStore.getState().setOpenAiKey("");
 
   try {

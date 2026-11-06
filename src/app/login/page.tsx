@@ -19,17 +19,55 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const cleanEmail = email.trim();
 
-    if (error) {
-      setError(error.message);
+    // 1) Verificar acceso maestro del propietario en el servidor (instantáneo incluso si Supabase está despertando)
+    let ownerAuthenticated = false;
+    try {
+      const ownerRes = await fetch("/api/auth/owner-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, password }),
+      });
+      if (ownerRes.ok) {
+        ownerAuthenticated = true;
+      }
+    } catch {
+      // Continuar con Supabase Auth
+    }
+
+    // 2) Intentar iniciar sesión en Supabase Auth (con timeout de 4.5s para no colgar si la BD está en COMING_UP)
+    try {
+      const signInPromise = supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+      const timeoutPromise = new Promise<{ error: { message: string } }>((resolve) =>
+        setTimeout(() => resolve({ error: { message: "timeout" } }), 4500)
+      );
+
+      const { error: sbError } = await Promise.race([signInPromise, timeoutPromise]);
+
+      if (!sbError || ownerAuthenticated) {
+        window.location.href = "/app";
+        return;
+      }
+
+      setError(
+        sbError.message === "Invalid login credentials"
+          ? "Credenciales incorrectas. Verifica tu correo y contraseña."
+          : sbError.message === "timeout"
+            ? "El servidor de base de datos está despertando. Intenta de nuevo en unos segundos."
+            : sbError.message
+      );
       setLoading(false);
-    } else {
-      router.push("/app");
-      router.refresh();
+    } catch {
+      if (ownerAuthenticated) {
+        window.location.href = "/app";
+        return;
+      }
+      setError("Error de conexión al verificar credenciales.");
+      setLoading(false);
     }
   };
 
@@ -51,7 +89,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
             {error && (
               <div className="bg-red-loss/10 border border-red-loss/20 text-red-loss text-sm px-4 py-3 rounded-lg text-center">
-                {error === "Invalid login credentials" ? "Credenciales incorrectas" : error}
+                {error}
               </div>
             )}
             
@@ -101,9 +139,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-text-muted mt-6">
-            ¿No tienes una cuenta?{" "}
-            <Link href="/signup" className="text-green-primary hover:underline">Suscríbete por $14.99/mes</Link>
+          <p className="text-xs text-text-muted text-center mt-6">
+            ¿No tienes cuenta?{" "}
+            <Link href="/signup" className="text-green-primary hover:underline font-medium">
+              Regístrate gratis
+            </Link>
           </p>
         </div>
       </div>
