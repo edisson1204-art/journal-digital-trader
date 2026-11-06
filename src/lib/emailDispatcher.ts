@@ -1,4 +1,3 @@
-import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   EMAIL_BANNER_URLS,
   buildVipPurchaseEmailHtml,
@@ -203,14 +202,17 @@ export async function dispatchTraderEmail(
 
   const simId = `sim_${input.template}_${Buffer.from(to).toString("hex").slice(0, 8)}_${Date.now()}`;
   try {
-    await supabaseAdmin.from("email_dispatch_logs").insert({
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const { supabaseAdmin } = await import("@/lib/supabase/admin");
+      await supabaseAdmin.from("email_dispatch_logs").insert({
       message_id: simId,
       template_key: input.template,
       recipient_email: to,
       subject,
       banner_url: bannerUrl,
-      delivery_mode: "simulated_verified",
-    });
+        delivery_mode: "simulated_verified",
+      });
+    }
   } catch {
     // Non-blocking audit log
   }
