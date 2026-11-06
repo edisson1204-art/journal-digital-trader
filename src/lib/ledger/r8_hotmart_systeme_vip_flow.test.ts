@@ -21,8 +21,9 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 import { POST as hotmartWebhook } from "@/app/api/webhooks/hotmart/route";
+import { POST as checkoutProcess } from "@/app/api/checkout/process/route";
 
-describe("R8 — Estrategia Cero-Dominio: Integración Hotmart + Systeme.io + Bienvenida VIP", () => {
+describe("R8 — Estrategia Cero-Dominio: Integración Hotmart + Systeme.io + Checkout + Bienvenida VIP", () => {
   beforeEach(() => {
     process.env.HOTMART_WEBHOOK_SECRET = "secreto_hotmart_test_2026";
   });
@@ -69,5 +70,25 @@ describe("R8 — Estrategia Cero-Dominio: Integración Hotmart + Systeme.io + Bi
     expect(json.email).toBe("comprador@hotmart.com");
     expect(json.transaction_id).toBe("HP179400998877");
     expect(json.emailsDispatched).toHaveLength(2);
+  });
+
+  it("3. Procesa una orden desde /api/checkout/process, genera ID de transacción y devuelve la redirección hacia /bienvenida-vip", async () => {
+    const req = new Request("https://journal-digital-trader.vercel.app/api/checkout/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Edisson Trader",
+        email: "edisson1204@gmail.com",
+        plan: "anual",
+        method: "hotmart",
+      }),
+    });
+
+    const res = await checkoutProcess(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.transactionId).toContain("ORD-ANUAL-");
+    expect(json.redirectUrl).toContain("/bienvenida-vip?email=edisson1204%40gmail.com");
   });
 });

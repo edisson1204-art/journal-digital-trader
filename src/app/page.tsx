@@ -4,6 +4,7 @@ import { MarketStrip } from "@/components/MarketStrip";
 import { FeatureGrid } from "@/components/FeatureGrid";
 import { PlatformPreview } from "@/components/PlatformPreview";
 import { TrustSection } from "@/components/TrustSection";
+import { PricingSection } from "@/components/PricingSection";
 import { BottomCTA } from "@/components/BottomCTA";
 import { Footer } from "@/components/Footer";
 
@@ -17,6 +18,7 @@ export default function Home() {
         <FeatureGrid />
         <PlatformPreview />
         <TrustSection />
+        <PricingSection />
         <BottomCTA />
       </main>
       <Footer />
