@@ -67,6 +67,33 @@ export async function POST(req: Request) {
         return NextResponse.json({ message: "User already has access.", email }, { status: 200 });
       }
 
+      // Si el SMTP por defecto de Supabase alcanza el límite de 3 correos/hora (429 rate limit),
+      // creamos la cuenta pre-confirmada directamente en la base de datos sin consumir cuota de correo.
+      if (
+        userError.status === 429 ||
+        userError.message.toLowerCase().includes("rate limit")
+      ) {
+        const { data: fallbackData, error: fallbackErr } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: {
+            source: "systeme_webhook_ratelimit_fallback",
+            created_at: new Date().toISOString(),
+          },
+        });
+        if (!fallbackErr) {
+          return NextResponse.json(
+            {
+              success: true,
+              email,
+              user_id: fallbackData?.user?.id,
+              mode: "direct_confirmed",
+            },
+            { status: 200 }
+          );
+        }
+      }
+
       console.error("[Systeme Webhook] Error creando usuario en Supabase:", userError);
       return NextResponse.json({ error: userError.message }, { status: 500 });
     }

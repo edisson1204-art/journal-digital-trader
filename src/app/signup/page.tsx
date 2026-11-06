@@ -21,18 +21,55 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
-      email,
+    const cleanEmail = email.trim().toLowerCase();
+
+    try {
+      // 1) Intentar registro directo pre-confirmado en servidor (sin límite de 3 correos/hora)
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, password, name: name.trim() }),
+      });
+
+      if (res.ok) {
+        // Iniciar sesión automáticamente y llevar al operador directo a /app
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        if (!signInErr) {
+          router.push("/app");
+          router.refresh();
+          return;
+        }
+        setSuccess(true);
+        setLoading(false);
+        return;
+      }
+
+      if (res.status === 409) {
+        const body = await res.json().catch(() => ({}));
+        setError(body?.error || "Este correo ya está registrado.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // Si falla la ruta admin, hacer fallback a signUp estándar
+    }
+
+    // 2) Fallback estándar de Supabase Auth
+    const { error: sbError } = await supabase.auth.signUp({
+      email: cleanEmail,
       password,
       options: {
         data: {
-          full_name: name,
-        }
-      }
+          full_name: name.trim(),
+        },
+      },
     });
 
-    if (error) {
-      setError(error.message);
+    if (sbError) {
+      setError(sbError.message);
       setLoading(false);
     } else {
       setSuccess(true);
@@ -44,12 +81,12 @@ export default function SignupPage() {
     return (
       <div className="min-h-screen bg-bg-main flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md bg-bg-card border border-border-card rounded-card p-8 shadow-card text-center">
-          <h2 className="text-2xl font-bold text-green-primary mb-4">¡Cuenta Creada!</h2>
+          <h2 className="text-2xl font-bold text-green-primary mb-4">¡Cuenta Creada y Activada!</h2>
           <p className="text-text-secondary text-sm mb-6">
-            Tu cuenta ha sido pre-aprobada en Supabase. Si esto fuera producción, habríamos enviado un correo de verificación.
+            Tu cuenta ya está confirmada y lista para operar en Journal Digital Trader Invest.
           </p>
           <Link href="/login" className="text-green-primary hover:underline text-sm font-semibold">
-            Ir a Iniciar Sesión
+            Ir a Iniciar Sesión →
           </Link>
         </div>
       </div>
