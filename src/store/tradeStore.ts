@@ -165,6 +165,11 @@ export const useTradeStore = create<TradeStore>()(
 
           // Trades locales de OTRO usuario (navegador compartido): no se suben ni se mezclan.
           const localIsMine = ownerId === null || ownerId === user.id;
+          if (!localIsMine && typeof window !== "undefined") {
+            ["tdi_prop_accounts_v1", "tdi_prop_accounts_v2", "tdi_prop_accounts_v3", "tdi_prop_accounts_v4", "tdi_prop_accounts_owner"].forEach(k => {
+              try { window.localStorage.removeItem(k); } catch { /* ignore */ }
+            });
+          }
           const pending = localIsMine
             ? localTrades.filter(t => !cloudIds.has(t.id) && !t.id.startsWith("demo-")).map(withUuid)
             : [];

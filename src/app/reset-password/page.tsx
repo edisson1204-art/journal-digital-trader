@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase/client";
 
 const MIN_LENGTH = 8;
 
-function extractCodeFromInput(raw: string): string | null {
+export function extractCodeFromInput(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   try {
@@ -41,9 +41,10 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     let active = true;
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (!active) return;
-      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+      // Solo activar automáticamente por evento explícito PASSWORD_RECOVERY
+      if (event === "PASSWORD_RECOVERY") {
         setReady(true);
         setChecked(true);
       }
@@ -58,11 +59,16 @@ export default function ResetPasswordPage() {
 
         if (code) {
           const { data, error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (!exchErr && data.session && active) {
-            setReady(true);
+          if (active) {
+            if (!exchErr && data.session) {
+              setReady(true);
+            } else {
+              setReady(false);
+              setError("El código de recuperación expiró o ya fue utilizado. Solicita un enlace nuevo.");
+            }
             setChecked(true);
-            return;
           }
+          return;
         }
 
         if (tokenHash && (type === "recovery" || !type)) {
@@ -70,16 +76,29 @@ export default function ResetPasswordPage() {
             token_hash: tokenHash,
             type: "recovery",
           });
-          if (!otpErr && data.session && active) {
-            setReady(true);
+          if (active) {
+            if (!otpErr && data.session) {
+              setReady(true);
+            } else {
+              setReady(false);
+              setError("El enlace de recuperación expiró o no es válido. Solicita uno nuevo.");
+            }
             setChecked(true);
-            return;
           }
+          return;
         }
 
-        const { data } = await supabase.auth.getSession();
+        // Si viene hash implícito (#access_token=...&type=recovery)
+        if (window.location.hash.includes("type=recovery")) {
+          const { data } = await supabase.auth.getSession();
+          if (active) {
+            if (data.session) setReady(true);
+            setChecked(true);
+          }
+          return;
+        }
+
         if (active) {
-          if (data.session) setReady(true);
           setChecked(true);
         }
       } catch {
@@ -206,7 +225,7 @@ export default function ResetPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
               {error && (
-                <div role="alert" className="bg-red-loss/10 border border-red-loss/20 text-red-loss text-sm px-4 py-3 rounded-lg text-center">{error}</div>
+                <div role="alert" className="bg-red-loss/10 border border-border-loss/20 text-red-loss text-sm px-4 py-3 rounded-lg text-center">{error}</div>
               )}
               <div>
                 <label htmlFor="pw" className="block text-xs font-medium text-text-secondary mb-1.5">Nueva contraseña (mínimo 8 caracteres)</label>

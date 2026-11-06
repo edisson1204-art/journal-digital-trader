@@ -503,6 +503,7 @@ const PROP_PRESETS: (Omit<PropAccountConfig, "id"> & { category: PresetCategory;
 ];
 
 const STORAGE_KEY = "tdi_prop_accounts_v4";
+const STORAGE_OWNER_KEY = "tdi_prop_accounts_owner";
 
 function ProgressBar({ value, max, color = "bg-green-primary", height = "h-2" }: {
   value: number; max: number; color?: string; height?: string;
@@ -629,9 +630,18 @@ export default function AccountsPage() {
         const user = data?.user;
         if (!user) return;
         const cloudAccounts = user.user_metadata?.prop_accounts;
-        const rawLocal = localStorage.getItem(STORAGE_KEY);
+        const localOwner = localStorage.getItem(STORAGE_OWNER_KEY);
+        const isDifferentUser = localOwner !== null && localOwner !== user.id;
+        if (isDifferentUser) {
+          try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+        }
+        try { localStorage.setItem(STORAGE_OWNER_KEY, user.id); } catch { /* ignore */ }
+        const rawLocal = isDifferentUser ? null : localStorage.getItem(STORAGE_KEY);
         const localList: PropAccountConfig[] = rawLocal ? JSON.parse(rawLocal) : [];
-        if (Array.isArray(cloudAccounts) && cloudAccounts.length > 0 && localList.length === 0) {
+        if (isDifferentUser && (!Array.isArray(cloudAccounts) || cloudAccounts.length === 0)) {
+          setAccounts([]);
+          setSelectedId("");
+        } else if (Array.isArray(cloudAccounts) && cloudAccounts.length > 0 && localList.length === 0) {
           setAccounts(cloudAccounts);
           setSelectedId(cloudAccounts[0].id);
           if (cloudAccounts.length >= 7) setViewMode("matrix");

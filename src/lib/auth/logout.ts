@@ -3,12 +3,18 @@ import { useTradeStore } from "@/store/tradeStore";
 import { useSettingsStore } from "@/store/settingsStore";
 
 /** Claves de localStorage que contienen datos privados del usuario. */
-const PRIVATE_KEY_PREFIXES = ["trading-intelligence-storage", "ai-mentor-chat-"];
+const PRIVATE_KEY_PREFIXES = [
+  "trading-intelligence-storage",
+  "ai-mentor-chat-",
+  "tdi_prop_accounts_",
+  "trading-settings-secured",
+];
 
 /**
  * Cierra la sesión de forma real:
  *  1. Invalida la sesión en Supabase y la cookie de sesión del propietario (`/api/auth/owner-login`).
- *  2. Vacía el estado en memoria sin borrar los trades almacenados en la nube.
+ *  2. Vacía el estado en memoria y limpia todas las claves locales privadas (trades, cuentas de fondeo, chats, API key)
+ *     para evitar filtración de datos si otro usuario inicia sesión en el mismo navegador.
  *  3. Navega con recarga completa a `/login`.
  */
 export async function logout(): Promise<void> {
