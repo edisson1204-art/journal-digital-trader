@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { Sparkles, ShieldCheck, TrendingUp, HeartHandshake, ArrowRight } from "lucide-react";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -24,7 +25,7 @@ export default function SignupPage() {
     const cleanEmail = email.trim().toLowerCase();
 
     try {
-      // 1) Intentar registro directo pre-confirmado en servidor (sin límite de 3 correos/hora)
+      // 1) Registro directo pre-confirmado en servidor (sin límite de 3 correos/hora)
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -32,16 +33,11 @@ export default function SignupPage() {
       });
 
       if (res.ok) {
-        // Iniciar sesión automáticamente y llevar al operador directo a /app
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
+        // Iniciar sesión automáticamente en segundo plano y mostrar tarjeta visual de bienvenida
+        await supabase.auth.signInWithPassword({
           email: cleanEmail,
           password,
-        });
-        if (!signInErr) {
-          router.push("/app");
-          router.refresh();
-          return;
-        }
+        }).catch(() => {});
         setSuccess(true);
         setLoading(false);
         return;
@@ -78,16 +74,67 @@ export default function SignupPage() {
   };
 
   if (success) {
+    const traderName = name.trim() ? name.trim().split(" ")[0] : "Trader";
     return (
       <div className="min-h-screen bg-bg-main flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md bg-bg-card border border-border-card rounded-card p-8 shadow-card text-center">
-          <h2 className="text-2xl font-bold text-green-primary mb-4">¡Cuenta Creada y Activada!</h2>
-          <p className="text-text-secondary text-sm mb-6">
-            Tu cuenta ya está confirmada y lista para operar en Journal Digital Trader Invest.
-          </p>
-          <Link href="/login" className="text-green-primary hover:underline text-sm font-semibold">
-            Ir a Iniciar Sesión →
-          </Link>
+        <div className="w-full max-w-lg rounded-2xl border border-green-primary/30 bg-bg-card shadow-2xl overflow-hidden relative">
+          {/* Banner Visual Superior con Ilustración y Gradiente */}
+          <div className="relative bg-gradient-to-br from-emerald-500/25 via-bg-section to-blue-500/20 px-8 pt-8 pb-6 border-b border-border-card overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-44 h-44 rounded-full bg-green-primary/15 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-12 -left-12 w-44 h-44 rounded-full bg-blue-accent/15 blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 flex flex-col items-center text-center">
+              <div className="h-16 w-16 rounded-2xl bg-green-primary/15 border border-green-primary/40 flex items-center justify-center mb-4 shadow-green-glow">
+                <Sparkles className="h-8 w-8 text-green-primary" />
+              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-primary/15 border border-green-primary/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-green-primary mb-2">
+                <ShieldCheck className="h-3.5 w-3.5" /> Acceso Institucional Activado
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight">
+                ¡Bienvenido a casa, {traderName}! 🚀
+              </h2>
+            </div>
+          </div>
+
+          {/* Cuerpo Empático y Motivador */}
+          <div className="p-8 space-y-5 text-center">
+            <p className="text-[14px] text-text-secondary leading-relaxed">
+              Sabemos que el camino del trading requiere coraje, paciencia y mucha disciplina.{" "}
+              <b className="text-text-primary">Hoy acabas de dar el paso que separa a los amateurs de los profesionales:</b>{" "}
+              medir cada decisión con datos reales.
+            </p>
+
+            <div className="rounded-xl bg-bg-section/80 border border-border-card p-4 text-left space-y-2.5">
+              <div className="flex items-start gap-3">
+                <HeartHandshake className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-[12px] text-text-secondary leading-relaxed">
+                  <b className="text-text-primary">No estás solo en el mercado:</b> Tu Diario FIFO, tu Simulador Monte Carlo y tu Mentor IA están listos para cuidar tu capital y acompañarte hacia tus metas de fondeo.
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <TrendingUp className="h-5 w-5 text-green-primary flex-shrink-0 mt-0.5" />
+                <p className="text-[12px] text-text-secondary leading-relaxed">
+                  <b className="text-text-primary">Un día a la vez, un trade a la vez:</b> Respeta tu plan, protege tu riesgo y deja que la estadística trabaje a tu favor. ¡Vamos por esa consistencia!
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/app");
+                  router.refresh();
+                }}
+                className="w-full py-3.5 px-6 font-bold text-bg-main bg-green-primary rounded-btn hover:bg-green-primary/90 transition-all shadow-green-glow text-sm flex items-center justify-center gap-2"
+              >
+                Entrar a mi Terminal Ahora <ArrowRight className="h-4 w-4" />
+              </button>
+              <Link href="/login" className="text-text-muted hover:text-green-primary text-xs font-medium transition-colors">
+                O ir a la pantalla de inicio de sesión
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
