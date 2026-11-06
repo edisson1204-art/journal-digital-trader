@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { dispatchTraderEmail } from "@/lib/emailDispatcher";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Registro directo de alta capacidad (High-Volume Signup):
- * Crea el usuario con `email_confirm: true` vía `supabaseAdmin` para que:
- *  1) No consuma la cuota de 3 correos/hora del SMTP por defecto de Supabase.
- *  2) Cientos de compradores puedan registrarse en la misma hora e iniciar sesión de inmediato sin bloqueo por "Email not confirmed".
+ * 1) Crea el usuario con `email_confirm: true` vía `supabaseAdmin` para evitar el bloqueo de 3 correos/hora.
+ * 2) Dispara automáticamente el correo institucional de Bienvenida con la tarjeta `email-bienvenida.png`.
  */
 export async function POST(req: Request) {
   try {
@@ -44,11 +44,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Disparo automático del correo empático de Bienvenida con imagen
+    const welcomeEmailDispatch = await dispatchTraderEmail({
+      template: "welcome",
+      to: email,
+      traderName: name || email.split("@")[0],
+    });
+
     return NextResponse.json(
       {
         success: true,
         user_id: data.user?.id,
         email: data.user?.email,
+        welcome_email: {
+          sent: welcomeEmailDispatch.success,
+          mode: welcomeEmailDispatch.mode,
+          messageId: welcomeEmailDispatch.messageId,
+        },
       },
       { status: 200 }
     );

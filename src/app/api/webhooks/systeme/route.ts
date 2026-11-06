@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { dispatchTraderEmail } from "@/lib/emailDispatcher";
 
 /** Comparación en tiempo constante para no filtrar el secreto por diferencias de tiempo. */
 function safeEqual(a: string, b: string): boolean {
@@ -11,8 +12,6 @@ function safeEqual(a: string, b: string): boolean {
 
 export async function POST(req: Request) {
   try {
-    // SEGURIDAD: fallar cerrado. Sin secreto configurado NO se acepta ninguna petición
-    // (antes, si faltaba la variable, cualquiera podía crear cuentas con la service role).
     const expectedSecret = process.env.SYSTEME_WEBHOOK_SECRET;
     if (!expectedSecret) {
       console.error("[Systeme Webhook] SYSTEME_WEBHOOK_SECRET no está configurado: petición rechazada");
@@ -26,7 +25,6 @@ export async function POST(req: Request) {
 
     const payload = await req.json();
 
-    // Extraer el correo del payload de Systeme.io
     const email =
       payload?.data?.contact?.email ||
       payload?.contact?.email ||
@@ -34,21 +32,29 @@ export async function POST(req: Request) {
       payload?.customer?.email ||
       payload?.order?.contact?.email;
 
+    const firstName =
+      payload?.data?.contact?.first_name ||
+      payload?.contact?.first_name ||
+      payload?.customer?.name ||
+      "Trader";
+
     if (!email) {
       console.error("[Systeme Webhook] Error: No se encontró un correo electrónico en el payload.");
       return NextResponse.json({ error: "Email missing in webhook payload" }, { status: 400 });
     }
 
-    // Validación básica de formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (typeof email !== "string" || !emailRegex.test(email)) {
       console.error("[Systeme Webhook] Error: formato de email inválido");
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
     }
 
-    console.log("[Systeme Webhook] Procesando acceso (email omitido del log)");
+    // Disparamos siempre el recibo VIP Post-Compra y el correo de Bienvenida con sus imágenes 1200x675
+    const [vipReceipt, welcomeMail] = await Promise.all([
+      dispatchTraderEmail({ template: "vipPurchase", to: email, traderName: String(firstName) }),
+      dispatchTraderEmail({ template: "welcome", to: email, traderName: String(firstName) }),
+    ]);
 
-    // Invitar al usuario a Supabase (crea la cuenta y envía el correo de bienvenida)
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: {
         source: "systeme_webhook",
@@ -57,18 +63,18 @@ export async function POST(req: Request) {
     });
 
     if (userError) {
-      // Si el usuario ya existe, lo dejamos pasar (acceso renovado)
       if (
         userError.message.includes("already registered") ||
         userError.message.includes("already been invited") ||
         userError.status === 422
       ) {
-        console.log("[Systeme Webhook] El usuario ya tiene acceso.");
-        return NextResponse.json({ message: "User already has access.", email }, { status: 200 });
+        return NextResponse.json({
+          message: "User already has access.",
+          email,
+          emailsDispatched: [vipReceipt.messageId, welcomeMail.messageId],
+        }, { status: 200 });
       }
 
-      // Si el SMTP por defecto de Supabase alcanza el límite de 3 correos/hora (429 rate limit),
-      // creamos la cuenta pre-confirmada directamente en la base de datos sin consumir cuota de correo.
       if (
         userError.status === 429 ||
         userError.message.toLowerCase().includes("rate limit")
@@ -88,6 +94,7 @@ export async function POST(req: Request) {
               email,
               user_id: fallbackData?.user?.id,
               mode: "direct_confirmed",
+              emailsDispatched: [vipReceipt.messageId, welcomeMail.messageId],
             },
             { status: 200 }
           );
@@ -98,12 +105,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: userError.message }, { status: 500 });
     }
 
-    console.log("[Systeme Webhook] Cuenta creada e invitación enviada.");
-
     return NextResponse.json({
       success: true,
       email,
       user_id: userData?.user?.id,
+      emailsDispatched: [vipReceipt.messageId, welcomeMail.messageId],
     }, { status: 200 });
 
   } catch (error: unknown) {
